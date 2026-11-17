@@ -1,3 +1,13 @@
+<p align="center">
+  <strong>赞助商 · 感谢支持 dsh-memory 开源开发</strong>
+  <br>
+  <a href="https://api.lwxiaoye.top/">
+    <img src="assets/sponsor-k.png" alt="XiaoyeyeyeyeyeAPI 赞助商 Logo" width="120">
+  </a>
+  <br>
+  <a href="https://api.lwxiaoye.top/">XiaoyeyeyeyeyeAPI · 访问赞助商网站</a>
+</p>
+
 <div align="center">
 
 # dsh-memory
@@ -244,17 +254,9 @@ dsh-memory 的首个完整版本不以以下能力为目标：
 
 ## 发布说明
 
-**当前公开仓库仅发布本产品预告。**源码、测试、设计文档、构建配置与本地开发历史尚未公开，因此暂不提供克隆构建、安装或试用命令。
+**当前公开仓库仅发布本产品预告与赞助商 Logo。**源码、测试、设计文档、构建配置与本地开发历史尚未公开，因此暂不提供克隆构建、安装或试用命令。
 
 完整产品将在相应能力完成验收、并获得维护者发布确认后另行公开。本文中的功能介绍不代表已有可下载的软件包，也不承诺具体发布日期。
-
-## 赞助商
-
-感谢以下伙伴支持 dsh-memory 的开源开发。
-
-<p align="center">
-  <a href="https://api.lwxiaoye.top/">XiaoyeyeyeyeyeAPI · 访问赞助商网站</a>
-</p>
 
 ## 许可证
 
