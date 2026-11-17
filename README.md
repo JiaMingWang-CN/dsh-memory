@@ -1,13 +1,3 @@
-<p align="center">
-  <strong>赞助商 · 感谢支持 dsh-memory 开源开发</strong>
-  <br>
-  <a href="https://api.lwxiaoye.top/">
-    <img src="assets/sponsor-k.png" alt="XiaoyeyeyeyeyeAPI 赞助商 Logo" width="120">
-  </a>
-  <br>
-  <a href="https://api.lwxiaoye.top/">XiaoyeyeyeyeyeAPI · 访问赞助商网站</a>
-</p>
-
 <div align="center">
 
 # dsh-memory
@@ -34,6 +24,16 @@
 > dsh-memory 正在开发中，尚未发布首个完整版本。本文描述的是 **0.1.0 的目标形态**，用于说明产品方向与最终使用体验；除[开发进度](#开发进度)中明确标注的能力外，均不应视为当前已实现或已验证。正式发布前，界面、配置与行为可能继续调整。
 
 ---
+
+<p align="center">
+  <strong>赞助商 · 感谢支持 dsh-memory 开源开发</strong>
+  <br>
+  <a href="https://api.lwxiaoye.top/">
+    <img src="assets/sponsor-k.png" alt="XiaoyeyeyeyeyeAPI 赞助商 Logo" width="120">
+  </a>
+  <br>
+  <a href="https://api.lwxiaoye.top/">XiaoyeyeyeyeyeAPI · 访问赞助商网站</a>
+</p>
 
 ## 产品预告
 
