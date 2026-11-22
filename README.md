@@ -11,7 +11,7 @@
 
 [项目简介](#项目简介) · [使用场景](#使用场景) · [工作方式](#工作方式) · [管理体验](#管理体验) · [隐私与安全](#隐私与安全) · [安装](#安装) · [配置](#配置) · [架构说明](#架构说明) · [发布说明](#发布说明) · [FAQ](#faq)
 
-[![Status](https://img.shields.io/badge/status-0.1.1--dev-blue)](#开发进度)
+[![Status](https://img.shields.io/badge/status-0.1.2--dev-blue)](#开发进度)
 [![Distribution](https://img.shields.io/badge/distribution-GitHub%20Plugin-black)](#安装)
 [![License](https://img.shields.io/badge/license-MIT-green)](#许可证)
 [![Local first](https://img.shields.io/badge/data-local--first-brightgreen)](#隐私与安全)
@@ -255,10 +255,10 @@ dsh-memory 以结构化记录、Markdown 正文和本地检索索引组成记忆
 发布对应版本的 GitHub Release 后，直接通过 DSH CLI 安装 Release 中附带的预构建 bundle 包（`.tgz`），无需在本地编译：
 
 ```bash
-dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/dsh-memory/releases/download/v0.1.1/dsh-memory-0.1.1.tgz
+dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/dsh-memory/releases/download/v0.1.2/dsh-memory-0.1.2.tgz
 ```
 
-也可在 GitHub Releases 页面下载 `dsh-memory-0.1.1.tgz` 后，通过 DSH 的 Plugins 页面安装。
+也可在 GitHub Releases 页面下载 `dsh-memory-0.1.2.tgz` 后，通过 DSH 的 Plugins 页面安装。
 
 **方式二：从 GitHub 源码构建并本地安装**
 
@@ -272,7 +272,7 @@ pnpm build          # 产出 dist/host 与 dist/client.js
 dsh plugin --profile desktop add link:./
 
 # 方式 B：打包为本地 bundle 文件后安装
-pnpm pack           # 生成 dsh-memory-0.1.1.tgz
+pnpm pack           # 生成 dsh-memory-0.1.2.tgz
 ```
 
 安装/启用属于 profile 变更，完成后重启 DSH，Settings 中会出现 Memory 页与图标。最小 patch 配置示例见 [`examples/cordis.patch.yml`](examples/cordis.patch.yml)。卸载可执行 `dsh plugin --profile desktop remove dsh-memory`（记忆数据仍保留在 `$DSH_HOME/storages/memory.json`）。

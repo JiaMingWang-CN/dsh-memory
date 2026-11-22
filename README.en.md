@@ -11,7 +11,7 @@ Recall them when needed; stay quiet when not.
 
 [Overview](#overview) · [Use cases](#use-cases) · [How it works](#how-it-works) · [Management](#management) · [Privacy and security](#privacy-and-security) · [Install](#install) · [Configuration](#configuration) · [Architecture](#architecture) · [FAQ](#faq) · [Release notes](#release-notes)
 
-[![Status](https://img.shields.io/badge/status-0.1.1--dev-blue)](#development-progress)
+[![Status](https://img.shields.io/badge/status-0.1.2--dev-blue)](#development-progress)
 [![Distribution](https://img.shields.io/badge/distribution-GitHub%20Plugin-black)](#install)
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![Local first](https://img.shields.io/badge/data-local--first-brightgreen)](#privacy-and-security)
@@ -244,10 +244,10 @@ The long-term direction is to add shadow runs, limited autonomy and ordinary una
 Once a GitHub Release is published, install its prebuilt `.tgz` bundle asset directly via the DSH CLI without building locally:
 
 ```bash
-dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/dsh-memory/releases/download/v0.1.1/dsh-memory-0.1.1.tgz
+dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/dsh-memory/releases/download/v0.1.2/dsh-memory-0.1.2.tgz
 ```
 
-You can also download `dsh-memory-0.1.1.tgz` from GitHub Releases and install it from the DSH Plugins page.
+You can also download `dsh-memory-0.1.2.tgz` from GitHub Releases and install it from the DSH Plugins page.
 
 **Option 2: Build from GitHub source and install locally**
 
@@ -261,7 +261,7 @@ pnpm build          # produces dist/host and dist/client.js
 dsh plugin --profile desktop add link:./
 
 # Approach B: pack into a local bundle tarball
-pnpm pack           # produces dsh-memory-0.1.1.tgz
+pnpm pack           # produces dsh-memory-0.1.2.tgz
 ```
 
 Installing or enabling changes your profile; restart DSH afterwards and Memory will appear under Settings with its icon. See [`examples/cordis.patch.yml`](examples/cordis.patch.yml) for a minimal patch config. To remove the plugin, run `dsh plugin --profile desktop remove dsh-memory` (your memories remain safely stored in `$DSH_HOME/storages/memory.json`).
