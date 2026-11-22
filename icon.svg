@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="dsh-memory">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4f6df5"/>
+      <stop offset="1" stop-color="#7a3ff2"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="url(#bg)"/>
+  <g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.95">
+    <path d="M64 34c-13 0-22 9-22 21 0 5 2 9 5 12-3 3-4 7-4 11 0 8 6 14 14 14h14c8 0 14-6 14-14 0-4-1-8-4-11 3-3 5-7 5-12 0-12-9-21-22-21z"/>
+    <path d="M64 34v58"/>
+    <path d="M50 52h8M70 52h8M48 70h8M72 70h8"/>
+  </g>
+  <g fill="#ffffff">
+    <circle cx="64" cy="34" r="5"/>
+    <circle cx="50" cy="52" r="4"/>
+    <circle cx="78" cy="52" r="4"/>
+    <circle cx="48" cy="70" r="4"/>
+    <circle cx="80" cy="70" r="4"/>
+    <circle cx="64" cy="92" r="4"/>
+  </g>
+</svg>

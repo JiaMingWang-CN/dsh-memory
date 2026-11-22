@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "记忆",
+    "description": "DSH 原生长期记忆插件：按作用域存储记忆，提供审计、崩溃恢复、容量控制、BM25 检索、显式记忆工具、导入导出与 Settings 管理页。",
+    "detail": "docs/DETAIL.md"
+  }
+}

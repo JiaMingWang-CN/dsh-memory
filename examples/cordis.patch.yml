@@ -1,0 +1,11 @@
+# dsh-memory 最小示例配置
+#
+# 与仓库根目录的 cordis.patch.yml 使用相同的 Cordis patch 语法。
+# 这里只展示最小可运行配置，不含任何真实路径、密钥或 profile 专用值。
+- insert:
+    - id: dsh-memory
+      name: dsh-memory
+      config:
+        autoDream: false
+        autoCaptureEpisodes: true
+        refreshIndexOnChange: false

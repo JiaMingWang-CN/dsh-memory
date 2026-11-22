@@ -1,0 +1,8 @@
+- insert:
+    - id: dsh-memory
+      name: dsh-memory
+      config:
+        indexMaxBytes: 4096
+        autoDream: false
+        autoCaptureEpisodes: true
+        refreshIndexOnChange: false

@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Memory",
+    "description": "A DSH-native long-term memory plugin: scoped memory storage with audit, crash recovery, capacity control, BM25 retrieval, explicit memory tools, import/export and a Settings management page.",
+    "detail": "docs/DETAIL.md"
+  }
+}

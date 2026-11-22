@@ -9,19 +9,19 @@
 记住做过的项目、踩过的坑、形成的规则与你的偏好。<br>
 在需要的时候想起，在不需要的时候安静。
 
-[产品预告](#产品预告) · [使用场景](#使用场景) · [工作方式](#工作方式) · [管理体验](#管理体验) · [隐私与安全](#隐私与安全) · [发布说明](#发布说明)
+[项目简介](#项目简介) · [使用场景](#使用场景) · [工作方式](#工作方式) · [管理体验](#管理体验) · [隐私与安全](#隐私与安全) · [安装](#安装) · [配置](#配置) · [架构说明](#架构说明) · [发布说明](#发布说明) · [FAQ](#faq)
 
-[![Status](https://img.shields.io/badge/status-产品预告-orange)](#产品预告)
-[![Target](https://img.shields.io/badge/target-0.1.0-blue)](#开发进度)
+[![Status](https://img.shields.io/badge/status-0.1.0--dev-blue)](#开发进度)
+[![Distribution](https://img.shields.io/badge/distribution-GitHub%20Plugin-black)](#安装)
 [![License](https://img.shields.io/badge/license-MIT-green)](#许可证)
 [![Local first](https://img.shields.io/badge/data-local--first-brightgreen)](#隐私与安全)
 
 </div>
 
-> [!IMPORTANT]
-> **这是产品预告，不是当前版本的功能清单。**
+> [!NOTE]
+> **当前为 `0.1.0` 开发版本（0.x），仅以 GitHub 插件形式通过 GitHub Releases 分发，不发布 npm 包。**
 >
-> dsh-memory 正在开发中，尚未发布首个完整版本。本文描述的是 **0.1.0 的目标形态**，用于说明产品方向与最终使用体验；除[开发进度](#开发进度)中明确标注的能力外，均不应视为当前已实现或已验证。正式发布前，界面、配置与行为可能继续调整。
+> 本文描述的能力与当前仓库实现保持同步；在达到正式稳定版前，界面、配置与行为仍可能调整。详细变更见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ---
 
@@ -35,7 +35,7 @@
   <a href="https://api.lwxiaoye.top/">XiaoyeyeyeyeyeAPI · 访问赞助商网站</a>
 </p>
 
-## 产品预告
+## 项目简介
 
 每个新会话，编程 Agent 都可能从零开始：重新理解项目，重新询问约定，甚至再次犯下已经被纠正过的错误。
 
@@ -88,7 +88,7 @@
 | **Wiki · 项目知识** | 架构、约定、命令、关键决策及相互链接的知识 | 当前工作区 |
 | **Preference · 用户偏好** | 沟通习惯、工作方式与长期目标 | 全局，也可限定工作区 |
 
-不是每一轮对话都值得成为记忆。普通寒暄、重复检索和无产出的过程不会全部写入工作日志；原始 turn 摘要也不会常驻新会话索引。
+不是每一轮对话都值得成为记忆。普通寒暄、重复检索和无产出的过程不会全部写入工作日志；原始 turn 摘要默认不进入新会话索引，只在日工作日志不足 3 条时按最近 7 天兜底进入，且只取标题与日期。
 
 ## 工作方式
 
@@ -103,6 +103,8 @@ dsh-memory 的设计是监听真正值得沉淀的信号：
 - 会话失败，留下了值得后续整理的片段。
 
 自动捕获首先生成轻量的 **Episode**，不是直接生成长期知识。保存内容采用字段白名单，并在持久化前脱敏；完整工具参数、完整工具输出、附件、图片和推理过程不在捕获范围内。
+
+满足条件的一轮工作（文件变更、交付物、用户纠正或明确完成结果）会生成确定性的 `worklog(turn)`，不调用模型。标题优先取助手结论中的第一句有效内容，其次取用户请求的第一行；问句与明显低信息片段不会成为标题，最长 80 字符；标题仍可能偏短，需人工审阅。正文按“结论优先”分配 4096 字节：`## Result` 先保留最多 2048 字节且不会被长请求挤掉，`## Request` 最多 1024 字节，剩余空间才给文件清单与工具失败；被裁剪的段落以 `…[truncated]` 标记。
 
 ### 2. Dreaming：把片段整理成经验
 
@@ -130,19 +132,28 @@ flowchart LR
 
 高置信度不等于事实。模型不会因为“很有把握”而绕过审阅。
 
+Dreaming 的可靠性行为（已实现）：
+
+- **启动恢复与冷会话对账**：进程重启后，已持久化的 `queued` dream 会按原 dream id 重新排队；中断在运行中的 dream 会被标记失败，已领取的 episode 回到可重试队列，不会重复生成提案。开启 `autoDream` 时，启动还会对最近 7 天的冷会话做一次对账，补捕遗漏的会话事件；`autoDream=false` 时既不读取冷会话，也不因此调用模型。
+- **失败分类、退避与暂停**：鉴权、额度类错误会立即暂停自动 dream；限流、超时、网络类错误按 60 秒、180 秒退避，连续三次后暂停。暂停与退避只存在于当前进程，重启后自动恢复；手动 dream 不受暂停影响，成功的手动 dream 会解除暂停。
+- **健康检查与证据分级**：每次需要调用模型的 dream 前，先在本地计算待处理 episode、重复工具失败、待审阅提案、重复标题与缺失日汇总，并作为提示交给模型。模型只使用 episode 中有依据的内容：用户明确说过的算证据并引用 episode id；缺少工具结果或用户陈述支持的助手断言标为未验证或省略；一条记忆只讲一个主题，只记录环境给不回来的东西（教训、做通的路子、验证过的规则、坑与进行中的计划），不记录代码、文件内容、当前配置值、git 历史或命令输出。
+
 ### 3. 新会话只带少量、相关的经验
 
 不是记住得越多越好，而是在正确的时候想起正确的事。
 
-新会话第一次请求的目标索引由三部分组成：
+新会话第一次请求的目标索引由四部分组成：
 
 | 内容 | 目标数量 |
 | --- | ---: |
-| 全局偏好、置顶或高重要度规则 | 最多 3 条 |
+| 全局偏好（`preference`） | 最多 5 条 |
+| 置顶或高重要度的工作区规则 | 最多 3 条 |
 | 与当前请求相关的 Lesson、Wiki、Preference | 最多 5 条 |
-| 最近的日工作日志标题与日期 | 最多 3 条 |
+| 最近的日工作日志标题与日期；不足 3 条时用最近 7 天内的工作日志标题兜底 | 最多 3 条 |
 
 默认索引预算为 **4096 字节**。检索采用本地 BM25、作用域过滤与重要性加权，不依赖外部向量数据库。
+
+“最近工作”优先使用日汇总；没有足够日汇总时，当前工作区内最近 7 天创建的 `worklog(turn)` 会补足，最多 3 条，只带标题与日期，不注入正文。归档、过期或其他工作区的记录不会进入。
 
 需要细节时，Agent 再通过搜索和读取逐步下钻：**先看索引，再搜索摘要，最后才读取完整正文与来源。**
 
@@ -156,34 +167,33 @@ flowchart LR
 
 ### Settings → Memory
 
-最终形态将提供完整的中英文管理页面：
+管理页采用**统一顶栏 + 4 个 Tab 分区**（`记忆库`、`待审阅`、`导入与导出`、`设置`），已提供以下能力（0.1.0 开发版本）：
 
-- **浏览与筛选**：按工作区、类型、状态和关键词找到记忆；
-- **查看与编辑**：管理 Markdown 正文、标签、重要性、置顶和状态；
-- **审阅与比较**：接受、拒绝或修改 Dreaming 提案，并查看新旧版本差异；
-- **追溯来源**：回到来源会话，理解一条记忆为何产生；
-- **整理与撤销**：查看 Dreaming 运行状态、模型与用量，并按运行批次撤销；
-- **导出与导入**：迁移记忆，跨机器导入时显式映射工作区路径；
-- **遗忘与恢复**：软遗忘后不再召回，必要时可以恢复；
-- **重建与清理**：在明确确认后执行，保护用户拥有或置顶的数据；
-- **配置**：管理自动整理、索引预算、模型选择、保留策略与脱敏。
+- **顶栏概览与导航**：切换当前工作区、点击生效/待审阅/已归档计数快速跳转、查看当前工作区索引容量占用条，并固定提供「新建记忆」「立即整理（`Dream now`）」「刷新」操作；
+- **记忆库（搜索与筛选）**：支持服务端关键词搜索（标题、正文与标签）、类型/状态分片筛选、用户标签预览与条件分页；
+- **新建、详情与编辑弹窗**：居中 Modal 固定底栏，支持标签胶囊、重要度滑块、正文与来源会话一键复制、内置未保存确认条；已归档记录仅提供恢复，隐藏归档按钮；
+- **待审阅与整理**：顶部卡片展示最近一次 Dreaming 的模型、处理片段与产出计数，支持取消或按运行批次撤销；提案弹窗支持**行级 Diff / 并排 / 仅看提案**切换、「保存并接受」闭环以及多提案连续审阅；
+- **导入与导出**：拆分为独立导出卡与拖拽/预览导入卡，导入前展示文件摘要（记忆数、片段数、工作区数与导出时间），支持逐工作区映射到本机路径并报告新增/跳过/未映射/失败结果；
+- **分组设置**：按「自动整理 / 索引与注入 / 数据保留 / 隐私与安全」4 组横排呈现，自动整理间隔支持分钟输入并换算存储，索引上限带 KB 换算，提供未保存变更提示与放弃修改。
+
+永久删除、全部清空与全量重建仍只通过 Host 管理 API 提供，需要明确的确认参数，不在 0.1.0 页面中暴露。
 
 默认只显示当前工作区与全局偏好。只有主动切换到“所有可访问工作区”，才会展示其他项目的记忆。
 
-会话中的记忆工具卡片与活动摘要，也会让“注入了几条、写入了什么、搜索了几次”变得可见。
+会话中，记忆工具沿用 DSH 原生的工具调用行（与 `memory_read` 一致），并在回答下方的用量/时间旁以一行小字仅显示非零的本会话注入、写入与搜索累计次数。
 
 ## 隐私与安全
 
 **记忆应该属于你，而不是成为一个不可见的黑盒。**
 
 - **本地优先**：记忆数据默认持久化在本机 `$DSH_HOME`，不建立云端账户，不做默认跨设备同步。若使用外部模型服务执行 Dreaming，发送内容取决于所选模型服务。
-- **先脱敏，后保存**：针对常见密钥、令牌、密码与 `.env` 行内值进行脱敏，不计划先保存原文再清理。
-- **工作区隔离**：项目记忆按规范化工作区身份过滤，全局层只允许用户偏好。
+- **先脱敏，后保存**：针对常见密钥、令牌、密码与 `.env` 行内值进行脱敏，不先保存原文再清理。显式 `memory_write` 命中私钥、常见云服务 API key、GitHub/Slack token 等强特征密钥时会直接拒写，并提示记录凭据的配置位置；捕获、dream 与导入路径仍按脱敏规则替换后保存。`redactSecrets=false` 只关闭显式写入、dream 与导入的脱敏，捕获与 worklog 文本始终脱敏。
+- **工作区隔离**：项目记忆按规范化工作区身份过滤，全局层只允许用户偏好。替换导入要求文件中的每个工作区都有映射，缺失时整次替换被拒绝。
 - **不可信内容**：记忆正文与来源引用只作为背景知识，不会被当作系统指令；持久化与注入还包含安全转义。
 - **不保存整份会话副本**：DSH 会话日志仍是会话事实的来源，记忆库保存提炼后的知识与必要引用。
-- **容量有边界**：达到硬上限时拒绝新增并告警，不静默丢弃数据。
+- **容量有边界**：达到硬上限时拒绝新增并告警，不静默丢弃数据。active 溢出只会自动归档未审阅的派生记录，用户拥有与置顶的记录受保护。
 - **用户拥有权**：用户创建、编辑、导入、接受或恢复的记忆受到保护，不能被派生缓存重建流程当作垃圾清理。
-- **危险操作需确认**：永久删除、全部清空、全量重建、替换导入、扩大作用域或关闭安全保护，仍需用户明确确认。
+- **危险操作需确认**：永久删除、全部清空、全量重建、替换导入、扩大作用域或关闭安全保护，仍需用户明确确认；导出文件包含个人记忆，管理页会提示妥善保管。
 
 ## 可追溯、可恢复、可撤销
 
@@ -207,14 +217,15 @@ dsh-memory 以结构化记录、Markdown 正文和本地检索索引组成记忆
 | 工具 | 目标用途 |
 | --- | --- |
 | `memory_search` | 按关键词、类型和作用域搜索摘要 |
-| `memory_read` | 读取完整正文与来源，并记录实际使用 |
-| `memory_write` | 显式新建或更新记忆 |
+| `memory_read` | 读取一条可召回记忆的完整正文与来源，并记录实际使用 |
+| `memory_write` | 显式新建或更新记忆，直接 `active`；工具描述内含“何时写/何时不写”的准则 |
 | `memory_forget` | 软遗忘，不允许模型直接永久删除 |
-| `memory_dream` | 手动发起一次记忆整理 |
+| `memory_dream` | 手动发起一次记忆整理（处理 episode 队列） |
+| `memory_organize` | 手动整理已有 active 记忆，产出去重/合并提案 |
 
 ### 用户命令
 
-规划提供 `/memory status`、`/memory search`、`/memory dream`、`/memory forget` 与 `/memory export`，用于查看状态、检索、整理、遗忘与导出。
+提供 `/memory status`、`/memory search`、`/memory dream`、`/memory organize`、`/memory forget` 与 `/memory export`，用于查看状态、检索、整理 episode 队列、整理已有记忆、遗忘与导出摘要。完整 JSON 导出在 Settings → Memory 中完成。
 
 ## 默认行为
 
@@ -228,6 +239,99 @@ dsh-memory 以结构化记录、Markdown 正文和本地检索索引组成记忆
 | `injectForSubagents` | `false` | 默认不给每个子任务重复注入固定上下文 |
 
 长期方向是在真实评估达到准入标准后，逐步支持影子运行、有限自治与常规无人值守；人工接管、审计、撤销和遗忘不会被取消。
+
+## 安装
+
+> dsh-memory **仅以 GitHub 插件形式发布（通过 GitHub 仓库与 GitHub Releases 分发），不发布 npm 包**。0.1.0 仍是 0.x 开发版本。
+
+**环境要求**
+
+- 本机安装版 DSH `0.2.2-rc.5`（`package.json` 的 `engines.dsh` 声明兼容范围 `^0.2.2-rc.5`）
+- Node.js `>=24.9.0`
+- pnpm（仅源码构建/本地开发需要）
+
+**方式一：从 GitHub Release 安装（推荐）**
+
+发布对应版本的 GitHub Release 后，直接通过 DSH CLI 安装 Release 中附带的预构建 bundle 包（`.tgz`），无需在本地编译：
+
+```bash
+dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/dsh-memory/releases/download/v0.1.0/dsh-memory-0.1.0.tgz
+```
+
+也可在 GitHub Releases 页面下载 `dsh-memory-0.1.0.tgz` 后，通过 DSH 的 Plugins 页面安装。
+
+**方式二：从 GitHub 源码构建并本地安装**
+
+```bash
+git clone https://github.com/JiaMingWang-CN/dsh-memory.git
+cd dsh-memory
+pnpm install
+pnpm build          # 产出 dist/host 与 dist/client.js
+
+# 方式 A：本地 link 安装（开发调试推荐，重构建后重启 DSH 即生效）
+dsh plugin --profile desktop add link:./
+
+# 方式 B：打包为本地 bundle 文件后安装
+pnpm pack           # 生成 dsh-memory-0.1.0.tgz
+```
+
+安装/启用属于 profile 变更，完成后重启 DSH，Settings 中会出现 Memory 页与图标。最小 patch 配置示例见 [`examples/cordis.patch.yml`](examples/cordis.patch.yml)。卸载可执行 `dsh plugin --profile desktop remove dsh-memory`（记忆数据仍保留在 `$DSH_HOME/storages/memory.json`）。
+
+## 快速开始
+
+1. **写入一条记忆**：在新会话里让 Agent 记住一条经验（它调用 `memory_write`），或在 Settings → Memory 新建。显式写入直接生效。
+2. **在新会话召回**：开启新会话时，dsh-memory 会在第一次请求前注入一份小型记忆索引；Agent 也可以调用 `memory_search` 搜索摘要，再用 `memory_read` 读取完整正文与来源。
+3. **整理与审阅**：运行 `/memory dream` 或点击 Settings → Memory 的 `Dream now`。整理结果先进入“待审阅”，接受或修改后接受才转为可检索的长期记忆。
+4. **遗忘**：用 `memory_forget` 或管理页做软遗忘，之后不再召回，必要时可恢复。
+
+一个典型闭环：
+
+```text
+> 构建前先跑 typecheck，避免打包时才发现类型错误。
+（Agent 调用 memory_write 写入一条 lesson）
+
+（新会话）> 这次要打包发布，先做什么？
+（索引中带回了“构建前先跑 typecheck”的教训）
+```
+
+## 配置
+
+配置默认值与源码 `src/host/config.ts` 逐项一致，完整字段见 [`docs/configuration.md`](docs/configuration.md)。0.1.0 的关键默认行为：
+
+| 配置 | 默认值 | 含义 |
+| --- | --- | --- |
+| `autoDream` | `false` | 默认不自动调用模型整理，由用户手动触发。 |
+| `refreshIndexOnChange` | `false` | 默认只在新会话首次请求时注入索引。 |
+| `autoCaptureEpisodes` | `true` | 自动捕获关键片段，但普通片段不直接成为可检索知识。 |
+| `indexMaxBytes` | `4096` | 首次记忆索引的字节预算。 |
+| `redactSecrets` | `true` | 持久化前执行秘密脱敏。 |
+| `injectForSubagents` | `false` | 默认不给每个子任务注入固定上下文。 |
+
+最小可运行配置示例：
+
+```yaml
+- insert:
+    - id: dsh-memory
+      name: dsh-memory
+      config:
+        autoDream: false
+        autoCaptureEpisodes: true
+        refreshIndexOnChange: false
+```
+
+## 架构说明
+
+dsh-memory 是一个同时包含 Host 与 Client 的单一 DSH bundle：
+
+- **Host**：以单一 `MemoryService` 注册 `memory` 服务，负责存储、BM25 检索、episode 捕获、dreaming 整理、已有记忆整理（organize）、`agent/pre-step` 索引注入、六个模型工具与 `/memory` 命令。
+- **Client**：注册 Settings → Memory 管理页与图标，并在助手动作行（用量/时间旁）以小字显示记忆用量；记忆工具使用 DSH 原生工具调用行，不注入自定义卡片。通过 `ctx.remote.memory.*` 读写，文案走 zh/en，样式只用主题 token。
+- **存储**：记忆使用 `storageDomain` 的 JSON 域持久化（默认 `$DSH_HOME/storages/memory.json`），六张表分别存储记忆、episode、dream、审计、操作日志与会话游标。
+- **一致性与恢复**：没有跨表事务，多表写入通过 `operations` 操作日志状态机完成，崩溃后按操作矩阵恢复；单行损坏不会阻止其余操作恢复。
+- **索引注入**：首次注入 baseline，开启刷新后只注入 `add` / `replace` / `remove` / `reset` 差异，不主动唤醒 Agent。
+- **错误契约**：Host 业务错误映射为稳定的 `memory/*` Remote 失败码，details 保留原始 `OperationError` code。
+- **兼容性**：`engines.dsh` 声明兼容的 DSH 版本范围，`prepack` 保证打包前完成构建。
+
+详见 [`docs/architecture.md`](docs/architecture.md)、[`docs/memory-model.md`](docs/memory-model.md)、[`docs/dreaming.md`](docs/dreaming.md) 与 [`docs/security.md`](docs/security.md)。
 
 ## 明确不做什么
 
@@ -243,24 +347,63 @@ dsh-memory 的首个完整版本不以以下能力为目标：
 
 ## 开发进度
 
-仓库当前处于 **0.x 开发阶段，尚未发布稳定版本**。截至本预告更新时，README 所确认的实现范围是：
+仓库当前处于 **0.1.0 开发版本（0.x）**，已实现并完成自动化测试的范围包括：
 
 - 记忆领域存储、CRUD、作用域隔离与版本控制；
 - 操作日志、审计、容量控制、导入导出与崩溃恢复；
-- 本地 BM25 检索；
-- `memory_write`、`memory_search`、`memory_read`、`memory_forget` 四个显式工具。
+- 本地 BM25 检索与管理页关键词搜索；
+- `memory_write`、`memory_search`、`memory_read`、`memory_forget`、`memory_dream`、`memory_organize` 六个显式工具；
+- 新会话记忆索引注入（默认首次基线，可选增量刷新）；
+- Episode 白名单捕获、条件 `worklog(turn)` 与手动/自动 Dreaming（产物一律 `pending`）；
+- 用户口头“记住/以后都…”直接写入 `active` 记忆（偏好类为 `preference`），与同 turn 的 `memory_write` 去重；
+- 已有 active 记忆的全库整理（`memory_organize` / `/memory organize`），提案必须 `supersedes` 旧记忆；
+- Dream 队列启动恢复与冷会话启动对账、失败分类/退避/进程内暂停、健康检查与证据分级；
+- worklog 标题与正文预算、强密钥显式写入拒写、最近 turn worklog 索引兜底（设计 D1，v2.4）；
+- `proposalKey` 去重、重复提案关联与按 dream run 撤销（管理页可触发）；
+- `/memory status | search | dream | organize | forget | export` 命令（`export` 返回摘要）；
+- Settings → Memory 4-Tab 管理页：顶栏统计与索引容量条、关键词搜索与分片筛选、新建记忆与居中详情/编辑弹窗（标签胶囊、重要度滑块、内置未保存确认、已归档隐藏归档按钮）、待审阅提案行级 Diff / 并排对比与「保存并接受」/连续审阅、`Dream now` 与详细运行状态/取消/撤销、拖拽导入预览与工作区映射、分组横排配置页；
+- Remote 管理接口使用稳定的 `memory/*` 失败码（冲突、找不到、内容无效、禁止、容量、不可用），客户端据此本地化并识别并发编辑冲突；
+- `engines.dsh` 声明兼容的 DSH 版本范围，`prepack` 在打包前构建，CI 覆盖打包文件校验。
 
-索引注入、Episode 捕获、Dreaming、`/memory` 命令、Settings 管理页与聊天卡片仍在实施计划中。完整产品的安装方式与使用文档将在对应能力通过验收后发布。
+Settings → Memory 管理页、审阅界面，以及会话中的记忆用量摘要均已交付（记忆工具沿用 DSH 原生工具调用行）。0.1.0 仍是 **0.x 开发版本**，默认 `autoDream=false`、`refreshIndexOnChange=false`、`autoCaptureEpisodes=true`；安装与使用说明见上文[安装](#安装)与[快速开始](#快速开始)。
 
 ## 发布说明
 
-**当前公开仓库仅发布本产品预告与赞助商 Logo。**源码、测试、设计文档、构建配置与本地开发历史尚未公开，因此暂不提供克隆构建、安装或试用命令。
+- **分发渠道**：本项目仅以 **GitHub 插件**形式通过 [GitHub Releases](https://github.com/JiaMingWang-CN/dsh-memory/releases) 分发预构建的 bundle 包（`.tgz`）与源码仓库，**不发布 npm 包**。
+- **变更记录**：详细变更见 [`CHANGELOG.md`](CHANGELOG.md)。
 
-完整产品将在相应能力完成验收、并获得维护者发布确认后另行公开。本文中的功能介绍不代表已有可下载的软件包，也不承诺具体发布日期。
+## FAQ
+
+**dsh-memory 现在可以用来长期使用吗？**
+仓库处于 0.1.0 开发版本（0.x），尚未发布正式版本。功能可用，但接口、配置与行为仍可能调整。
+
+**会自动整理我的记忆吗？**
+默认不会。`autoDream=false`，需要你手动 `/memory dream`（整理 episode 队列）或 `/memory organize`（整理已有 active 记忆）；即使开启自动整理，产物也先进入待审阅。
+
+**我说“记住”会直接写入吗？**
+会。模型没有在本轮调用 `memory_write` 时，明确的“记住/以后都…”会直接生成 `active` 记忆（偏好类为 `preference`，否则 `lesson`）；自动 dream/organize 的产物仍然先进入待审阅。
+
+**整理出来的记忆会直接生效吗？**
+不会。所有 dream 生成的 `lesson` / `wiki` / `worklog(daily)` 一律 `pending`，在 Settings → Memory 接受或修改后接受后才可检索。
+
+**支持语义搜索或向量检索吗？**
+不支持。检索使用本地 BM25，不做向量检索，也不依赖外部 embedding 服务。
+
+**记忆会跨设备同步吗？**
+不会。数据默认只在本机 `$DSH_HOME`，没有云端账户或跨设备同步。
+
+**不同项目的记忆会互相污染吗？**
+不会。记忆按规范化 `workspaceKey` 隔离，默认只显示当前工作区与全局偏好；只有显式切换到“所有可访问工作区”才展示其他工作区。
+
+**如何备份或迁移记忆？**
+在 Settings → Memory 的导出区导出完整 JSON，再用导入区逐工作区映射后合并或替换。`/memory export` 只返回导出摘要，不写文件。跨机器导入时为每个源工作区选择本机目标；未映射的条目会被跳过，替换模式则要求全部映射。
+
+**卸载插件会删除我的记忆吗？**
+禁用/卸载后会停止注入与捕获，历史消息保留；记忆数据保留在 `$DSH_HOME`，可手动清理。
 
 ## 许可证
 
-本项目采用 MIT 许可证；完整许可证文件将随源码公开。当前公开内容仅为产品预告，赞助商品牌及标识的权利归其各自所有者。
+本项目采用 [MIT 许可证](LICENSE)。赞助商品牌及标识的权利归其各自所有者。
 
 ---
 
@@ -268,6 +411,6 @@ dsh-memory 的首个完整版本不以以下能力为目标：
 
 **让经验留下来，让每个新会话接着前进。**
 
-dsh-memory · DSH-native long-term memory · 产品预告
+dsh-memory · DSH-native long-term memory · 0.1.0-dev
 
 </div>
