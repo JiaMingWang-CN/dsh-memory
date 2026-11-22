@@ -214,6 +214,8 @@ export interface RemoteDreamRequest {
 /** Configuration fields the Settings page may write in 0.1.0 (design §8). */
 export const EDITABLE_CONFIG_FIELDS = [
   'autoDream',
+  'autoAcceptProposals',
+  'dreamIdleDelayMs',
   'autoDreamMinIntervalMs',
   'indexMaxBytes',
   'refreshIndexOnChange',

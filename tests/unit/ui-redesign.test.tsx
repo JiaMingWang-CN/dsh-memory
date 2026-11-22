@@ -320,18 +320,15 @@ describe('ConfigPanel seconds conversion, auto-accept confirmation, grouping & d
     await screen.findByText('config.saved')
   })
 
-  it('requires inline confirmation before enabling autoAcceptProposals', async () => {
+  it('saves autoAcceptProposals directly without secondary confirmation', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined)
     render(h(ConfigPanel, { config: { autoAcceptProposals: false }, onSave }))
 
     fireEvent.click(screen.getByRole('switch', { name: 'config.autoAcceptProposals' }))
     fireEvent.click(screen.getByText('common.save'))
-    expect(screen.getByText('config.confirmEnableAutoAccept')).toBeTruthy()
-    expect(onSave).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByText('common.confirm'))
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
     expect(onSave.mock.calls[0]?.[0]).toMatchObject({ autoAcceptProposals: true })
+    expect(screen.queryByText('common.confirm')).toBeNull()
   })
 })
 

@@ -163,7 +163,7 @@ The management page uses a **unified header + four focused tabs** (`Memories`, `
 - **Centered modals for create, detail and edit**: pinned footers, tag chips, synchronized importance slider, one-click body/source copying, and inline unsaved-change confirmation; archived records show only Restore and hide Archive;
 - **Review and dreaming**: top status card showing the latest run's model, processed episodes and output counts with cancel/undo actions; proposal modal with **line-level diff / side-by-side / proposed-only** views, one-step `Save & accept`, and previous/next sequential review;
 - **Import and export**: separated Export and drag-and-drop Import cards with parsed file summary preview (memories, episodes, workspaces, exported timestamp), per-workspace mapping and structured import reports;
-- **Grouped settings**: four horizontal setting groups (`Automatic dreaming`, `Index & injection`, `Retention`, `Privacy & security`) with second-based idle wait and interval inputs, an opt-in `Auto-accept proposals` switch (off by default, requires inline confirmation, keeps `derived` ownership and remains undoable by run), live KB budget conversion, unsaved-change indicator and discard action.
+- **Grouped settings**: four horizontal setting groups (`Automatic dreaming`, `Index & injection`, `Retention`, `Privacy & security`) with second-based idle wait and interval inputs, an opt-in `Auto-accept proposals` switch (off by default, keeps `derived` ownership and remains undoable by run), live KB budget conversion, unsaved-change indicator and discard action.
 
 Permanent deletion, full purge and full rebuild remain available only through the Host management API, require explicit confirmation parameters, and are not exposed in the 0.1.0 page.
 

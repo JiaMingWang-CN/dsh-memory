@@ -43,7 +43,7 @@ written only when that version is actually released.
 
 ### Changed
 
-- Added an opt-in `autoAcceptProposals` setting (default `false`, requires inline confirmation in Settings) so dream/organize proposals can be applied immediately while keeping `ownership='derived'`, superseding archive order, redaction, and per-run undo; exposed `dreamIdleDelayMs` and `autoDreamMinIntervalMs` in seconds in the Settings UI.
+- Added an opt-in `autoAcceptProposals` setting (default `false`) so dream/organize proposals can be applied immediately while keeping `ownership='derived'`, superseding archive order, redaction, and per-run undo; exposed `dreamIdleDelayMs` and `autoDreamMinIntervalMs` in seconds in the Settings UI.
 - Reorganized the Settings → Memory UI into a four-tab layout (`Memories`, `Review`, `Import & Export`, `Settings`) with a stable header action bar, clickable overview counts and an index-budget meter; added server-side keyword search (`ListRequest.query`), pill filters, user-tag display, unified centered modals with pinned footers and inline unsaved-change confirmation, line-level proposal diff comparison with sequential review and save-and-accept, drag-and-drop import preview, grouped horizontal settings with minute/KB units, boundary-aware `Select` popovers, and non-zero session memory usage notes.
 - Standardized distribution as a GitHub plugin (GitHub repository and GitHub Releases carrying the packed `.tgz` bundle) with no npm package publication (`private: true` retained in `package.json`).
 - Retarget the plugin to DSH `0.2.2-rc.5`: the peer range is `^0.2.2-rc.5`, `engines.dsh` declares the same range, and the development dependencies pin that
@@ -66,6 +66,7 @@ written only when that version is actually released.
 
 ### Fixed
 
+- Added `autoAcceptProposals` and `dreamIdleDelayMs` to `EDITABLE_CONFIG_FIELDS` in `MemoryService.updateConfig` so saving Settings changes no longer fails with `memory/invalid`, and removed the inline secondary confirmation when enabling `autoAcceptProposals`.
 - Preserved `this` binding when invoking host `locale.subscribe` and `ctx.effect` in the Client bundle, preventing slot crashes against class-backed DSH host services.
 - Hid the Archive action and confirmation bar in `MemoryDetail` when inspecting an already archived memory, leaving only Restore.
 - A failed permanent-delete operation strips its content snapshots, so an aborted delete cannot retain the body it was removing.

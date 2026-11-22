@@ -155,6 +155,54 @@ describe('remote config invalid', () => {
       await host.dispose()
     }
   })
+
+  it('allows updating autoAcceptProposals and dreamIdleDelayMs from Settings', async () => {
+    const host = await openService()
+    try {
+      const entry = { id: 'memory-entry' }
+      let persisted: Record<string, unknown> = {}
+      const serviceCtx = (
+        host.service as unknown as {
+          ctx: {
+            get: (name: string) => unknown
+            fiber?: { entry?: unknown }
+          }
+        }
+      ).ctx
+      const origGet = serviceCtx.get.bind(serviceCtx)
+      serviceCtx.get = (name: string) =>
+        name === 'configEditor'
+          ? {
+              configuration: () => [{ entry, inherited: {}, override: persisted }],
+              edit: async (
+                _entry: unknown,
+                change: (
+                  current: Record<string, unknown>,
+                  inherited: Record<string, unknown>,
+                ) => Record<string, unknown>,
+              ) => {
+                persisted = change(persisted, {})
+              },
+            }
+          : origGet(name)
+      if (serviceCtx.fiber !== undefined) {
+        serviceCtx.fiber.entry = entry
+      }
+
+      const result = await host.service.updateConfig({
+        autoAcceptProposals: true,
+        dreamIdleDelayMs: 15_000,
+      })
+      expect(result.config.autoAcceptProposals).toBe(true)
+      expect(result.config.dreamIdleDelayMs).toBe(15_000)
+      expect(persisted).toMatchObject({
+        autoAcceptProposals: true,
+        dreamIdleDelayMs: 15_000,
+      })
+    } finally {
+      await host.dispose()
+    }
+  })
 })
 
 describe('remote event', () => {

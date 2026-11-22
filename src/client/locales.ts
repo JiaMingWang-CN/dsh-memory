@@ -180,8 +180,6 @@ export const zh: LocaleDict = {
   'config.autoAcceptProposals': '自动接受提案',
   'config.autoAcceptProposalsHint':
     '整理生成的提案跳过待审阅直接生效（保留派生所有权，仍可按整理批次撤销）。',
-  'config.confirmEnableAutoAccept':
-    '开启自动接受后，dream 与全库整理生成的记忆将直接生效并参与召回（仍遵守脱敏、作用域隔离与替换归档规则，且支持撤销）。确认开启并保存？',
   'config.dreamIdleDelaySec': '会话空闲等待时间（秒）',
   'config.dreamIdleDelayHint': '一轮对话结束后等待空闲多久再触发自动整理（保存为毫秒）。',
   'config.autoDreamMinIntervalMs': '自动整理最小间隔（秒）',
@@ -407,8 +405,6 @@ export const en: LocaleDict = {
   'config.autoAcceptProposals': 'Auto-accept proposals',
   'config.autoAcceptProposalsHint':
     'Apply dream and organize proposals directly without manual review (kept derived and still undoable by run).',
-  'config.confirmEnableAutoAccept':
-    'Enabling auto-accept activates dream and organize proposals immediately for recall (redaction, scope isolation, superseding archive, and run undo still apply). Confirm and save?',
   'config.dreamIdleDelaySec': 'Idle wait before auto-dream (seconds)',
   'config.dreamIdleDelayHint':
     'Seconds of workspace idle time after a turn ends before automatic dreaming queues (stored in milliseconds).',

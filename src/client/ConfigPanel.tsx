@@ -127,10 +127,8 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
   const [efforts, setEfforts] = React.useState<ModelOption[]>([])
   const [savingLocal, setSavingLocal] = React.useState(false)
   const [confirmDisableRedact, setConfirmDisableRedact] = React.useState(false)
-  const [confirmEnableAutoAccept, setConfirmEnableAutoAccept] = React.useState(false)
   const saving = props.saving === true || savingLocal
   const savedRedact = props.config.redactSecrets ?? true
-  const savedAutoAccept = props.config.autoAcceptProposals ?? false
   const dirty = !sameDraft(draft, baseline)
 
   // A saved (or reloaded) config is authoritative: rebuild the form from it so
@@ -138,7 +136,6 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
   React.useEffect(() => {
     setDraft(baseline)
     setConfirmDisableRedact(false)
-    setConfirmEnableAutoAccept(false)
   }, [baseline])
 
   React.useEffect(() => {
@@ -177,9 +174,7 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
     setDraft((current) => ({ ...current, ...patch }))
   }
 
-  const save = async (
-    confirmed: { autoAccept?: boolean; redact?: boolean } = {},
-  ): Promise<void> => {
+  const save = async (confirmed = false): Promise<void> => {
     if (
       draft.dreamModelMode === 'fixed' &&
       (draft.dreamProvider.trim() === '' || draft.dreamModel.trim() === '')
@@ -187,17 +182,11 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
       setError(t('config.dreamModelRequired'))
       return
     }
-    if (!savedAutoAccept && draft.autoAcceptProposals && confirmed.autoAccept !== true) {
-      setError('')
-      setConfirmEnableAutoAccept(true)
-      return
-    }
-    if (savedRedact && !draft.redactSecrets && confirmed.redact !== true) {
+    if (savedRedact && !draft.redactSecrets && !confirmed) {
       setError('')
       setConfirmDisableRedact(true)
       return
     }
-    setConfirmEnableAutoAccept(false)
     setConfirmDisableRedact(false)
     setError('')
     setSavedNotice(false)
@@ -315,40 +304,8 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
         hint: t('config.autoAcceptProposalsHint'),
         checked: draft.autoAcceptProposals,
         disabled: saving,
-        onChange: (value: boolean) => {
-          update({ autoAcceptProposals: value })
-          if (!value) setConfirmEnableAutoAccept(false)
-        },
+        onChange: (value: boolean) => update({ autoAcceptProposals: value }),
       }),
-      confirmEnableAutoAccept
-        ? h(
-            'div',
-            { className: 'dsh-mem-confirm', role: 'alert' },
-            h('span', null, t('config.confirmEnableAutoAccept')),
-            h(
-              Button,
-              {
-                variant: 'danger',
-                size: 'sm',
-                ...(saving ? { disabled: true } : {}),
-                onClick: () => {
-                  void save({ autoAccept: true })
-                },
-              },
-              t('common.confirm'),
-            ),
-            h(
-              Button,
-              {
-                variant: 'ghost',
-                size: 'sm',
-                ...(saving ? { disabled: true } : {}),
-                onClick: () => setConfirmEnableAutoAccept(false),
-              },
-              t('common.cancel'),
-            ),
-          )
-        : null,
       h(SettingRow, {
         label: t('config.dreamIdleDelaySec'),
         hint: t('config.dreamIdleDelayHint'),
@@ -502,7 +459,7 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
                 size: 'sm',
                 ...(saving ? { disabled: true } : {}),
                 onClick: () => {
-                  void save({ autoAccept: !confirmEnableAutoAccept, redact: true })
+                  void save(true)
                 },
               },
               t('common.confirm'),
@@ -543,7 +500,6 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
                   setDraft(baseline)
                   setError('')
                   setConfirmDisableRedact(false)
-                  setConfirmEnableAutoAccept(false)
                 },
               },
               t('config.discard'),
