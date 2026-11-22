@@ -1,6 +1,6 @@
 {
   "name": "dsh-memory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "A DSH-native long-term memory plugin: durable, scoped memory storage with audit, crash recovery, capacity control, BM25 retrieval, explicit memory tools and import/export.",
   "type": "module",
