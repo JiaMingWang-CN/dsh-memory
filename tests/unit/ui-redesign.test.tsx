@@ -12,6 +12,8 @@ import { MemoryUsageText } from '../../src/client/MemoryUsageText.tsx'
 import { TransferPanel } from '../../src/client/TransferPanel.tsx'
 import { setTranslate } from '../../src/client/locales.ts'
 import { clearClientContext, setClientContext } from '../../src/client/runtime.ts'
+import { MemoryDreamer } from '../../src/host/dreamer.ts'
+import { scriptedLlm } from '../helpers/dream-llm.ts'
 import { DreamId, MemoryId, type DreamRun } from '../../src/shared/types.ts'
 import { makeMemoryRecord } from '../helpers/factory.ts'
 import { openStore } from '../helpers/runner.ts'
@@ -277,13 +279,18 @@ describe('proposal review diff, save-and-accept and sequential navigation', () =
   })
 })
 
-describe('ConfigPanel minutes conversion, grouping & discard', () => {
-  it('converts autoDreamMinIntervalMs to minutes and saves back in milliseconds', async () => {
+describe('ConfigPanel seconds conversion, auto-accept confirmation, grouping & discard', () => {
+  it('converts dreamIdleDelayMs and autoDreamMinIntervalMs to seconds and saves back in milliseconds', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined)
     const onDirtyChange = vi.fn()
     render(
       h(ConfigPanel, {
-        config: { autoDream: true, autoDreamMinIntervalMs: 300_000, indexMaxBytes: 4096 },
+        config: {
+          autoDream: true,
+          dreamIdleDelayMs: 30_000,
+          autoDreamMinIntervalMs: 300_000,
+          indexMaxBytes: 4096,
+        },
         onSave,
         onDirtyChange,
       }),
@@ -294,17 +301,100 @@ describe('ConfigPanel minutes conversion, grouping & discard', () => {
     expect(screen.getByText('config.groupRetention')).toBeTruthy()
     expect(screen.getByText('config.groupPrivacy')).toBeTruthy()
 
+    const idleInput = screen.getByLabelText('config.dreamIdleDelaySec') as HTMLInputElement
     const intervalInput = screen.getByLabelText('config.autoDreamMinIntervalMs') as HTMLInputElement
-    expect(intervalInput.value).toBe('5')
+    expect(idleInput.value).toBe('30')
+    expect(intervalInput.value).toBe('300')
 
-    fireEvent.change(intervalInput, { target: { value: '12' } })
+    fireEvent.change(idleInput, { target: { value: '15' } })
+    fireEvent.change(intervalInput, { target: { value: '120' } })
     expect(onDirtyChange).toHaveBeenLastCalledWith(true)
     expect(screen.getByText('config.discard')).toBeTruthy()
 
     fireEvent.click(screen.getByText('common.save'))
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
-    expect(onSave.mock.calls[0]?.[0]).toMatchObject({ autoDreamMinIntervalMs: 720_000 })
+    expect(onSave.mock.calls[0]?.[0]).toMatchObject({
+      dreamIdleDelayMs: 15_000,
+      autoDreamMinIntervalMs: 120_000,
+    })
     await screen.findByText('config.saved')
+  })
+
+  it('requires inline confirmation before enabling autoAcceptProposals', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    render(h(ConfigPanel, { config: { autoAcceptProposals: false }, onSave }))
+
+    fireEvent.click(screen.getByRole('switch', { name: 'config.autoAcceptProposals' }))
+    fireEvent.click(screen.getByText('common.save'))
+    expect(screen.getByText('config.confirmEnableAutoAccept')).toBeTruthy()
+    expect(onSave).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByText('common.confirm'))
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+    expect(onSave.mock.calls[0]?.[0]).toMatchObject({ autoAcceptProposals: true })
+  })
+})
+
+describe('MemoryDreamer autoAcceptProposals', () => {
+  it('activates proposals as derived and archives superseded records when enabled', async () => {
+    const { store, runner } = await openStore({ defaultWorkspaceKey: 'c:/ws/a' })
+    const old = await store.create({
+      type: 'lesson',
+      title: 'Old rule',
+      body: 'Old body',
+      scope: { kind: 'workspace', key: 'c:/ws/a', root: 'C:/ws/a' },
+      actor: 'user',
+    })
+    const ep = await store.appendEpisode({
+      sessionId: 'sess-1',
+      workspaceKey: 'c:/ws/a',
+      workspaceRoot: 'C:/ws/a',
+      kind: 'user-correction',
+      turn: 1,
+      sourceSeqs: [1, 2],
+      prompt: 'Use the new rule instead.',
+      files: [],
+    })
+    expect(ep).toBeDefined()
+
+    const llm = scriptedLlm([
+      JSON.stringify({
+        memories: [
+          {
+            type: 'lesson',
+            title: 'New rule',
+            body: 'Always use the new rule.',
+            confidence: 0.9,
+            importance: 0.8,
+            sourceEpisodeIds: [ep!.id],
+            supersedes: [old.id],
+            tags: ['workflow'],
+          },
+        ],
+      }),
+    ])
+    const dreamer = new MemoryDreamer({
+      store,
+      runner,
+      config: { autoAcceptProposals: true },
+      llm,
+    })
+    const queued = await dreamer.enqueue({
+      scopeKey: 'c:/ws/a',
+      scopeKind: 'workspace',
+      scopeRoot: 'C:/ws/a',
+      trigger: 'manual',
+    })
+    const settled = await dreamer.run(queued.id)
+    expect(settled?.status).toBe('completed')
+    expect(settled?.pending).toBe(0)
+
+    const active = store.activeRecords()
+    expect(active).toHaveLength(1)
+    expect(active[0]?.title).toBe('New rule')
+    expect(active[0]?.ownership).toBe('derived')
+    expect(active[0]?.reviewedByUserAt).toBeUndefined()
+    expect(store.get(old.id)?.status).toBe('archived')
   })
 })
 

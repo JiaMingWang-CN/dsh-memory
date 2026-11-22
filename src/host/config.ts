@@ -13,6 +13,7 @@ export interface MemoryConfig {
   indexMaxBytes?: number
   autoCaptureEpisodes?: boolean
   autoDream?: boolean
+  autoAcceptProposals?: boolean
   dreamIdleDelayMs?: number
   autoDreamMinIntervalMs?: number
   dreamModelMode?: 'follow-session' | 'fixed'
@@ -51,6 +52,7 @@ const fields = {
   indexMaxBytes: z.number().min(1024).max(32768).step(1).default(4096),
   autoCaptureEpisodes: z.boolean().default(true),
   autoDream: z.boolean().default(false),
+  autoAcceptProposals: z.boolean().default(false),
   dreamIdleDelayMs: z.natural().default(30_000),
   autoDreamMinIntervalMs: z.natural().default(300_000),
   dreamModelMode: z.union([z.const('follow-session'), z.const('fixed')]).default('follow-session'),

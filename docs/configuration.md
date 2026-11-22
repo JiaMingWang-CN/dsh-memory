@@ -12,8 +12,9 @@ dsh-memory 的全部可调项都在 `src/host/config.ts` 的 `Config` schema 中
 | `indexMaxBytes` | `4096` | 新会话记忆索引的字节预算，范围 1024–32768。 |
 | `autoCaptureEpisodes` | `true` | 自动捕获 episode（不直接生成可检索知识）。 |
 | `autoDream` | `false` | 是否自动调用模型整理；默认关闭，手动运行不受影响。 |
-| `dreamIdleDelayMs` | `30000` | 自动 dream 的 turn/end 防抖延迟（毫秒）。 |
-| `autoDreamMinIntervalMs` | `300000` | 每个工作区自动 dream 的最小间隔（毫秒）。 |
+| `autoAcceptProposals` | `false` | 是否自动接受 dream / organize 生成的提案；默认关闭，开启需二次确认，自动生效条目保留 `ownership='derived'` 且可按运行批次撤销。 |
+| `dreamIdleDelayMs` | `30000` | 自动 dream 的 turn/end 防抖延迟（毫秒，设置页按秒编辑）。 |
+| `autoDreamMinIntervalMs` | `300000` | 每个工作区自动 dream 的最小间隔（毫秒，设置页按秒编辑）。 |
 | `dreamModelMode` | `follow-session` | dream 模型选择：`follow-session` 或 `fixed`。 |
 | `dreamProvider` | —（未设置） | `fixed` 模式使用的 provider；为空则退回默认模型。 |
 | `dreamModel` | —（未设置） | `fixed` 模式使用的 model；为空则退回默认模型。 |

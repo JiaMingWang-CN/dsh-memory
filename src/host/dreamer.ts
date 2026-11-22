@@ -205,6 +205,7 @@ export interface MemoryDreamerOptions {
 interface WriteSummary {
   created: number
   updated: number
+  accepted: number
   skipped: number
   usedEpisodeIds: string[]
 }
@@ -952,17 +953,18 @@ export class MemoryDreamer {
     dream: DreamRun,
     operation: Awaited<ReturnType<OperationRunner['begin']>>,
     episodeCount: number,
-    summary: { created: number; updated: number; skipped: number },
+    summary: { created: number; updated: number; accepted?: number; skipped: number },
     warning?: string,
   ): Promise<void> {
     if (this.store.getDream(dream.id)?.status === 'cancelled') return
+    const accepted = summary.accepted ?? 0
     const finished: DreamRun = {
       ...dream,
       status: 'completed',
       finishedAt: this.nowIso(),
       episodes: episodeCount,
       committed: summary.created,
-      pending: summary.created + summary.updated,
+      pending: Math.max(0, summary.created + summary.updated - accepted),
       ...(warning === undefined ? {} : { error: warning }),
     }
     const stored = await this.store.putDreamTerminal(finished)
@@ -1352,7 +1354,29 @@ export class MemoryDreamer {
     operationId: string,
     signal: AbortSignal,
   ): Promise<WriteSummary> {
-    const summary: WriteSummary = { created: 0, updated: 0, skipped: 0, usedEpisodeIds: [] }
+    const summary: WriteSummary = {
+      created: 0,
+      updated: 0,
+      accepted: 0,
+      skipped: 0,
+      usedEpisodeIds: [],
+    }
+    const autoAccept = this.config.autoAcceptProposals === true
+    const tryAutoAccept = async (id: MemoryRecord['id']): Promise<void> => {
+      if (!autoAccept) return
+      try {
+        await this.store.acceptProposal(id, {
+          actor: 'system',
+          markReviewed: false,
+          dreamId: dream.id,
+        })
+        summary.accepted += 1
+      } catch (error) {
+        this.logger.warn?.(
+          `dsh-memory: auto-accept left proposal ${id} pending: ${this.messageOf(error)}`,
+        )
+      }
+    }
     const used = new Set<string>()
     const byId = new Map(claimed.map((episode) => [episode.id as string, episode]))
     for (const proposal of output.memories) {
@@ -1396,6 +1420,7 @@ export class MemoryDreamer {
             operationId,
           )
           summary.updated += 1
+          await tryAutoAccept(existing.id)
         } else {
           summary.skipped += 1
           this.logger.warn?.(`dsh-memory: duplicate dream proposal skipped for ${existing.id}`)
@@ -1405,6 +1430,7 @@ export class MemoryDreamer {
       const record = this.buildRecord(proposal, dream, key, byId)
       await this.store.writeDreamProposal(record, dream.id, operationId)
       summary.created += 1
+      await tryAutoAccept(record.id)
     }
     summary.usedEpisodeIds = [...used]
     return summary

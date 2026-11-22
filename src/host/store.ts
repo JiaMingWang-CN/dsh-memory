@@ -167,6 +167,21 @@ export interface ArchiveOptions {
   actor?: AuditActor
   reason?: string
   requestId?: string
+  dreamId?: string
+}
+
+/** Options accepted by {@link MemoryStore.acceptProposal}. */
+export interface AcceptProposalOptions {
+  requestId?: string
+  actor?: AuditActor
+  /**
+   * When true (default, human review), ownership promotes to `user` and
+   * `reviewedByUserAt` is stamped. When false (automatic opt-in acceptance),
+   * ownership stays `derived` so rebuild/capacity rules continue to protect
+   * user-owned memories.
+   */
+  markReviewed?: boolean
+  dreamId?: string
 }
 
 /** One captured episode waiting in the dream queue. */
@@ -814,6 +829,7 @@ export class MemoryStore {
         actor: options.actor ?? 'user',
         action: 'archive',
         ...(options.reason === undefined ? {} : { reason: options.reason }),
+        ...(options.dreamId === undefined ? {} : { dreamId: options.dreamId }),
       },
       options.requestId,
     )
@@ -877,12 +893,25 @@ export class MemoryStore {
    * @param requestId - Optional caller request identity for dedupe.
    * @returns The activated record.
    */
-  async acceptProposal(id: MemoryId, requestId?: string): Promise<MemoryRecord> {
-    return this.serialize(() => this.acceptProposalUnlocked(id, requestId))
+  async acceptProposal(
+    id: MemoryId,
+    requestIdOrOptions?: string | AcceptProposalOptions,
+  ): Promise<MemoryRecord> {
+    const options: AcceptProposalOptions =
+      typeof requestIdOrOptions === 'string'
+        ? { requestId: requestIdOrOptions }
+        : (requestIdOrOptions ?? {})
+    return this.serialize(() => this.acceptProposalUnlocked(id, options))
   }
 
-  private async acceptProposalUnlocked(id: MemoryId, requestId?: string): Promise<MemoryRecord> {
+  private async acceptProposalUnlocked(
+    id: MemoryId,
+    options: AcceptProposalOptions,
+  ): Promise<MemoryRecord> {
     this.assertReady()
+    const requestId = options.requestId
+    const actor = options.actor ?? 'user'
+    const markReviewed = options.markReviewed !== false
     const replayed = await this.replayRequest(requestId, 'memory.accept', id)
     if (replayed !== undefined) {
       this.emitChange({ action: 'upsert', record: replayed })
@@ -916,15 +945,15 @@ export class MemoryStore {
     this.capacity?.assertActiveRoom(this.activeRecords().length, targets.length)
     for (const target of targets) {
       await this.archiveUnlocked(target.id, {
-        actor: 'user',
+        actor,
         reason: `superseded by ${current.id}`,
+        ...(options.dreamId === undefined ? {} : { dreamId: options.dreamId }),
       })
     }
     const after = this.stamp({
       ...current,
       status: 'active',
-      ownership: 'user',
-      reviewedByUserAt: nowIso,
+      ...(markReviewed ? { ownership: 'user' as const, reviewedByUserAt: nowIso } : {}),
       contentRevision: current.contentRevision + 1,
       updatedAt: nowIso,
     })
@@ -935,7 +964,8 @@ export class MemoryStore {
         oldAfter: null,
         newBefore: current,
         after,
-        actor: 'user',
+        actor,
+        ...(options.dreamId === undefined ? {} : { dreamId: options.dreamId }),
       },
       requestId,
     )

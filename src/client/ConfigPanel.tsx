@@ -19,7 +19,7 @@ const h = React.createElement
 /** One option in the provider, model, or effort menu. */
 type ModelOption = { value: string; label: string }
 
-const MS_PER_MINUTE = 60_000
+const MS_PER_SECOND = 1_000
 
 /** Props accepted by {@link ConfigPanel}. */
 export interface ConfigPanelProps {
@@ -37,7 +37,9 @@ export interface ConfigPanelProps {
 
 interface ConfigDraft {
   autoDream: boolean
-  autoDreamMinIntervalMin: number
+  autoAcceptProposals: boolean
+  dreamIdleDelaySec: number
+  autoDreamMinIntervalSec: number
   indexMaxBytes: number
   refreshIndexOnChange: boolean
   dreamModelMode: 'follow-session' | 'fixed'
@@ -50,10 +52,13 @@ interface ConfigDraft {
 }
 
 function draftFromConfig(config: MemoryConfig): ConfigDraft {
+  const idleMs = config.dreamIdleDelayMs ?? 30_000
   const intervalMs = config.autoDreamMinIntervalMs ?? 300_000
   return {
     autoDream: config.autoDream ?? false,
-    autoDreamMinIntervalMin: Math.max(0, Math.round(intervalMs / MS_PER_MINUTE)),
+    autoAcceptProposals: config.autoAcceptProposals ?? false,
+    dreamIdleDelaySec: Math.max(0, Math.round(idleMs / MS_PER_SECOND)),
+    autoDreamMinIntervalSec: Math.max(0, Math.round(intervalMs / MS_PER_SECOND)),
     indexMaxBytes: config.indexMaxBytes ?? 4096,
     refreshIndexOnChange: config.refreshIndexOnChange ?? false,
     dreamModelMode: config.dreamModelMode ?? 'follow-session',
@@ -69,7 +74,9 @@ function draftFromConfig(config: MemoryConfig): ConfigDraft {
 function sameDraft(left: ConfigDraft, right: ConfigDraft): boolean {
   return (
     left.autoDream === right.autoDream &&
-    left.autoDreamMinIntervalMin === right.autoDreamMinIntervalMin &&
+    left.autoAcceptProposals === right.autoAcceptProposals &&
+    left.dreamIdleDelaySec === right.dreamIdleDelaySec &&
+    left.autoDreamMinIntervalSec === right.autoDreamMinIntervalSec &&
     left.indexMaxBytes === right.indexMaxBytes &&
     left.refreshIndexOnChange === right.refreshIndexOnChange &&
     left.dreamModelMode === right.dreamModelMode &&
@@ -120,8 +127,10 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
   const [efforts, setEfforts] = React.useState<ModelOption[]>([])
   const [savingLocal, setSavingLocal] = React.useState(false)
   const [confirmDisableRedact, setConfirmDisableRedact] = React.useState(false)
+  const [confirmEnableAutoAccept, setConfirmEnableAutoAccept] = React.useState(false)
   const saving = props.saving === true || savingLocal
   const savedRedact = props.config.redactSecrets ?? true
+  const savedAutoAccept = props.config.autoAcceptProposals ?? false
   const dirty = !sameDraft(draft, baseline)
 
   // A saved (or reloaded) config is authoritative: rebuild the form from it so
@@ -129,6 +138,7 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
   React.useEffect(() => {
     setDraft(baseline)
     setConfirmDisableRedact(false)
+    setConfirmEnableAutoAccept(false)
   }, [baseline])
 
   React.useEffect(() => {
@@ -167,7 +177,9 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
     setDraft((current) => ({ ...current, ...patch }))
   }
 
-  const save = async (confirmed = false): Promise<void> => {
+  const save = async (
+    confirmed: { autoAccept?: boolean; redact?: boolean } = {},
+  ): Promise<void> => {
     if (
       draft.dreamModelMode === 'fixed' &&
       (draft.dreamProvider.trim() === '' || draft.dreamModel.trim() === '')
@@ -175,11 +187,17 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
       setError(t('config.dreamModelRequired'))
       return
     }
-    if (savedRedact && !draft.redactSecrets && !confirmed) {
+    if (!savedAutoAccept && draft.autoAcceptProposals && confirmed.autoAccept !== true) {
+      setError('')
+      setConfirmEnableAutoAccept(true)
+      return
+    }
+    if (savedRedact && !draft.redactSecrets && confirmed.redact !== true) {
       setError('')
       setConfirmDisableRedact(true)
       return
     }
+    setConfirmEnableAutoAccept(false)
     setConfirmDisableRedact(false)
     setError('')
     setSavedNotice(false)
@@ -187,7 +205,9 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
     try {
       await props.onSave({
         autoDream: draft.autoDream,
-        autoDreamMinIntervalMs: draft.autoDreamMinIntervalMin * MS_PER_MINUTE,
+        autoAcceptProposals: draft.autoAcceptProposals,
+        dreamIdleDelayMs: draft.dreamIdleDelaySec * MS_PER_SECOND,
+        autoDreamMinIntervalMs: draft.autoDreamMinIntervalSec * MS_PER_SECOND,
         indexMaxBytes: draft.indexMaxBytes,
         refreshIndexOnChange: draft.refreshIndexOnChange,
         dreamModelMode: draft.dreamModelMode,
@@ -290,15 +310,65 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
         disabled: saving,
         onChange: (value: boolean) => update({ autoDream: value }),
       }),
+      h(Switch, {
+        label: t('config.autoAcceptProposals'),
+        hint: t('config.autoAcceptProposalsHint'),
+        checked: draft.autoAcceptProposals,
+        disabled: saving,
+        onChange: (value: boolean) => {
+          update({ autoAcceptProposals: value })
+          if (!value) setConfirmEnableAutoAccept(false)
+        },
+      }),
+      confirmEnableAutoAccept
+        ? h(
+            'div',
+            { className: 'dsh-mem-confirm', role: 'alert' },
+            h('span', null, t('config.confirmEnableAutoAccept')),
+            h(
+              Button,
+              {
+                variant: 'danger',
+                size: 'sm',
+                ...(saving ? { disabled: true } : {}),
+                onClick: () => {
+                  void save({ autoAccept: true })
+                },
+              },
+              t('common.confirm'),
+            ),
+            h(
+              Button,
+              {
+                variant: 'ghost',
+                size: 'sm',
+                ...(saving ? { disabled: true } : {}),
+                onClick: () => setConfirmEnableAutoAccept(false),
+              },
+              t('common.cancel'),
+            ),
+          )
+        : null,
+      h(SettingRow, {
+        label: t('config.dreamIdleDelaySec'),
+        hint: t('config.dreamIdleDelayHint'),
+        dim: !draft.autoDream,
+        control: numberControl(
+          t('config.dreamIdleDelaySec'),
+          draft.dreamIdleDelaySec,
+          (value) => update({ dreamIdleDelaySec: value }),
+          { min: 0, max: 86_400 },
+        ),
+      }),
       h(SettingRow, {
         label: t('config.autoDreamMinIntervalMs'),
         hint: t('config.autoDreamMinIntervalHint'),
         dim: !draft.autoDream,
         control: numberControl(
           t('config.autoDreamMinIntervalMs'),
-          draft.autoDreamMinIntervalMin,
-          (value) => update({ autoDreamMinIntervalMin: value }),
-          { min: 0, max: 10_080 },
+          draft.autoDreamMinIntervalSec,
+          (value) => update({ autoDreamMinIntervalSec: value }),
+          { min: 0, max: 604_800 },
         ),
       }),
       h(SettingRow, {
@@ -432,7 +502,7 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
                 size: 'sm',
                 ...(saving ? { disabled: true } : {}),
                 onClick: () => {
-                  void save(true)
+                  void save({ autoAccept: !confirmEnableAutoAccept, redact: true })
                 },
               },
               t('common.confirm'),
@@ -473,6 +543,7 @@ export function ConfigPanel(props: ConfigPanelProps): React.ReactElement {
                   setDraft(baseline)
                   setError('')
                   setConfirmDisableRedact(false)
+                  setConfirmEnableAutoAccept(false)
                 },
               },
               t('config.discard'),

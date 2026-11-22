@@ -43,6 +43,7 @@ written only when that version is actually released.
 
 ### Changed
 
+- Added an opt-in `autoAcceptProposals` setting (default `false`, requires inline confirmation in Settings) so dream/organize proposals can be applied immediately while keeping `ownership='derived'`, superseding archive order, redaction, and per-run undo; exposed `dreamIdleDelayMs` and `autoDreamMinIntervalMs` in seconds in the Settings UI.
 - Reorganized the Settings → Memory UI into a four-tab layout (`Memories`, `Review`, `Import & Export`, `Settings`) with a stable header action bar, clickable overview counts and an index-budget meter; added server-side keyword search (`ListRequest.query`), pill filters, user-tag display, unified centered modals with pinned footers and inline unsaved-change confirmation, line-level proposal diff comparison with sequential review and save-and-accept, drag-and-drop import preview, grouped horizontal settings with minute/KB units, boundary-aware `Select` popovers, and non-zero session memory usage notes.
 - Standardized distribution as a GitHub plugin (GitHub repository and GitHub Releases carrying the packed `.tgz` bundle) with no npm package publication (`private: true` retained in `package.json`).
 - Retarget the plugin to DSH `0.2.2-rc.5`: the peer range is `^0.2.2-rc.5`, `engines.dsh` declares the same range, and the development dependencies pin that
