@@ -92,7 +92,7 @@
     "@types/react-dom": "^19.3.0",
     "esbuild": "^0.25.12",
     "eslint": "9.39.5",
-    "jsdom": "^26.1.0",
+    "jsdom": "^31.0.1",
     "prettier": "3.10.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
