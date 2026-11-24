@@ -1,4 +1,9 @@
-import type { ToolDefinition, ToolRunContext, ToolsService } from '@deepseek-ai/dsh-tools'
+import {
+  validateJsonSchemaValue,
+  type ToolDefinition,
+  type ToolRunContext,
+  type ToolsService,
+} from '@deepseek-ai/dsh-tools'
 
 /**
  * Look up a registered tool or fail loudly.
@@ -47,12 +52,13 @@ export function toolExec(
 }
 
 /**
- * Execute a tool and parse its JSON string output.
+ * Execute a tool, validate its structured output against `output.schema`, and
+ * verify that `output.render` emits valid JSON text.
  * @param tools - Tool registry.
  * @param name - Registered tool name.
  * @param args - Tool arguments.
  * @param agentId - Calling agent id.
- * @returns The parsed JSON output.
+ * @returns The structured output object.
  */
 export async function runTool(
   tools: ToolsService,
@@ -60,6 +66,16 @@ export async function runTool(
   args: Record<string, unknown>,
   agentId = 'agent-a',
 ): Promise<any> {
-  const text = await getTool(tools, name).execute(args, toolExec(name, agentId))
-  return JSON.parse(text as string)
+  const tool = getTool(tools, name)
+  const value = await tool.execute(args, toolExec(name, agentId))
+  const violations = validateJsonSchemaValue(tool.output.schema, value)
+  if (violations.length > 0) {
+    throw new Error(`tool "${name}" output failed schema validation: ${violations.join('; ')}`)
+  }
+  const rendered = tool.output.render(args, value as Parameters<typeof tool.output.render>[1])
+  if (rendered.length !== 1 || rendered[0]?.type !== 'text') {
+    throw new Error(`tool "${name}" render() must return a single text block`)
+  }
+  JSON.parse((rendered[0] as { text: string }).text)
+  return value
 }

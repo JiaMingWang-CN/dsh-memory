@@ -1,10 +1,12 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { MemoryCapture } from '../../src/host/capture.ts'
 import { createTurnWorklog } from '../../src/host/worklog.ts'
 import { openStore } from '../helpers/runner.ts'
 import {
   assistantMessage,
   captureSession,
+  ptcDispatch,
+  ptcDispatchStart,
   toolCall,
   toolResult,
   turnEnd,
@@ -335,5 +337,371 @@ describe('capture subagent boundary', () => {
     const store = await withWorklog(1)
     expect(store.episodeList().some((item) => item.kind === 'turn')).toBe(true)
     expect(store.activeRecords().filter((record) => record.type === 'worklog')).toHaveLength(0)
+  })
+})
+
+describe('capture plugin noise filtering and PTC compatibility', () => {
+  it('ignores tool-failure and tool-recovery episodes for all memory_* tools', async () => {
+    const { store, capture } = await setup()
+    const session = captureSession()
+    const memoryTools = [
+      'memory_search',
+      'memory_read',
+      'memory_write',
+      'memory_forget',
+      'memory_dream',
+      'memory_organize',
+    ]
+    capture.onSessionEvent(session, turnStart(1, 1))
+    capture.onSessionEvent(session, userMessage(2, 'run memory maintenance'))
+    let seq = 3
+    for (const toolName of memoryTools) {
+      const failId = `fail-${toolName}`
+      const okId = `ok-${toolName}`
+      capture.onSessionEvent(
+        session,
+        toolCall(seq++, { callId: failId, name: toolName, arguments: '{}' }),
+      )
+      capture.onSessionEvent(
+        session,
+        toolResult(seq++, {
+          callId: failId,
+          isError: true,
+          error: { name: toolName, code: 'MEMORY_INVALID_QUERY', reason: 'bad args' },
+        }),
+      )
+      capture.onSessionEvent(
+        session,
+        toolCall(seq++, { callId: okId, name: toolName, arguments: '{}' }),
+      )
+      capture.onSessionEvent(session, toolResult(seq++, { callId: okId }))
+    }
+    capture.onSessionEvent(session, assistantMessage(seq++, 'checked memory'))
+    capture.onSessionEvent(session, turnEnd(seq++))
+    await capture.flush()
+
+    expect(store.episodeList()).toHaveLength(0)
+  })
+
+  it('ignores run_code script errors and memory_* failures inside PTC without creating turn noise', async () => {
+    const { store, capture } = await setup()
+    const session = captureSession()
+    capture.onSessionEvent(session, turnStart(1, 1))
+    capture.onSessionEvent(session, userMessage(2, '执行记忆操作'))
+    capture.onSessionEvent(
+      session,
+      toolCall(3, {
+        callId: 'ptc-1',
+        name: 'run_code',
+        arguments: '{"code":"for (const r of res.results) {}"}',
+      }),
+    )
+    capture.onSessionEvent(
+      session,
+      ptcDispatchStart(4, {
+        rootCallId: 'ptc-1',
+        parentCallId: 'ptc-1',
+        subCallId: 'ptc-1:ptc:1',
+        name: 'memory_search',
+        arguments: { query: 'anything' },
+      }),
+    )
+    capture.onSessionEvent(
+      session,
+      ptcDispatch(5, {
+        rootCallId: 'ptc-1',
+        parentCallId: 'ptc-1',
+        subCallId: 'ptc-1:ptc:1',
+        name: 'memory_search',
+        arguments: { query: 'anything' },
+        isError: true,
+        error: { name: 'memory_search', code: 'E_SEARCH', reason: 'failed' },
+      }),
+    )
+    capture.onSessionEvent(
+      session,
+      toolResult(6, {
+        callId: 'ptc-1',
+        isError: true,
+        error: {
+          name: 'run_code',
+          code: 'PTC_RUNTIME_ERROR',
+          reason: 'TypeError: res.results is not iterable',
+        },
+      }),
+    )
+    capture.onSessionEvent(session, assistantMessage(7, 'memory check complete'))
+    capture.onSessionEvent(session, turnEnd(8))
+    await capture.flush()
+
+    expect(store.episodeList()).toHaveLength(0)
+  })
+
+  it('keeps turn episode when memory_* is accompanied by an error turn outcome', async () => {
+    const { store, capture } = await setup()
+    const session = captureSession()
+    capture.onSessionEvent(session, turnStart(1, 1))
+    capture.onSessionEvent(session, userMessage(2, 'check memory'))
+    capture.onSessionEvent(
+      session,
+      toolCall(3, { callId: 'c1', name: 'memory_search', arguments: '{}' }),
+    )
+    capture.onSessionEvent(session, toolResult(4, { callId: 'c1' }))
+    capture.onSessionEvent(
+      session,
+      turnEnd(5, 'error', 1, { code: 'MODEL_UNAVAILABLE', message: 'model down' }),
+    )
+    await capture.flush()
+
+    const turns = store.episodeList().filter((item) => item.kind === 'turn')
+    expect(turns).toHaveLength(1)
+    expect(turns[0]?.outcome).toBe('error')
+    expect(turns[0]?.failureCode).toBe('MODEL_UNAVAILABLE')
+  })
+
+  it('keeps turn episode when memory_* is mixed with a user correction or business tool', async () => {
+    const { store, capture } = await setup()
+    const session = captureSession()
+    capture.onSessionEvent(session, turnStart(1, 1))
+    capture.onSessionEvent(session, userMessage(2, 'do it'))
+    capture.onSessionEvent(session, assistantMessage(3, 'wrong answer'))
+    capture.onSessionEvent(session, turnEnd(4))
+
+    capture.onSessionEvent(session, turnStart(5, 2))
+    capture.onSessionEvent(session, userMessage(6, '不对，应该是 pnpm typecheck'))
+    capture.onSessionEvent(
+      session,
+      toolCall(7, { callId: 'c1', name: 'memory_write', arguments: '{}' }),
+    )
+    capture.onSessionEvent(session, toolResult(8, { callId: 'c1' }))
+    capture.onSessionEvent(session, turnEnd(9, 'completed', 2))
+
+    capture.onSessionEvent(session, turnStart(10, 3))
+    capture.onSessionEvent(session, userMessage(11, 'search memory and run check'))
+    capture.onSessionEvent(
+      session,
+      toolCall(12, { callId: 'c2', name: 'memory_search', arguments: '{}' }),
+    )
+    capture.onSessionEvent(session, toolResult(13, { callId: 'c2' }))
+    capture.onSessionEvent(
+      session,
+      toolCall(14, { callId: 'c3', name: 'bash', arguments: '{"command":"pnpm typecheck"}' }),
+    )
+    capture.onSessionEvent(session, toolResult(15, { callId: 'c3' }))
+    capture.onSessionEvent(session, turnEnd(16, 'completed', 3))
+    await capture.flush()
+
+    const turns = store.episodeList().filter((item) => item.kind === 'turn')
+    expect(turns.map((item) => item.turn)).toEqual([1, 2, 3])
+  })
+
+  it('captures PTC business file edits, tool-failure, tool-recovery and worklogs with redaction', async () => {
+    const opened = await openStore()
+    const capture = new MemoryCapture({
+      store: opened.store,
+      config: {},
+      onTurnEnd: async (input, record) => {
+        await createTurnWorklog(opened.store, {}, input, record)
+      },
+    })
+    const session = captureSession('s1', 'C:/ws/a', 0)
+    capture.onSessionEvent(session, turnStart(1, 1))
+    capture.onSessionEvent(session, userMessage(2, 'fix and write file'))
+    capture.onSessionEvent(
+      session,
+      toolCall(3, {
+        callId: 'ptc-root',
+        name: 'run_code',
+        arguments: '{"code":"await write(...); await deliver(...)"}',
+      }),
+    )
+    capture.onSessionEvent(
+      session,
+      ptcDispatch(4, {
+        rootCallId: 'ptc-root',
+        parentCallId: 'ptc-root',
+        subCallId: 'ptc-root:ptc:1',
+        name: 'write',
+        arguments: { file_path: 'C:/ws/a/password=hunter2.ts', content: 'RAW_SECRET_PAYLOAD' },
+        isError: true,
+        error: { name: 'write', code: 'E_IO', reason: 'password=hunter2 failed' },
+      }),
+    )
+    capture.onSessionEvent(
+      session,
+      ptcDispatch(5, {
+        rootCallId: 'ptc-root',
+        parentCallId: 'ptc-root',
+        subCallId: 'ptc-root:ptc:2',
+        name: 'write',
+        arguments: { file_path: 'C:/ws/a/password=hunter2.ts', content: 'RAW_SECRET_PAYLOAD' },
+        isError: false,
+      }),
+    )
+    capture.onSessionEvent(
+      session,
+      ptcDispatch(6, {
+        rootCallId: 'ptc-root',
+        parentCallId: 'ptc-root',
+        subCallId: 'ptc-root:ptc:3',
+        name: 'deliver',
+        arguments: { summary: 'done' },
+        isError: false,
+      }),
+    )
+    capture.onSessionEvent(session, toolResult(7, { callId: 'ptc-root' }))
+    capture.onSessionEvent(session, assistantMessage(8, 'Updated the file cleanly.'))
+    capture.onSessionEvent(session, turnEnd(9))
+    await capture.flush()
+
+    const episodes = opened.store.episodeList()
+    const failure = episodes.find((item) => item.kind === 'tool-failure')
+    const recovery = episodes.find((item) => item.kind === 'tool-recovery')
+    const turn = episodes.find((item) => item.kind === 'turn')
+    expect(failure?.toolName).toBe('write')
+    expect(failure?.toolError).toContain('[REDACTED]')
+    expect(recovery?.toolName).toBe('write')
+    expect(recovery?.sourceSeqs).toEqual([4, 5])
+    expect(turn?.files).toEqual(['C:/ws/a/[REDACTED]'])
+    expect(JSON.stringify(episodes)).not.toContain('RAW_SECRET_PAYLOAD')
+    expect(JSON.stringify(episodes)).not.toContain('hunter2')
+    expect(opened.store.activeRecords().filter((record) => record.type === 'worklog')).toHaveLength(
+      1,
+    )
+  })
+
+  it('captures PTC completion tools and suppresses spoken remember after PTC memory_write', async () => {
+    const opened = await openStore()
+    const capture = new MemoryCapture({
+      store: opened.store,
+      config: {},
+      onTurnEnd: async (input, record) => {
+        await createTurnWorklog(opened.store, {}, input, record)
+      },
+    })
+    const session = captureSession('s1', 'C:/ws/a', 0)
+    capture.onSessionEvent(session, turnStart(1, 1))
+    capture.onSessionEvent(session, userMessage(2, '记住：部署前先跑 pnpm typecheck'))
+    capture.onSessionEvent(
+      session,
+      toolCall(3, { callId: 'ptc-root', name: 'run_code', arguments: '{"code":"..."}' }),
+    )
+    capture.onSessionEvent(
+      session,
+      ptcDispatch(4, {
+        rootCallId: 'ptc-root',
+        parentCallId: 'ptc-root',
+        subCallId: 'ptc-root:ptc:1',
+        name: 'memory_write',
+        arguments: { type: 'lesson', title: 't', body: 'b' },
+        isError: false,
+      }),
+    )
+    capture.onSessionEvent(
+      session,
+      ptcDispatch(5, {
+        rootCallId: 'ptc-root',
+        parentCallId: 'ptc-root',
+        subCallId: 'ptc-root:ptc:2',
+        name: 'complete_task',
+        arguments: {},
+        isError: false,
+      }),
+    )
+    capture.onSessionEvent(session, toolResult(6, { callId: 'ptc-root' }))
+    capture.onSessionEvent(session, assistantMessage(7, 'Completed the task and saved memory.'))
+    capture.onSessionEvent(session, turnEnd(8))
+    await capture.flush()
+
+    const records = opened.store.activeRecords()
+    expect(records.filter((record) => record.type === 'lesson')).toHaveLength(0)
+    expect(records.filter((record) => record.type === 'worklog')).toHaveLength(1)
+  })
+
+  it('extracts and redacts first-line error summary from DSH PTC content when error field is absent', async () => {
+    const { store, capture } = await setup()
+    const session = captureSession()
+    capture.onSessionEvent(session, turnStart(1, 1))
+    capture.onSessionEvent(session, userMessage(2, 'run build command'))
+    capture.onSessionEvent(
+      session,
+      toolCall(3, {
+        callId: 'ptc-root',
+        name: 'run_code',
+        arguments: '{"code":"await bash(...)"}',
+      }),
+    )
+    capture.onSessionEvent(
+      session,
+      ptcDispatch(4, {
+        rootCallId: 'ptc-root',
+        parentCallId: 'ptc-root',
+        subCallId: 'ptc-root:ptc:1',
+        name: 'bash',
+        arguments: { command: 'pnpm build' },
+        isError: true,
+        text: '\n  Error: exit 1 password=hunter2  \nsecond line huge raw output should be ignored\n',
+      }),
+    )
+    capture.onSessionEvent(
+      session,
+      ptcDispatch(5, {
+        rootCallId: 'ptc-root',
+        parentCallId: 'ptc-root',
+        subCallId: 'ptc-root:ptc:2',
+        name: 'bash',
+        arguments: { command: 'pnpm build' },
+        isError: false,
+      }),
+    )
+    capture.onSessionEvent(session, toolResult(6, { callId: 'ptc-root' }))
+    capture.onSessionEvent(session, turnEnd(7))
+    await capture.flush()
+
+    const failure = store.episodeList().find((item) => item.kind === 'tool-failure')
+    const recovery = store.episodeList().find((item) => item.kind === 'tool-recovery')
+    expect(failure?.toolName).toBe('bash')
+    expect(failure?.toolError).toContain('Error: exit 1 [REDACTED]')
+    expect(failure?.toolError).not.toContain('hunter2')
+    expect(failure?.toolError).not.toContain('second line huge raw output')
+    expect(recovery?.toolName).toBe('bash')
+    expect(recovery?.sourceSeqs).toEqual([4, 5])
+  })
+
+  it('does not invoke onTurnEnd callback on pure memory-maintenance turns', async () => {
+    const opened = await openStore()
+    const onTurnEnd = vi.fn()
+    const capture = new MemoryCapture({
+      store: opened.store,
+      config: {},
+      onTurnEnd,
+    })
+    const session = captureSession()
+
+    capture.onSessionEvent(session, turnStart(1, 1))
+    capture.onSessionEvent(session, userMessage(2, '执行记忆操作'))
+    capture.onSessionEvent(
+      session,
+      toolCall(3, { callId: 'c1', name: 'memory_search', arguments: '{}' }),
+    )
+    capture.onSessionEvent(session, toolResult(4, { callId: 'c1' }))
+    capture.onSessionEvent(session, assistantMessage(5, 'memory checked'))
+    capture.onSessionEvent(session, turnEnd(6))
+    await capture.flush()
+
+    expect(onTurnEnd).not.toHaveBeenCalled()
+    expect(opened.store.episodeList()).toHaveLength(0)
+
+    capture.onSessionEvent(session, turnStart(7, 2))
+    capture.onSessionEvent(session, userMessage(8, 'edit file'))
+    capture.onSessionEvent(
+      session,
+      toolCall(9, { callId: 'c2', name: 'write', arguments: '{"file_path":"C:/ws/a/app.ts"}' }),
+    )
+    capture.onSessionEvent(session, toolResult(10, { callId: 'c2' }))
+    capture.onSessionEvent(session, turnEnd(11, 'completed', 2))
+    await capture.flush()
+
+    expect(onTurnEnd).toHaveBeenCalledTimes(1)
   })
 })

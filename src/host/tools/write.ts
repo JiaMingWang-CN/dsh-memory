@@ -6,8 +6,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { MemoryService } from '../service.ts'
 import { workspaceIdentityOf } from '../workspace.ts'
-
-const MEMORY_TYPES = ['lesson', 'worklog', 'wiki', 'preference'] as const
+import { MEMORY_STATUSES, MEMORY_TYPES, renderJsonOutput } from './schemas.ts'
 
 /** Session id carried by the calling agent, when the runtime exposes one. */
 function sessionIdOf(agent: unknown): string | undefined {
@@ -25,7 +24,7 @@ export function memoryWriteTool(ctx: Context, service: MemoryService): ToolDefin
   return defineTool({
     name: 'memory_write',
     description:
-      'Create or update one long-term memory. Write only durable knowledge the environment cannot give back: reusable rules, verified approaches, pitfalls and stable user preferences. Do not write task progress, completed actions, code or file contents, current config values, git history or command output. Search first and update an existing memory (id + expectedContentRevision) instead of duplicating it; keep one topic per memory and a searchable title. Explicit writes are active immediately. Literal \\n sequences in title or body are normalized to real newlines when the text has no real newlines. Strong secrets (private keys, API keys, tokens) are refused; record where the credential is configured instead.',
+      'Create or update one long-term memory. Write only durable knowledge the environment cannot give back: reusable rules, verified approaches, pitfalls and stable user preferences. Do not write task progress, completed actions, code or file contents, current config values, git history or command output. Never copy, paraphrase or summarize already auto-loaded project instructions or docs (such as AGENTS.md, CLAUDE.md, README or the injected skills list). When given a broad request to perform memory operations and the current session has no new discoveries, pitfalls, decisions or user corrections, do not copy existing docs to fill the store. Keep each memory concise and focused on a single independent topic with a searchable title; never bundle unrelated modules or constraints into one long note. Search first and update an existing memory (id + expectedContentRevision) instead of duplicating it. Explicit writes are active immediately. Literal \\n sequences in title or body are normalized to real newlines when the text has no real newlines. Strong secrets (private keys, API keys, tokens) are refused; record where the credential is configured instead.',
     parameters: {
       id: { type: 'string', description: 'Existing memory id to update; omit to create.' },
       type: { type: 'string', required: true, enum: MEMORY_TYPES, description: 'Memory type.' },
@@ -44,8 +43,18 @@ export function memoryWriteTool(ctx: Context, service: MemoryService): ToolDefin
       },
     },
     output: {
-      schema: { type: 'string' },
-      render: (_args, value) => [{ type: 'text', text: value }],
+      schema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', required: true },
+          contentRevision: { type: 'integer', required: true },
+          status: { type: 'string', enum: MEMORY_STATUSES, required: true },
+          redactions: { type: 'integer', required: true },
+          duplicate: { type: 'boolean', required: true },
+        },
+        additionalProperties: false,
+      },
+      render: renderJsonOutput,
     },
     async execute(args, exec) {
       const workspace = await workspaceIdentityOf(ctx, exec.agent)
@@ -71,13 +80,13 @@ export function memoryWriteTool(ctx: Context, service: MemoryService): ToolDefin
         workspace,
         exec.callId,
       )
-      return JSON.stringify({
+      return {
         id: result.record.id,
         contentRevision: result.record.contentRevision,
         status: result.record.status,
         redactions: result.redactions,
         duplicate: result.duplicate ?? false,
-      })
+      }
     },
   })
 }

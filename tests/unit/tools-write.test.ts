@@ -262,12 +262,11 @@ describe('memory_write tool', () => {
   it('records the calling session as a source reference when creating', async () => {
     const host = await openWorkspaceService()
     try {
-      const text = await getTool(host.tools, 'memory_write').execute(
+      const created = (await getTool(host.tools, 'memory_write').execute(
         { type: 'lesson', title: 'sourced lesson', body: 'body' },
         toolExec('memory_write', 'agent-a', 'session-1'),
-      )
-      const parsed = JSON.parse(text as string) as { id: string }
-      const stored = host.service.read(parsed.id, 'c:/ws/a')
+      )) as { id: string }
+      const stored = host.service.read(created.id, 'c:/ws/a')
       expect(stored.sourceRefs).toEqual([{ sessionId: 'session-1' }])
     } finally {
       await host.dispose()
@@ -279,12 +278,14 @@ describe('memory_write tool', () => {
     try {
       const exec = (callId: string) => toolExec('memory_write', 'agent-a', 'session-1', callId)
       const args = { type: 'lesson' as const, title: 'retry once', body: 'body' }
-      const first = JSON.parse(
-        (await getTool(host.tools, 'memory_write').execute(args, exec('call-retry'))) as string,
-      ) as { id: string }
-      const second = JSON.parse(
-        (await getTool(host.tools, 'memory_write').execute(args, exec('call-retry'))) as string,
-      ) as { id: string }
+      const first = (await getTool(host.tools, 'memory_write').execute(
+        args,
+        exec('call-retry'),
+      )) as { id: string }
+      const second = (await getTool(host.tools, 'memory_write').execute(
+        args,
+        exec('call-retry'),
+      )) as { id: string }
       expect(second.id).toBe(first.id)
       expect(host.service.list({ workspaceKey: 'c:/ws/a' }).items).toHaveLength(1)
     } finally {
@@ -295,11 +296,10 @@ describe('memory_write tool', () => {
   it('keeps the existing source references when updating', async () => {
     const host = await openWorkspaceService()
     try {
-      const createdText = await getTool(host.tools, 'memory_write').execute(
+      const created = (await getTool(host.tools, 'memory_write').execute(
         { type: 'lesson', title: 'sourced lesson', body: 'body' },
         toolExec('memory_write', 'agent-a', 'session-1'),
-      )
-      const created = JSON.parse(createdText as string) as { id: string }
+      )) as { id: string }
       await getTool(host.tools, 'memory_write').execute(
         {
           id: created.id,
@@ -312,6 +312,21 @@ describe('memory_write tool', () => {
       )
       const stored = host.service.read(created.id, 'c:/ws/a')
       expect(stored.sourceRefs).toEqual([{ sessionId: 'session-1' }])
+    } finally {
+      await host.dispose()
+    }
+  })
+
+  it('forbids copying auto-loaded docs and enforces single-topic concise writes in description', async () => {
+    const host = await openWorkspaceService()
+    try {
+      const { description } = getTool(host.tools, 'memory_write')
+      expect(description).toContain('AGENTS.md')
+      expect(description).toContain('CLAUDE.md')
+      expect(description).toContain('README')
+      expect(description).toContain('skills')
+      expect(description).toContain('single independent topic')
+      expect(description).toContain('broad request')
     } finally {
       await host.dispose()
     }

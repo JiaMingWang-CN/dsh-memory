@@ -90,6 +90,50 @@ export function toolResult(
   })
 }
 
+export function ptcDispatchStart(
+  seq: number,
+  input: {
+    rootCallId?: string
+    parentCallId?: string
+    subCallId: string
+    name: string
+    arguments: unknown
+  },
+): SessionEvent {
+  return event('tool/ptc-dispatch-start', seq, {
+    rootCallId: input.rootCallId ?? 'root-1',
+    parentCallId: input.parentCallId ?? 'root-1',
+    subCallId: input.subCallId,
+    name: input.name,
+    arguments: input.arguments,
+  })
+}
+
+export function ptcDispatch(
+  seq: number,
+  input: {
+    rootCallId?: string
+    parentCallId?: string
+    subCallId: string
+    name: string
+    arguments: unknown
+    isError?: boolean
+    text?: string
+    error?: { name: string; code: string; reason?: string }
+  },
+): SessionEvent {
+  return event('tool/ptc-dispatch', seq, {
+    rootCallId: input.rootCallId ?? 'root-1',
+    parentCallId: input.parentCallId ?? 'root-1',
+    subCallId: input.subCallId,
+    name: input.name,
+    arguments: input.arguments,
+    isError: input.isError ?? false,
+    content: [{ type: 'text', text: input.text ?? 'done' }],
+    ...(input.error === undefined ? {} : { error: input.error }),
+  })
+}
+
 export function turnEnd(
   seq: number,
   reasonKind = 'completed',

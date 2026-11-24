@@ -12,6 +12,7 @@ import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
 import { OperationError } from '../operations.ts'
 import type { MemoryService } from '../service.ts'
 import { workspaceIdentityOf } from '../workspace.ts'
+import { MEMORY_STATUSES, renderJsonOutput } from './schemas.ts'
 
 /**
  * Build the `memory_forget` tool.
@@ -29,8 +30,17 @@ export function memoryForgetTool(ctx: Context, service: MemoryService): ToolDefi
       reason: { type: 'string', description: 'Optional reason recorded for the audit trail.' },
     },
     output: {
-      schema: { type: 'string' },
-      render: (_args, value) => [{ type: 'text', text: value }],
+      schema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', required: true },
+          status: { type: 'string', enum: MEMORY_STATUSES, required: true },
+          contentRevision: { type: 'integer', required: true },
+          reason: { oneOf: [{ type: 'string' }, { type: 'null' }], required: true },
+        },
+        additionalProperties: false,
+      },
+      render: renderJsonOutput,
     },
     async execute(args, exec) {
       const forged = args as Record<string, unknown>
@@ -47,12 +57,12 @@ export function memoryForgetTool(ctx: Context, service: MemoryService): ToolDefi
         args.reason,
         exec.callId,
       )
-      return JSON.stringify({
+      return {
         id: archived.id,
         status: archived.status,
         contentRevision: archived.contentRevision,
         reason: args.reason ?? null,
-      })
+      }
     },
   })
 }

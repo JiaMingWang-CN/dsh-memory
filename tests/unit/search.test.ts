@@ -209,3 +209,61 @@ describe('SearchIndex.search', () => {
     expect(result.results[0]?.id).toBe('mem-lesson')
   })
 })
+
+describe('SearchIndex.browse', () => {
+  it('orders visible active records by pinned, importance, then updatedAt and obeys limit', () => {
+    const index = new SearchIndex()
+    index.rebuild([
+      makeMemoryRecord({
+        id: MemoryId('mem-low'),
+        title: 'low',
+        body: 'low body',
+        scope: workspaceA,
+        importance: 0.2,
+        updatedAt: '2026-11-20T00:00:00.000Z',
+      }),
+      makeMemoryRecord({
+        id: MemoryId('mem-pinned'),
+        title: 'pinned',
+        body: 'pinned body',
+        scope: workspaceA,
+        pinned: true,
+        importance: 0.1,
+        updatedAt: '2026-11-18T00:00:00.000Z',
+      }),
+      makeMemoryRecord({
+        id: MemoryId('mem-high-old'),
+        title: 'high old',
+        body: 'high old body',
+        scope: workspaceA,
+        importance: 0.8,
+        updatedAt: '2026-11-19T00:00:00.000Z',
+      }),
+      makeMemoryRecord({
+        id: MemoryId('mem-high-new'),
+        title: 'high new',
+        body: 'high new body',
+        scope: workspaceA,
+        importance: 0.8,
+        updatedAt: '2026-11-21T00:00:00.000Z',
+      }),
+      makeMemoryRecord({
+        id: MemoryId('mem-expired'),
+        title: 'expired',
+        body: 'expired body',
+        scope: workspaceA,
+        importance: 1,
+        expiresAt: '2020-01-01T00:00:00.000Z',
+      }),
+    ])
+    const now = new Date('2026-11-22T00:00:00.000Z')
+    const page = index.browse({ workspaceKey: 'ws-a', limit: 3, now })
+    expect(page.results.map((hit) => hit.id)).toEqual([
+      'mem-pinned',
+      'mem-high-new',
+      'mem-high-old',
+    ])
+    expect(page.total).toBe(4)
+    expect(page.truncated).toBe(true)
+  })
+})

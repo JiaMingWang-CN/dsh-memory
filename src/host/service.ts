@@ -16,6 +16,7 @@ import {
 import {
   SearchIndex,
   DEFAULT_SEARCH_LIMIT,
+  type BrowseRequest,
   type SearchRequest,
   type SearchResult,
 } from './search.ts'
@@ -1536,6 +1537,19 @@ export class MemoryService extends TypertRemoteService {
     const index = this.searchIndex
     if (index === undefined) return { results: [], total: 0, truncated: false }
     return index.search(request)
+  }
+
+  /**
+   * List active memories visible in one scope without a keyword query.
+   * Statistics are not touched here.
+   * @param request - Scope, filters, limit and clock.
+   * @returns Ranked summaries plus total/truncation metadata.
+   */
+  browse(request: BrowseRequest): SearchResult {
+    this.requireStore()
+    const index = this.searchIndex
+    if (index === undefined) return { results: [], total: 0, truncated: false }
+    return index.browse(request)
   }
 
   /**

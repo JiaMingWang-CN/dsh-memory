@@ -1,14 +1,12 @@
 /**
- * `memory_search` — BM25 search over long-term memories.
+ * `memory_search` — BM25 search and priority listing over long-term memories.
  * @module dsh-memory/host/tools/search
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
-import { OperationError } from '../operations.ts'
 import type { MemoryService } from '../service.ts'
 import { workspaceIdentityOf } from '../workspace.ts'
-
-const MEMORY_TYPES = ['lesson', 'worklog', 'wiki', 'preference'] as const
+import { MEMORY_SCOPE_OUTPUT_SCHEMA, MEMORY_TYPES, renderJsonOutput } from './schemas.ts'
 
 /**
  * Build the `memory_search` tool.
@@ -20,9 +18,13 @@ export function memorySearchTool(ctx: Context, service: MemoryService): ToolDefi
   return defineTool({
     name: 'memory_search',
     description:
-      'Search long-term memories by keywords, optionally filtered by type and scope. Returns ranked summaries; use memory_read for the full body.',
+      'Search long-term memories by keywords, or omit query to list visible active memories in the selected scope ordered by priority (pinned, importance, updatedAt). Optionally filter by type and scope. Returns summaries; use memory_read for the full body.',
     parameters: {
-      query: { type: 'string', required: true, description: 'Search keywords.' },
+      query: {
+        type: 'string',
+        description:
+          'Search keywords. Omit or leave empty to list visible active memories without guessing keywords.',
+      },
       type: { type: 'string', enum: MEMORY_TYPES, description: 'Restrict results to one type.' },
       scope: {
         type: 'string',
@@ -33,25 +35,54 @@ export function memorySearchTool(ctx: Context, service: MemoryService): ToolDefi
       limit: { type: 'integer', description: 'Maximum number of hits (1-50, default 20).' },
     },
     output: {
-      schema: { type: 'string' },
-      render: (_args, value) => [{ type: 'text', text: value }],
+      schema: {
+        type: 'object',
+        properties: {
+          results: {
+            type: 'array',
+            required: true,
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', required: true },
+                type: { type: 'string', enum: MEMORY_TYPES, required: true },
+                title: { type: 'string', required: true },
+                snippet: { type: 'string', required: true },
+                scope: { ...MEMORY_SCOPE_OUTPUT_SCHEMA, required: true },
+                confidence: { type: 'number', required: true },
+                updatedAt: { type: 'string', required: true },
+                score: { type: 'number', required: true },
+              },
+              additionalProperties: false,
+            },
+          },
+          total: { type: 'integer', required: true },
+          truncated: { type: 'boolean', required: true },
+        },
+        additionalProperties: false,
+      },
+      render: renderJsonOutput,
     },
+    isConcurrencySafe: () => true,
     async execute(args, exec) {
-      const query = args.query.trim()
-      if (query.length === 0) {
-        throw new OperationError('MEMORY_INVALID_QUERY', 'query must not be empty')
-      }
+      const query = args.query?.trim() ?? ''
       const scope = args.scope ?? 'auto'
       const workspace = scope === 'global' ? null : await workspaceIdentityOf(ctx, exec.agent)
       if (scope === 'workspace' && workspace === null) {
-        return JSON.stringify({ results: [], total: 0, truncated: false })
+        return { results: [], total: 0, truncated: false }
       }
-      const result = service.search({
-        query,
+      const filter = {
         workspaceKey: workspace?.key ?? null,
         scope,
         ...(args.type === undefined ? {} : { types: [args.type] }),
         ...(args.limit === undefined ? {} : { limit: args.limit }),
+      }
+      if (query.length === 0) {
+        return service.browse(filter)
+      }
+      const result = service.search({
+        query,
+        ...filter,
       })
       // Search hits touch match statistics only; failures are diagnostic and
       // must never block the result or fail the tool call.
@@ -64,11 +95,11 @@ export function memorySearchTool(ctx: Context, service: MemoryService): ToolDefi
           )
         })
       }
-      return JSON.stringify({
+      return {
         results: result.results,
         total: result.total,
         truncated: result.truncated,
-      })
+      }
     },
   })
 }

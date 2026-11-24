@@ -48,7 +48,24 @@ const FILE_TOOLS = new Set([
   'move',
 ])
 const DELIVERY_TOOLS = new Set(['present', 'deliver'])
+const RUN_CODE_TOOL = 'run_code'
+const MEMORY_TOOLS = new Set([
+  'memory_search',
+  'memory_read',
+  'memory_write',
+  'memory_forget',
+  'memory_dream',
+  'memory_organize',
+])
 const WHITELIST_ARG_KEYS = ['file_path', 'filePath', 'path', 'cwd', 'command', 'notebook_path']
+
+/** Minimal payload shape of a `tool/ptc-dispatch` or `tool/ptc-dispatch-start` event. */
+interface PtcDispatchPayload {
+  name: string
+  arguments?: unknown
+  isError?: boolean
+  error?: { code?: string; reason?: string }
+}
 
 /**
  * Episode summary handed to the worklog builder and the dream queue. It carries
@@ -118,6 +135,8 @@ interface SessionState {
   correctionText?: string | undefined
   explicitCompletion: boolean
   explicitWrite: boolean
+  sawMemoryTool: boolean
+  sawNonMemoryTool: boolean
   rememberText?: string | undefined
   rememberSeq?: number | undefined
   previousAssistantText?: string
@@ -163,18 +182,22 @@ function textOf(content: readonly { type: string; text?: string }[]): string {
     .join('\n')
 }
 
-/** Parse whitelisted target fields out of a raw tool-call argument string. */
-function whitelistedTarget(argumentsText: string): {
+/** Parse whitelisted target fields out of raw tool-call arguments (JSON string or object). */
+function whitelistedTarget(rawArguments: unknown): {
   targetHash: string
   targetPath?: string
 } {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(argumentsText)
-  } catch {
+  let parsed: unknown = rawArguments
+  if (typeof rawArguments === 'string') {
+    try {
+      parsed = JSON.parse(rawArguments)
+    } catch {
+      return { targetHash: hashOf('') }
+    }
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return { targetHash: hashOf('') }
   }
-  if (parsed === null || typeof parsed !== 'object') return { targetHash: hashOf('') }
   const record = parsed as Record<string, unknown>
   const picked: [string, string][] = []
   let targetPath: string | undefined
@@ -196,6 +219,50 @@ function whitelistedTarget(argumentsText: string): {
   return {
     targetHash: hashOf(JSON.stringify(picked)),
     ...(targetPath === undefined ? {} : { targetPath }),
+  }
+}
+
+function firstContentLine(content: unknown): string | undefined {
+  if (!Array.isArray(content)) return undefined
+  for (const block of content) {
+    if (block === null || typeof block !== 'object') continue
+    const item = block as { type?: unknown; text?: unknown }
+    if (item.type !== 'text' || typeof item.text !== 'string') continue
+    for (const rawLine of item.text.split(/\r?\n/)) {
+      const line = rawLine.trim()
+      if (line !== '') return line
+    }
+  }
+  return undefined
+}
+
+function asPtcDispatchPayload(data: unknown): PtcDispatchPayload | undefined {
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) return undefined
+  const record = data as Record<string, unknown>
+  if (typeof record.name !== 'string' || record.name === '') return undefined
+  const rawError = record.error
+  let error: { code?: string; reason?: string } | undefined
+  if (rawError !== null && typeof rawError === 'object' && !Array.isArray(rawError)) {
+    const err = rawError as Record<string, unknown>
+    error = {
+      ...(typeof err.code === 'string' ? { code: err.code } : {}),
+      ...(typeof err.reason === 'string' ? { reason: err.reason } : {}),
+    }
+  }
+  const isError = typeof record.isError === 'boolean' ? record.isError : undefined
+  if (isError === true && (error?.reason === undefined || error.reason.trim() === '')) {
+    // Real DSH 0.2.2-rc.5 `tool/ptc-dispatch` failures carry the message in
+    // `content` without a structured `error` field; keep only the sanitized first line.
+    const summary = sanitize(firstContentLine(record.content), MAX_CAPTURE_TOOL_ERROR_BYTES)
+    if (summary !== undefined && summary !== '') {
+      error = { ...(error ?? {}), reason: summary }
+    }
+  }
+  return {
+    name: record.name,
+    arguments: record.arguments,
+    ...(isError === undefined ? {} : { isError }),
+    ...(error === undefined ? {} : { error }),
   }
 }
 
@@ -248,6 +315,8 @@ export class MemoryCapture {
         correction: false,
         explicitCompletion: false,
         explicitWrite: false,
+        sawMemoryTool: false,
+        sawNonMemoryTool: false,
       }
       this.states.set(id, state)
     }
@@ -271,24 +340,30 @@ export class MemoryCapture {
       if (event.type === 'turn/end') this.resetTurn(state)
       return
     }
-    switch (event.type) {
+    switch (event.type as string) {
       case 'turn/start':
-        state.turn = event.data.turn
+        state.turn = (event as SessionEvent<'turn/start'>).data.turn
         break
       case 'user/message':
-        this.onUserMessage(session, state, event)
+        this.onUserMessage(session, state, event as SessionEvent<'user/message'>)
         break
       case 'tool/call':
-        this.onToolCall(state, event)
+        this.onToolCall(state, event as SessionEvent<'tool/call'>)
         break
       case 'tool/result':
-        this.onToolResultEvent(session, state, event)
+        this.onToolResultEvent(session, state, event as SessionEvent<'tool/result'>)
+        break
+      case 'tool/ptc-dispatch-start':
+        this.onPtcDispatchStart(state, event.data)
+        break
+      case 'tool/ptc-dispatch':
+        this.onPtcDispatch(session, state, event.seq, event.data)
         break
       case 'assistant/message':
-        this.onAssistantMessage(state, event)
+        this.onAssistantMessage(state, event as SessionEvent<'assistant/message'>)
         break
       case 'turn/end':
-        this.onTurnEndEvent(session, state, event)
+        this.onTurnEndEvent(session, state, event as SessionEvent<'turn/end'>)
         break
       default:
         break
@@ -296,20 +371,21 @@ export class MemoryCapture {
   }
 
   /**
-   * Handle one `tools/result` host event. Only `memory_write` is observed: a
-   * successful explicit write means the model already persisted the fact, so
-   * the current turn will not create a duplicate spoken "remember" proposal.
+   * Handle one `tools/result` host event. Tracks `memory_*` invocations so
+   * a successful explicit `memory_write` suppresses duplicate spoken "remember"
+   * proposals in the same turn.
    * @param exec - Executed tool call.
    * @param result - Tool outcome.
    */
   onToolResult(exec: Readonly<ToolExecution>, result: Readonly<ToolExecutionResult>): void {
     if (!this.enabled) return
-    if (exec.name !== 'memory_write') return
+    if (!MEMORY_TOOLS.has(exec.name)) return
     const agentId = exec.agent?.id
     if (agentId === undefined) return
     const state = this.states.get(agentId)
     if (state === undefined) return
-    if (result.isError === false) state.explicitWrite = true
+    state.sawMemoryTool = true
+    if (exec.name === 'memory_write' && result.isError === false) state.explicitWrite = true
   }
 
   private onUserMessage(
@@ -359,6 +435,17 @@ export class MemoryCapture {
 
   private onToolCall(state: SessionState, event: SessionEvent<'tool/call'>): void {
     const { callId, name, arguments: argumentsText, step } = event.data
+    state.seqs.push(event.seq)
+    if (name === RUN_CODE_TOOL || MEMORY_TOOLS.has(name)) {
+      if (MEMORY_TOOLS.has(name)) state.sawMemoryTool = true
+      state.toolCalls.set(String(callId), {
+        name,
+        targetHash: hashOf(''),
+        step,
+      })
+      return
+    }
+    state.sawNonMemoryTool = true
     const target = whitelistedTarget(argumentsText)
     state.toolCalls.set(String(callId), {
       name,
@@ -366,7 +453,6 @@ export class MemoryCapture {
       ...(target.targetPath === undefined ? {} : { targetPath: target.targetPath }),
       step,
     })
-    state.seqs.push(event.seq)
   }
 
   private onToolResultEvent(
@@ -377,51 +463,146 @@ export class MemoryCapture {
     const data = event.data
     const callId = String(data.message.source.callId)
     const call = state.toolCalls.get(callId)
-    const name = call?.name ?? 'unknown'
+    const name = call?.name ?? data.error?.name ?? 'unknown'
     const isError = data.message.isError === true || data.error !== undefined
-    if (isError) {
-      const code = data.error?.code ?? 'UNKNOWN'
-      const errorText =
-        sanitize(
-          `${name}: ${code}${data.error?.reason === undefined ? '' : ` ${data.error.reason}`}`,
-          MAX_CAPTURE_TOOL_ERROR_BYTES,
-        ) ?? `${name}: ${code}`
-      state.failures.push({
-        name,
-        targetHash: call?.targetHash ?? hashOf(''),
-        code,
-        seq: event.seq,
-        consumed: false,
-      })
-      state.seqs.push(event.seq)
-      const workspace = this.workspaceInput(session)
-      if (workspace.workspaceKey === '') return
-      // Snapshot the turn before the queued write: turn/end resets the live state.
-      const turn = state.turn
-      this.enqueue(async () => {
-        await this.store.appendEpisode({
-          ...workspace,
-          kind: 'tool-failure',
-          turn,
-          sourceSeqs: [event.seq],
-          toolName: name,
-          toolError: errorText,
-        })
+    this.handleSettledTool(session, state, {
+      name,
+      targetHash: call?.targetHash ?? hashOf(''),
+      ...(call?.targetPath === undefined ? {} : { targetPath: call.targetPath }),
+      seq: event.seq,
+      isError,
+      ...(data.error === undefined ? {} : { error: data.error }),
+    })
+  }
+
+  private onPtcDispatchStart(state: SessionState, rawData: unknown): void {
+    const payload = asPtcDispatchPayload(rawData)
+    if (payload === undefined) return
+    if (MEMORY_TOOLS.has(payload.name)) {
+      state.sawMemoryTool = true
+      return
+    }
+    if (payload.name !== RUN_CODE_TOOL) state.sawNonMemoryTool = true
+  }
+
+  private onPtcDispatch(
+    session: Session,
+    state: SessionState,
+    seq: number,
+    rawData: unknown,
+  ): void {
+    const payload = asPtcDispatchPayload(rawData)
+    if (payload === undefined) return
+    const isError = payload.isError === true || payload.error !== undefined
+    if (payload.name === RUN_CODE_TOOL || MEMORY_TOOLS.has(payload.name)) {
+      this.handleSettledTool(session, state, {
+        name: payload.name,
+        targetHash: hashOf(''),
+        seq,
+        isError,
+        ...(payload.error === undefined ? {} : { error: payload.error }),
       })
       return
     }
-    if (name === 'memory_write') state.explicitWrite = true
+    state.seqs.push(seq)
+    const target = whitelistedTarget(payload.arguments)
+    this.handleSettledTool(session, state, {
+      name: payload.name,
+      targetHash: target.targetHash,
+      ...(target.targetPath === undefined ? {} : { targetPath: target.targetPath }),
+      seq,
+      isError,
+      ...(payload.error === undefined ? {} : { error: payload.error }),
+    })
+  }
+
+  private handleSettledTool(
+    session: Session,
+    state: SessionState,
+    input: {
+      name: string
+      targetHash: string
+      targetPath?: string
+      seq: number
+      isError: boolean
+      error?: { code?: string; reason?: string }
+    },
+  ): void {
+    // Ignore the PTC transport wrapper and all memory_* tools so plugin errors
+    // or recoveries never pollute project tool-failure / tool-recovery episodes.
+    if (input.name === RUN_CODE_TOOL) return
+    if (MEMORY_TOOLS.has(input.name)) {
+      state.sawMemoryTool = true
+      if (!input.isError && input.name === 'memory_write') state.explicitWrite = true
+      return
+    }
+    state.sawNonMemoryTool = true
+    if (input.isError) {
+      this.recordFailure(session, state, input)
+      return
+    }
+    this.recordSuccess(session, state, input)
+  }
+
+  private recordFailure(
+    session: Session,
+    state: SessionState,
+    input: {
+      name: string
+      targetHash: string
+      seq: number
+      error?: { code?: string; reason?: string }
+    },
+  ): void {
+    const code = input.error?.code ?? 'UNKNOWN'
+    const errorText =
+      sanitize(
+        `${input.name}: ${code}${input.error?.reason === undefined ? '' : ` ${input.error.reason}`}`,
+        MAX_CAPTURE_TOOL_ERROR_BYTES,
+      ) ?? `${input.name}: ${code}`
+    state.failures.push({
+      name: input.name,
+      targetHash: input.targetHash,
+      code,
+      seq: input.seq,
+      consumed: false,
+    })
+    state.seqs.push(input.seq)
+    const workspace = this.workspaceInput(session)
+    if (workspace.workspaceKey === '') return
+    // Snapshot the turn before the queued write: turn/end resets the live state.
+    const turn = state.turn
+    this.enqueue(async () => {
+      await this.store.appendEpisode({
+        ...workspace,
+        kind: 'tool-failure',
+        turn,
+        sourceSeqs: [input.seq],
+        toolName: input.name,
+        toolError: errorText,
+      })
+    })
+  }
+
+  private recordSuccess(
+    session: Session,
+    state: SessionState,
+    input: {
+      name: string
+      targetHash: string
+      targetPath?: string
+      seq: number
+    },
+  ): void {
     // Success: a matching earlier failure with the same tool and target becomes
     // a recovery episode. Different target or tool never infers "fixed".
     const failure = state.failures.find(
       (entry) =>
-        !entry.consumed &&
-        entry.name === name &&
-        entry.targetHash === (call?.targetHash ?? hashOf('')),
+        !entry.consumed && entry.name === input.name && entry.targetHash === input.targetHash,
     )
     if (failure !== undefined) {
       failure.consumed = true
-      state.seqs.push(event.seq)
+      state.seqs.push(input.seq)
       const workspace = this.workspaceInput(session)
       if (workspace.workspaceKey !== '') {
         // Snapshot the turn and failure seq: both live state and the failure list
@@ -433,15 +614,17 @@ export class MemoryCapture {
             ...workspace,
             kind: 'tool-recovery',
             turn,
-            sourceSeqs: [failureSeq, event.seq],
-            toolName: name,
+            sourceSeqs: [failureSeq, input.seq],
+            toolName: input.name,
           })
         })
       }
     }
-    if (call?.targetPath !== undefined && FILE_TOOLS.has(name)) state.files.add(call.targetPath)
-    if (DELIVERY_TOOLS.has(name)) state.delivered = true
-    if (COMPLETION_TOOLS.has(name)) state.explicitCompletion = true
+    if (input.targetPath !== undefined && FILE_TOOLS.has(input.name)) {
+      state.files.add(input.targetPath)
+    }
+    if (DELIVERY_TOOLS.has(input.name)) state.delivered = true
+    if (COMPLETION_TOOLS.has(input.name)) state.explicitCompletion = true
   }
 
   private onAssistantMessage(state: SessionState, event: SessionEvent<'assistant/message'>): void {
@@ -464,6 +647,14 @@ export class MemoryCapture {
     const rememberText = state.rememberText
     const rememberSeq = state.rememberSeq
     const explicitWrite = state.explicitWrite
+    const pureMemoryTurn =
+      state.sawMemoryTool &&
+      !state.sawNonMemoryTool &&
+      state.files.size === 0 &&
+      !state.correction &&
+      !state.delivered &&
+      !state.explicitCompletion &&
+      outcome !== 'error'
     const input: CaptureEpisodeInput = {
       kind: 'turn',
       ...this.workspaceInput(session),
@@ -496,10 +687,11 @@ export class MemoryCapture {
     if (input.workspaceKey === '') return
     this.enqueue(async () => {
       const hasContent =
-        input.prompt !== undefined ||
-        input.assistantFinal !== undefined ||
-        input.files.length > 0 ||
-        outcome !== 'completed'
+        !pureMemoryTurn &&
+        (input.prompt !== undefined ||
+          input.assistantFinal !== undefined ||
+          input.files.length > 0 ||
+          outcome !== 'completed')
       let record: EpisodeRecord | undefined
       if (hasContent) {
         record = await this.store.appendEpisode({
@@ -521,7 +713,7 @@ export class MemoryCapture {
       if (rememberText !== undefined && rememberSeq !== undefined && !explicitWrite) {
         await this.remember(input, rememberText, rememberSeq)
       }
-      if (this.onTurnEnd !== undefined) await this.onTurnEnd(input, record)
+      if (!pureMemoryTurn && this.onTurnEnd !== undefined) await this.onTurnEnd(input, record)
     })
   }
 
@@ -540,6 +732,8 @@ export class MemoryCapture {
     state.correctionText = undefined
     state.explicitCompletion = false
     state.explicitWrite = false
+    state.sawMemoryTool = false
+    state.sawNonMemoryTool = false
     state.rememberText = undefined
     state.rememberSeq = undefined
   }

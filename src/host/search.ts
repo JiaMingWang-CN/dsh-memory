@@ -93,6 +93,9 @@ export interface SearchRequest {
   now?: Date
 }
 
+/** Request accepted by {@link SearchIndex.browse}. */
+export type BrowseRequest = Omit<SearchRequest, 'query'>
+
 /** One search hit. */
 export interface SearchHit {
   id: string
@@ -276,22 +279,11 @@ export class SearchIndex {
     }
   }
 
-  /**
-   * Score and filter the indexed records for one request.
-   * @param request - Query, scope, type/tag filters, page size and clock.
-   * @returns The ranked page plus total/truncation metadata.
-   */
-  search(request: SearchRequest): SearchResult {
-    const queryTerms = [...new Set(tokenize(request.query))]
-    const limit = Math.min(Math.max(request.limit ?? this.defaultLimit, 1), MAX_SEARCH_LIMIT)
-    if (queryTerms.length === 0) return { results: [], total: 0, truncated: false }
+  /** Filter indexed active records by scope, expiry, type and tag constraints. */
+  private collectVisible(request: BrowseRequest): MemoryRecord[] {
     const nowMs = (request.now ?? new Date()).getTime()
-    const docCount = this.docs.size
-    let totalLength = 0
-    for (const doc of this.docs.values()) totalLength += doc.length
-    const averageLength = docCount === 0 ? 0 : totalLength / docCount
     const scopeMode = request.scope ?? 'auto'
-    const scored: { record: MemoryRecord; score: number }[] = []
+    const visible: MemoryRecord[] = []
     for (const doc of this.docs.values()) {
       const record = doc.record
       if (!scopeMatches(record.scope, request.workspaceKey, scopeMode)) continue
@@ -304,6 +296,59 @@ export class SearchIndex {
       if (request.tags !== undefined && !request.tags.every((tag) => record.tags.includes(tag))) {
         continue
       }
+      visible.push(record)
+    }
+    return visible
+  }
+
+  /**
+   * List visible active memories without a keyword query, ordered by `pinned`
+   * first, `importance` descending, then `updatedAt` descending.
+   * @param request - Scope, type/tag filters, page size and clock.
+   * @returns Ranked summaries plus total/truncation metadata.
+   */
+  browse(request: BrowseRequest): SearchResult {
+    const limit = Math.min(Math.max(request.limit ?? this.defaultLimit, 1), MAX_SEARCH_LIMIT)
+    const records = this.collectVisible(request)
+    records.sort(
+      (left, right) =>
+        Number(right.pinned) - Number(left.pinned) ||
+        right.importance - left.importance ||
+        right.updatedAt.localeCompare(left.updatedAt) ||
+        left.id.localeCompare(right.id),
+    )
+    const total = records.length
+    const page = records.slice(0, limit)
+    const results: SearchHit[] = page.map((record) => ({
+      id: record.id,
+      type: record.type,
+      title: record.title,
+      snippet: makeSnippet(record.body, []),
+      scope: record.scope,
+      confidence: record.confidence,
+      updatedAt: record.updatedAt,
+      score: 0,
+    }))
+    return { results, total, truncated: total > limit }
+  }
+
+  /**
+   * Score and filter the indexed records for one request.
+   * @param request - Query, scope, type/tag filters, page size and clock.
+   * @returns The ranked page plus total/truncation metadata.
+   */
+  search(request: SearchRequest): SearchResult {
+    const queryTerms = [...new Set(tokenize(request.query))]
+    const limit = Math.min(Math.max(request.limit ?? this.defaultLimit, 1), MAX_SEARCH_LIMIT)
+    if (queryTerms.length === 0) return { results: [], total: 0, truncated: false }
+    const docCount = this.docs.size
+    let totalLength = 0
+    for (const doc of this.docs.values()) totalLength += doc.length
+    const averageLength = docCount === 0 ? 0 : totalLength / docCount
+    const scored: { record: MemoryRecord; score: number }[] = []
+    for (const record of this.collectVisible(request)) {
+      const doc = this.docs.get(record.id)
+      if (doc === undefined) continue
       let score = 0
       for (const term of queryTerms) {
         const postings = this.inverted.get(term)

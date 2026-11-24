@@ -6,6 +6,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { MemoryService } from '../service.ts'
 import { workspaceIdentityOf } from '../workspace.ts'
+import { DREAM_QUEUE_OUTPUT_SCHEMA, renderJsonOutput } from './schemas.ts'
 
 /**
  * Build the `memory_organize` tool.
@@ -27,14 +28,14 @@ export function memoryOrganizeTool(ctx: Context, service: MemoryService): ToolDe
       },
     },
     output: {
-      schema: { type: 'string' },
-      render: (_args, value) => [{ type: 'text', text: value }],
+      schema: DREAM_QUEUE_OUTPUT_SCHEMA,
+      render: renderJsonOutput,
     },
     async execute(args, exec) {
       const scope = args.scope ?? 'workspace'
       const workspace = scope === 'global' ? null : await workspaceIdentityOf(ctx, exec.agent)
       if (scope === 'workspace' && workspace === null) {
-        return JSON.stringify({ dreamId: null, status: 'error', reason: 'no working directory' })
+        return { dreamId: null, status: 'error' as const, reason: 'no working directory' }
       }
       const dream = await service.enqueueDream({
         scope,
@@ -42,7 +43,7 @@ export function memoryOrganizeTool(ctx: Context, service: MemoryService): ToolDe
         trigger: 'organize',
         agent: exec.agent,
       })
-      return JSON.stringify({ dreamId: dream.id, status: 'queued' })
+      return { dreamId: dream.id, status: 'queued' as const }
     },
   })
 }

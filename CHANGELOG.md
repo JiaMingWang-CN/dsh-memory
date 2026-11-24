@@ -43,6 +43,8 @@ written only when that version is actually released.
 
 ### Changed
 
+- Tightened `memory_write` tool description and dreaming system prompt rules to forbid copying or summarizing already auto-loaded docs (`AGENTS.md`, `CLAUDE.md`, `README`, or injected skills lists), keep each memory concise on a single independent topic, and avoid filling the store when given a broad memory request with no new findings.
+- Made `memory_search` parameter `query` optional: omitting `query` or passing whitespace lists visible active, unexpired memories ordered by `pinned`, `importance` descending, and `updatedAt` descending without incrementing `matchCount` or `useCount`, and marked `memory_search` and `memory_read` concurrency-safe (`isConcurrencySafe`).
 - Added an opt-in `autoAcceptProposals` setting (default `false`) so dream/organize proposals can be applied immediately while keeping `ownership='derived'`, superseding archive order, redaction, and per-run undo; exposed `dreamIdleDelayMs` and `autoDreamMinIntervalMs` in seconds in the Settings UI.
 - Reorganized the Settings → Memory UI into a four-tab layout (`Memories`, `Review`, `Import & Export`, `Settings`) with a stable header action bar, clickable overview counts and an index-budget meter; added server-side keyword search (`ListRequest.query`), pill filters, user-tag display, unified centered modals with pinned footers and inline unsaved-change confirmation, line-level proposal diff comparison with sequential review and save-and-accept, drag-and-drop import preview, grouped horizontal settings with minute/KB units, boundary-aware `Select` popovers, and non-zero session memory usage notes.
 - Standardized distribution as a GitHub plugin (GitHub repository and GitHub Releases carrying the packed `.tgz` bundle) with no npm package publication (`private: true` retained in `package.json`).
@@ -66,6 +68,8 @@ written only when that version is actually released.
 
 ### Fixed
 
+- Upgraded all six memory model tools (`memory_search`, `memory_read`, `memory_write`, `memory_forget`, `memory_dream`, `memory_organize`) from raw JSON string output schemas to strict DSH structured object schemas (`additionalProperties: false`) with JSON text rendering in `output.render`, preventing `TypeError` when PTC (`run_code`) callers access result properties directly.
+- Filtered `memory_*` tool failures/recoveries and `run_code` wrapper errors out of episode capture, added PTC sub-dispatch (`tool/ptc-dispatch`) capture for real business file edits, deliveries, completions, failures and recoveries with whitelisted-key redaction, and skipped `turn` episodes on pure memory-maintenance turns.
 - Added `autoAcceptProposals` and `dreamIdleDelayMs` to `EDITABLE_CONFIG_FIELDS` in `MemoryService.updateConfig` so saving Settings changes no longer fails with `memory/invalid`, and removed the inline secondary confirmation when enabling `autoAcceptProposals`.
 - Preserved `this` binding when invoking host `locale.subscribe` and `ctx.effect` in the Client bundle, preventing slot crashes against class-backed DSH host services.
 - Hid the Archive action and confirmation bar in `MemoryDetail` when inspecting an already archived memory, leaving only Restore.
