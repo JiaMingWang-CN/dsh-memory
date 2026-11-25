@@ -268,5 +268,14 @@ describe('agy workspace resolver and runtime nonce', () => {
       listRoots: async () => ['http://example.com/x'],
     })
     expect(rejected.workspace).toBeNull()
+
+    // A bare file:// host without a share segment has no workspace root.
+    const bareHost = await resolveCallContext({
+      args: {},
+      dataDir,
+      sessionStore,
+      listRoots: async () => ['file://server', 'file://server/'],
+    })
+    expect(bareHost.workspace).toBeNull()
   })
 })

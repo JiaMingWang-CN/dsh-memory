@@ -84,8 +84,11 @@ function parseRootEntry(entry: string): WorkspaceIdentity | null {
       const host = parsed.hostname.toLowerCase()
       if (host !== '') {
         // file://server/share is a UNC root and keeps //server/share
-        // semantics on every host.
-        return toWorkspaceIdentity(path.win32.normalize(`//${host}${decoded}`))
+        // semantics on every host. A bare host without a share segment has
+        // no workspace root, so it is rejected instead of yielding /server.
+        const share = decoded.slice(1).replace(/\/+$/, '')
+        if (share.length === 0) return null
+        return toWorkspaceIdentity(path.win32.normalize(`//${host}/${share}`))
       }
       // POSIX path "/C:/ws" from "file:///C:/ws" is a Windows drive path.
       if (/^\/[a-zA-Z]:\//.test(decoded)) {
