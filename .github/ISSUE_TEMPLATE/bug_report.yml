@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible defect in dsh-memory
+description: Report a reproducible defect in memloom
 title: '[bug] '
 labels: ['bug']
 body:
@@ -11,7 +11,7 @@ body:
     id: version
     attributes:
       label: Version
-      description: dsh-memory, DSH and Node.js versions
+      description: memloom, DSH/AGY and Node.js versions
     validations:
       required: true
   - type: textarea

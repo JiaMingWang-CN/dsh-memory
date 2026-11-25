@@ -36,8 +36,8 @@ describe('inject first turn', () => {
       if (decision.kind !== 'enter') throw new Error('unreachable')
       expect(decision.messages).toHaveLength(2)
       const injected = decision.messages[1]!
-      expect(injected.source.kind).toBe('dsh-memory')
-      if (injected.source.kind !== 'dsh-memory') throw new Error('unreachable')
+      expect(injected.source.kind).toBe('memloom')
+      if (injected.source.kind !== 'memloom') throw new Error('unreachable')
       expect(injected.source.mode).toBe('baseline')
 
       // Simulate the loop persisting the admitted message, then run step 1 again.
@@ -77,7 +77,7 @@ describe('inject first turn', () => {
       expect(decision.kind).toBe('enter')
       if (decision.kind !== 'enter') throw new Error('unreachable')
       expect(decision.messages).toHaveLength(2)
-      expect(decision.messages[1]!.source.kind).toBe('dsh-memory')
+      expect(decision.messages[1]!.source.kind).toBe('memloom')
     } finally {
       await host.dispose()
     }

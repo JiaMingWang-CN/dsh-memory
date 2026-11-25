@@ -1,6 +1,6 @@
 /**
  * Host-agnostic workspace identity and path normalization.
- * @module dsh-memory/core/workspace
+ * @module memloom/core/workspace
  */
 
 /** Stable workspace identity stored in a memory scope. */

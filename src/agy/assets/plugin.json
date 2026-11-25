@@ -1,6 +1,6 @@
 {
-  "name": "dsh-memory",
-  "displayName": "DSH Memory",
+  "name": "memloom",
+  "displayName": "Memloom",
   "version": "0.1.3",
   "description": "长期记忆插件：按作用域隔离的持久化记忆存储、BM25 检索、增量会话捕获、两阶段 Dreaming 整理与人工审阅门禁。",
   "logo": "assets/logo.svg",
@@ -10,9 +10,9 @@
     "审阅待确认的记忆提案并逐条查看变更对比"
   ],
   "author": "JiaMingWang-CN",
-  "homepage": "https://github.com/JiaMingWang-CN/dsh-memory",
+  "homepage": "https://github.com/JiaMingWang-CN/memloom",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JiaMingWang-CN/dsh-memory.git"
+    "url": "https://github.com/JiaMingWang-CN/memloom.git"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "dsh-memory": {
+  "memloom": {
     "PreInvocation": [
       {
         "type": "command",

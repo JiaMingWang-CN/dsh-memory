@@ -3,7 +3,7 @@
  *
  * Rejects unknown or invalid fields via {@link validateMemoryConfigPatch},
  * persists atomically, and supports lightweight `stat` + SHA-256 hot reload.
- * @module dsh-memory/agy/config-store
+ * @module memloom/agy/config-store
  */
 import type { Stats } from 'node:fs'
 import * as fs from 'node:fs/promises'

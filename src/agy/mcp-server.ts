@@ -5,7 +5,7 @@
  * {@link AgySessionStateStore}, {@link MemoryEngine}, the 20 tiered AGY MCP
  * tools, startup crash recovery, and periodic 6-hour retention onto
  * {@link StdioMcpServer}.
- * @module dsh-memory/agy/mcp-server
+ * @module memloom/agy/mcp-server
  */
 import { realpathSync } from 'node:fs'
 import path from 'node:path'
@@ -19,7 +19,7 @@ import { FileMemoryDomain } from './storage.ts'
 import { createAgyTools } from './tools.ts'
 import { resolveCallContext } from './workspace-resolver.ts'
 
-const SERVER_NAME = 'dsh-memory'
+const SERVER_NAME = 'memloom'
 const SERVER_VERSION = '0.1.3'
 const RETENTION_INTERVAL_MS = 6 * 60 * 60 * 1000
 const SESSION_RETENTION_DAYS = 30
@@ -45,7 +45,7 @@ export async function startAgyMcpServer(
 
   const logStderr = (message: string): void => {
     try {
-      stderr.write(`[dsh-memory] ${message}\n`)
+      stderr.write(`[memloom] ${message}\n`)
     } catch {
       // Ignore diagnostic stream errors.
     }
@@ -180,7 +180,7 @@ if (isDirectEntrypoint()) {
     })
     .catch((err) => {
       process.stderr.write(
-        `[dsh-memory] failed to start MCP server: ${err instanceof Error ? err.message : String(err)}\n`,
+        `[memloom] failed to start MCP server: ${err instanceof Error ? err.message : String(err)}\n`,
       )
       process.exit(1)
     })

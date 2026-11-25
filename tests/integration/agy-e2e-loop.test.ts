@@ -525,7 +525,7 @@ describe('AGY bundled plugin end-to-end full loop', () => {
           workspacePaths: [workspaceRoot],
           toolCall: {
             id: 'tc-review-1',
-            name: 'dsh-memory_memory_review',
+            name: 'memloom_memory_review',
             args: reviewBaseArgs,
           },
         },
@@ -575,7 +575,7 @@ describe('AGY bundled plugin end-to-end full loop', () => {
         { includeArchived: true },
         () => mcpStderr,
       )
-      expect(exported.format).toBe('dsh-memory')
+      expect(exported.format).toBe('memloom')
       expect(exported.version).toBe(1)
       expect(exported.memories.length).toBeGreaterThanOrEqual(3)
       expect(exported.episodes.length).toBeGreaterThanOrEqual(1)

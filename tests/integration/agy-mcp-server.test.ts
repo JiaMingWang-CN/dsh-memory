@@ -172,7 +172,7 @@ async function createInProcessServer(
   })
 
   const server = new StdioMcpServer({
-    serverInfo: { name: 'dsh-memory', version: '0.1.3' },
+    serverInfo: { name: 'memloom', version: '0.1.3' },
     tools,
     resolveContext: (args, listRoots) =>
       resolveCallContext({
@@ -248,7 +248,7 @@ describe('StdioMcpServer (PassThrough streams)', () => {
       expect(initRes.result).toEqual({
         protocolVersion: '2025-03-26',
         capabilities: { tools: {} },
-        serverInfo: { name: 'dsh-memory', version: '0.1.3' },
+        serverInfo: { name: 'memloom', version: '0.1.3' },
       })
 
       // 2. notifications/initialized + ping
@@ -509,7 +509,7 @@ describe('AGY MCP Server real Node child process', () => {
       capabilities: { tools?: Record<string, unknown> }
     }
     expect(initPayload.protocolVersion).toBe('2025-03-26')
-    expect(initPayload.serverInfo.name).toBe('dsh-memory')
+    expect(initPayload.serverInfo.name).toBe('memloom')
     expect(initPayload.capabilities.tools).toEqual({})
 
     // 2. notifications/initialized + ping

@@ -1,6 +1,6 @@
 /**
  * `memory_search` — BM25 search and priority listing over long-term memories.
- * @module dsh-memory/host/tools/search
+ * @module memloom/host/tools/search
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
@@ -89,7 +89,7 @@ export function memorySearchTool(ctx: Context, service: MemoryService): ToolDefi
       for (const hit of result.results) {
         void service.recordMatch(hit.id).catch((error: unknown) => {
           console.warn(
-            '[dsh-memory] failed to record search statistics',
+            '[memloom] failed to record search statistics',
             hit.id,
             error instanceof Error ? error.message : String(error),
           )

@@ -3,7 +3,7 @@
  *
  * The contract matches DSH storage-domain's `Domain` / `KvTable`
  * surface structurally while carrying zero DSH runtime dependencies.
- * @module dsh-memory/core/storage-contract
+ * @module memloom/core/storage-contract
  */
 import { createHash } from 'node:crypto'
 import type { z } from 'zod'

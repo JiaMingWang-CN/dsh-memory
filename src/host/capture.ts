@@ -6,7 +6,7 @@
  * raw tool arguments, raw tool output, environment variables, attachments,
  * images or reasoning; it never creates a `lesson` directly from a correction
  * candidate. `autoCaptureEpisodes=false` disables every automatic write.
- * @module dsh-memory/host/capture
+ * @module memloom/host/capture
  */
 import { createHash } from 'node:crypto'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
@@ -768,7 +768,7 @@ export class MemoryCapture {
         actor: 'system',
       })
     } catch (error) {
-      const message = `[dsh-memory] failed to store a spoken remember request: ${
+      const message = `[memloom] failed to store a spoken remember request: ${
         error instanceof Error ? error.message : String(error)
       }`
       if (this.logger?.warn !== undefined) this.logger.warn(message)

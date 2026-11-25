@@ -8,7 +8,7 @@
  * `ownership='derived'`, `origin='dream'`, and only after exact `proposalKey`
  * and semantic duplicate checks. Episodes are marked `processed` only when a
  * proposal referenced them.
- * @module dsh-memory/host/dreamer
+ * @module memloom/host/dreamer
  */
 import type { GenerateOptions, LlmFailure, StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { MemoryConfig } from './config.ts'
@@ -430,7 +430,7 @@ export class MemoryDreamer {
     this.queue = this.queue
       .then(() => this.runInternal(dreamId))
       .catch((error: unknown) => {
-        this.logger.warn?.(`dsh-memory: dream ${dreamId} scheduling failed: ${String(error)}`)
+        this.logger.warn?.(`memloom: dream ${dreamId} scheduling failed: ${String(error)}`)
       })
       .finally(() => {
         this.scheduled.delete(dreamId)
@@ -630,7 +630,7 @@ export class MemoryDreamer {
       await this.runner.markFailed(operation, error)
     } catch (settleError) {
       this.logger.warn?.(
-        `dsh-memory: failed to settle dream operation ${operation.id}: ${String(settleError)}`,
+        `memloom: failed to settle dream operation ${operation.id}: ${String(settleError)}`,
       )
     }
   }
@@ -1373,7 +1373,7 @@ export class MemoryDreamer {
         summary.accepted += 1
       } catch (error) {
         this.logger.warn?.(
-          `dsh-memory: auto-accept left proposal ${id} pending: ${this.messageOf(error)}`,
+          `memloom: auto-accept left proposal ${id} pending: ${this.messageOf(error)}`,
         )
       }
     }
@@ -1423,7 +1423,7 @@ export class MemoryDreamer {
           await tryAutoAccept(existing.id)
         } else {
           summary.skipped += 1
-          this.logger.warn?.(`dsh-memory: duplicate dream proposal skipped for ${existing.id}`)
+          this.logger.warn?.(`memloom: duplicate dream proposal skipped for ${existing.id}`)
         }
         continue
       }

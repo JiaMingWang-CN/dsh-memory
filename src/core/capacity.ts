@@ -5,7 +5,7 @@
  * records; `maxActiveMemories` demotes low-value `derived` records to
  * `archived` when new knowledge arrives, but never archives a record the user
  * owns or pinned: user data is protected by refusing the write instead.
- * @module dsh-memory/core/capacity
+ * @module memloom/core/capacity
  */
 import type { MemoryRecord } from '../shared/types.ts'
 import type { StoreCounts } from './store.ts'

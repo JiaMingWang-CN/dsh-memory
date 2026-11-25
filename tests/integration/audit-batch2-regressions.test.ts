@@ -143,8 +143,8 @@ describe('Batch 2 audit regressions', () => {
       if (step2.kind !== 'enter') throw new Error('expected enter')
       expect(step2.messages).toHaveLength(2)
       const injected = step2.messages[1]!
-      expect(injected.source.kind).toBe('dsh-memory')
-      if (injected.source.kind === 'dsh-memory') {
+      expect(injected.source.kind).toBe('memloom')
+      if (injected.source.kind === 'memloom') {
         expect(injected.source.mode).toBe('reset')
       }
     } finally {
@@ -162,7 +162,7 @@ describe('Batch 2 audit regressions', () => {
           role: 'user',
           content: [{ type: 'text', text: 'idx' }],
           source: {
-            kind: 'dsh-memory',
+            kind: 'memloom',
             form: 'memory-index',
             mode: turn === 1 ? 'baseline' : 'reset',
             protocolVersion: 1,

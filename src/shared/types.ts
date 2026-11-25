@@ -5,7 +5,7 @@
  * (later) the Client Remote surface. They are declared once here as zod
  * schemas so validation and TypeScript types cannot drift, and the `memory`
  * domain is built directly from these schemas.
- * @module dsh-memory/shared/types
+ * @module memloom/shared/types
  */
 import { z } from 'zod'
 
@@ -360,8 +360,17 @@ export type MemoryIndexChange =
   | { action: 'add' | 'replace'; memoryId: string; contentRevision: number; digest: string }
   | { action: 'remove'; memoryId: string; contentRevision: number }
 
+export const MEMORY_INDEX_SOURCE_KIND = 'memloom' as const
+export const LEGACY_MEMORY_INDEX_SOURCE_KIND = 'dsh-memory' as const
+export type MemoryIndexSourceKind =
+  typeof MEMORY_INDEX_SOURCE_KIND | typeof LEGACY_MEMORY_INDEX_SOURCE_KIND
+
+export function isMemoryIndexSourceKind(kind: unknown): kind is MemoryIndexSourceKind {
+  return kind === MEMORY_INDEX_SOURCE_KIND || kind === LEGACY_MEMORY_INDEX_SOURCE_KIND
+}
+
 export interface MemoryIndexSource {
-  kind: 'dsh-memory'
+  kind: MemoryIndexSourceKind
   form: 'memory-index'
   mode: 'baseline' | 'delta' | 'reset'
   protocolVersion: 1

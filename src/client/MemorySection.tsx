@@ -10,7 +10,7 @@
  * Data shape: a memory's workspace key is the normalized working-directory
  * path the Host stores, so the selector carries `WorkspaceInfo.key`; the live
  * workspace list arrives through the slot's `useWorkspaces` hook when present.
- * @module dsh-memory/client/MemorySection
+ * @module memloom/client/MemorySection
  */
 import * as React from 'react'
 import type {
@@ -111,7 +111,7 @@ function downloadExport(payload: MemoryExport): void {
   const anchor = document.createElement('a')
   anchor.href = url
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-  anchor.download = `dsh-memory-export-${stamp}.json`
+  anchor.download = `memloom-export-${stamp}.json`
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()

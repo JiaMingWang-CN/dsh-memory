@@ -4,7 +4,7 @@
  * Shows dream proposals awaiting review with metadata badges and the records
  * they would supersede. Accept/Reject/Edit-before-accept are delegated to the
  * section, which owns the Remote calls and audit trail.
- * @module dsh-memory/client/ReviewPanel
+ * @module memloom/client/ReviewPanel
  */
 import * as React from 'react'
 import type { MemoryRecord } from './context.ts'

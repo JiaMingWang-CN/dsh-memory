@@ -1,6 +1,6 @@
 /**
  * Audit helpers over the `audit` table.
- * @module dsh-memory/core/audit
+ * @module memloom/core/audit
  */
 import type { AuditRecord } from '../shared/types.ts'
 import type { MemoryDomainHandle } from './storage-contract.ts'

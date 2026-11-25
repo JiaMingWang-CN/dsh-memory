@@ -94,7 +94,7 @@ describe('index inbox', () => {
     )
     if (accepted.kind !== 'enter') throw new Error('expected enter')
     expect(accepted.messages).toHaveLength(2)
-    expect(accepted.messages[1]!.source.kind).toBe('dsh-memory')
+    expect(accepted.messages[1]!.source.kind).toBe('memloom')
   })
 
   it('defers a non-urgent delta without putting anything into a waking inbox', async () => {
@@ -135,6 +135,6 @@ describe('index inbox', () => {
     )
     if (fourth.kind !== 'enter') throw new Error('expected enter')
     expect(fourth.messages).toHaveLength(2)
-    expect(fourth.messages[1]!.source.kind).toBe('dsh-memory')
+    expect(fourth.messages[1]!.source.kind).toBe('memloom')
   })
 })

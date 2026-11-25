@@ -1,10 +1,11 @@
 /**
  * DSH host adapter for folding durable memory-index messages and recovering
  * visible index state from a session surface.
- * @module dsh-memory/host/index-state
+ * @module memloom/host/index-state
  */
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session } from '@deepseek-ai/dsh-session'
+import { isMemoryIndexSourceKind } from '../shared/types.ts'
 import {
   diffIndex,
   foldRawIndexSources,
@@ -80,7 +81,7 @@ export function resetReason(
       (source): source is Record<string, unknown> =>
         source !== null &&
         typeof source === 'object' &&
-        (source as { kind?: unknown }).kind === 'dsh-memory',
+        isMemoryIndexSourceKind((source as { kind?: unknown }).kind),
     )
   const baseline = sources
     .filter((source) => source.mode === 'baseline' || source.mode === 'reset')

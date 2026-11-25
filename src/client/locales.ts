@@ -5,7 +5,7 @@
  * dictionaries are registered with `ctx.locale.register(NS, { zh, en })` when
  * the Client applies. Keeping the active translator in one module lets leaf
  * components call `t()` without threading a prop through every slot boundary.
- * @module dsh-memory/client/locales
+ * @module memloom/client/locales
  */
 import type { LocaleDict } from './context.ts'
 
@@ -140,7 +140,7 @@ export const zh: LocaleDict = {
   'transfer.exportTitle': '导出记忆',
   'transfer.exportDesc': '将当前所选范围的记忆导出为 JSON 备份文件。',
   'transfer.importTitle': '从备份导入',
-  'transfer.importDesc': '拖拽或选择 dsh-memory 导出的 JSON 文件，预览后再决定合并或替换。',
+  'transfer.importDesc': '拖拽或选择 Memloom 导出的 JSON 文件，预览后再决定合并或替换。',
   'transfer.dropHint': '拖拽 JSON 文件到此处，或点击选择文件',
   'transfer.chooseFile': '选择文件',
   'transfer.clearFile': '清除文件',
@@ -161,7 +161,7 @@ export const zh: LocaleDict = {
   'transfer.mapping': '工作区映射',
   'transfer.mappingHint': '为文件中的每个工作区选择本机目标；选择“不导入”则跳过该工作区。',
   'transfer.mappingSkip': '不导入',
-  'transfer.parseError': '该文件不是有效的 dsh-memory 导出 JSON。',
+  'transfer.parseError': '该文件不是有效的 Memloom 导出 JSON。',
   'transfer.needFile': '请先选择一个导出文件。',
   'transfer.needMapping': '替换模式要求为文件中的每个工作区选择映射。',
   'transfer.importing': '正在导入…',
@@ -364,7 +364,7 @@ export const en: LocaleDict = {
   'transfer.exportDesc': 'Download memories in the selected scope as a JSON backup.',
   'transfer.importTitle': 'Import from backup',
   'transfer.importDesc':
-    'Drop or choose a dsh-memory JSON export, preview its contents, then merge or replace.',
+    'Drop or choose a Memloom JSON export, preview its contents, then merge or replace.',
   'transfer.dropHint': 'Drop a JSON file here, or click to choose',
   'transfer.chooseFile': 'Choose file',
   'transfer.clearFile': 'Clear file',
@@ -386,7 +386,7 @@ export const en: LocaleDict = {
   'transfer.mappingHint':
     'Map every workspace in the file to a local target; choose "skip" to leave one out.',
   'transfer.mappingSkip': 'Skip',
-  'transfer.parseError': 'This file is not a valid dsh-memory export.',
+  'transfer.parseError': 'This file is not a valid Memloom export.',
   'transfer.needFile': 'Choose an export file first.',
   'transfer.needMapping': 'Replace requires a mapping for every workspace in the file.',
   'transfer.importing': 'Importing…',

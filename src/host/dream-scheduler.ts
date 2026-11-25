@@ -6,7 +6,7 @@
  * re-checks the workspace is idle and honours `autoDreamMinIntervalMs`. Every
  * workspace shares the dreamer's global serial queue, so at most one dream runs
  * at a time.
- * @module dsh-memory/host/dream-scheduler
+ * @module memloom/host/dream-scheduler
  */
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -470,7 +470,7 @@ export class DreamScheduler {
         totals.episodes += report.episodes
       } catch (error) {
         this.logger.warn?.(
-          `dsh-memory: cold session backfill failed for ${workspaceKey}: ${String(error)}`,
+          `memloom: cold session backfill failed for ${workspaceKey}: ${String(error)}`,
         )
       }
     }

@@ -9,7 +9,7 @@
  * (`src/host/workspace.ts`), not the Workspace registry id, so the selector
  * carries {@link WorkspaceInfo.key} and falls back to the id only for callers
  * that bring synthetic rows.
- * @module dsh-memory/client/WorkspaceFilter
+ * @module memloom/client/WorkspaceFilter
  */
 import * as React from 'react'
 import type { WorkspaceInfo } from './context.ts'
@@ -42,13 +42,17 @@ export function workspaceKey(workspace: WorkspaceInfo): string {
 }
 
 /** Local-storage key holding the last workspace the user picked. */
-export const WORKSPACE_STORAGE_KEY = 'dsh-memory.workspace'
+export const WORKSPACE_STORAGE_KEY = 'memloom.workspace'
+/** Legacy local-storage key kept for smooth upgrades from `dsh-memory`. */
+export const LEGACY_WORKSPACE_STORAGE_KEY = 'dsh-memory.workspace'
 
 /** Read the remembered workspace choice, if the browser allows storage. */
 export function readStoredWorkspace(): string | 'all' | undefined {
   if (typeof window === 'undefined') return undefined
   try {
-    const raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY)
+    const raw =
+      window.localStorage.getItem(WORKSPACE_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_WORKSPACE_STORAGE_KEY)
     if (raw === null || raw === '') return undefined
     return raw === 'all' ? 'all' : raw
   } catch {

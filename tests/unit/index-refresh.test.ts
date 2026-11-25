@@ -110,8 +110,8 @@ describe('refresh delta', () => {
     if (decision.kind !== 'enter') throw new Error('expected enter')
     expect(decision.messages).toHaveLength(2)
     const injected = decision.messages[1]!
-    expect(injected.source.kind).toBe('dsh-memory')
-    if (injected.source.kind !== 'dsh-memory') throw new Error('unreachable')
+    expect(injected.source.kind).toBe('memloom')
+    if (injected.source.kind !== 'memloom') throw new Error('unreachable')
     expect(injected.source.mode).toBe('delta')
     expect(injected.source.changes).toEqual([
       expect.objectContaining({ action: 'add', memoryId: 'b' }),
@@ -135,7 +135,7 @@ describe('refresh remove priority', () => {
     const decision = await runStep(injector, fake, 2)
     if (decision.kind !== 'enter') throw new Error('expected enter')
     const injected = decision.messages[1]!
-    if (injected.source.kind !== 'dsh-memory') throw new Error('unreachable')
+    if (injected.source.kind !== 'memloom') throw new Error('unreachable')
     expect(injected.source.mode).toBe('reset')
     expect(injected.source.invalidations).toEqual([{ memoryId: 'a', contentRevision: 1 }])
     expect(injected.source.changes).toEqual([
@@ -159,7 +159,7 @@ describe('refresh reset threshold', () => {
     const decision = await runStep(injector, fake, 2)
     if (decision.kind !== 'enter') throw new Error('expected enter')
     const injected = decision.messages[1]!
-    if (injected.source.kind !== 'dsh-memory') throw new Error('unreachable')
+    if (injected.source.kind !== 'memloom') throw new Error('unreachable')
     expect(injected.source.mode).toBe('reset')
   })
 })

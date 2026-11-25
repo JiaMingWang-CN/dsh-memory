@@ -26,7 +26,7 @@ function baselineSource(
   invalidations: { memoryId: string; contentRevision: number }[] = [],
 ): MemoryIndexSource {
   return {
-    kind: 'dsh-memory',
+    kind: 'memloom',
     form: 'memory-index',
     mode,
     protocolVersion: 1,

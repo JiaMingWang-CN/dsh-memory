@@ -12,7 +12,7 @@
  * validation, and the wire only needs JSON-safe values plus an exact parameter
  * shape (`{ request }` / `{ input }`) that the Gateway matches with
  * `assertExactArguments`.
- * @module dsh-memory/remote-spec
+ * @module memloom/remote-spec
  */
 import { z } from 'zod'
 import { createTypertRemoteInfo } from '@deepseek-ai/dsh-typert-protocol/remote-info'
@@ -26,7 +26,7 @@ import type {
 
 const codec = (): TypertRemoteCodecSpec => ({
   mode: 'strict',
-  typeSymbol: 'dsh-memory/wire',
+  typeSymbol: 'memloom/wire',
   create: () => z.unknown(),
 })
 
@@ -58,7 +58,7 @@ function method(
 
 /** Endpoint key → Host implementation, parameter names, and result codec. */
 export const MEMORY_REMOTE_SPEC: TypertRemoteSpec = {
-  package: 'dsh-memory',
+  package: 'memloom',
   methods: {
     'memory/overview': method('overview', [parameter('request')]),
     'memory/activeWorkspace': method('activeWorkspace', []),

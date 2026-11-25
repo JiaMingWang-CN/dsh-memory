@@ -1,6 +1,6 @@
 /**
  * DSH host adapter for `MemoryStore` over `memoryDomain`.
- * @module dsh-memory/host/store
+ * @module memloom/host/store
  */
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import type { OperationRunner } from '../core/operations.ts'

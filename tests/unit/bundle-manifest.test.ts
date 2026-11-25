@@ -23,7 +23,7 @@ const manifest = JSON.parse(read('package.json')) as PackageManifest
 
 describe('bundle manifest', () => {
   it('declares the expected package identity and entry', () => {
-    expect(manifest.name).toBe('dsh-memory')
+    expect(manifest.name).toBe('memloom')
     expect(manifest.version).toBe('0.1.3')
     expect(manifest.private).toBe(true)
     expect(manifest.type).toBe('module')
@@ -54,10 +54,10 @@ describe('bundle manifest', () => {
     }
   })
 
-  it('inserts a single dsh-memory service row', () => {
+  it('inserts a single memloom service row', () => {
     const patch = read('cordis.patch.yml')
-    expect(patch).toContain('id: dsh-memory')
-    expect(patch).toContain('name: dsh-memory')
+    expect(patch).toContain('id: memloom')
+    expect(patch).toContain('name: memloom')
   })
 
   it('provides bilingual metadata and an existing detail document', () => {

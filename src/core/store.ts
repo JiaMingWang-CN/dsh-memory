@@ -6,7 +6,7 @@
  * enforces lifecycle rules (scope, revisions, ownership, soft vs. permanent
  * delete), capacity gates, retention and maintenance. The single
  * `MemoryService` owns one instance.
- * @module dsh-memory/core/store
+ * @module memloom/core/store
  */
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { ZodError } from 'zod'
@@ -1292,7 +1292,7 @@ export class MemoryStore {
       return
     }
     this.lastEpisodeOverflowWarnAt = now
-    const message = `[dsh-memory] episode queue is full; capture was dropped: ${
+    const message = `[memloom] episode queue is full; capture was dropped: ${
       error instanceof Error ? error.message : String(error)
     }`
     if (this.logger?.warn !== undefined) this.logger.warn(message)

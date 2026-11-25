@@ -5,7 +5,7 @@
  * around mutations, strict global-only degradation without a workspace, explicit
  * approval gates for cross-workspace/export-write operations, and AGY-only hot
  * configuration updates.
- * @module dsh-memory/agy/tools
+ * @module memloom/agy/tools
  */
 import * as fs from 'node:fs/promises'
 import path from 'node:path'

@@ -6,7 +6,7 @@
  * Only the design §8 fields exposed in 0.1.0 are shown; `autoCommitConfidence`
  * never appears. `autoDreamMinIntervalMs` is edited in human-friendly minutes
  * and persisted in milliseconds.
- * @module dsh-memory/client/ConfigPanel
+ * @module memloom/client/ConfigPanel
  */
 import * as React from 'react'
 import type { MemoryConfig, MemoryModelCatalog, MemoryModelEfforts } from './context.ts'

@@ -1,11 +1,11 @@
 /**
- * Minimal Client contract for the dsh-memory Settings surface.
+ * Minimal Client contract for the Memloom Settings surface.
  *
  * The Client bundle must not import any Harness Client package as a module, so
  * this file declares only the service shapes the plugin actually uses. They are
  * structural descriptions of the live `ctx.slots`, `ctx.locale` and `ctx.remote`
  * services, not a re-export of their packages.
- * @module dsh-memory/client/context
+ * @module memloom/client/context
  */
 import type { MemoryConfig } from '../host/config.ts'
 import type {

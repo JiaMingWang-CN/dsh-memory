@@ -4,7 +4,7 @@
  * Tools must never trust a model-supplied path: the workspace key always comes
  * from `ctx.workingDirectory.ensure(agent)`, normalized the same way for reads
  * and writes so a project cannot leak across workspaces.
- * @module dsh-memory/host/workspace
+ * @module memloom/host/workspace
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { normalizeWorkspaceKey, type WorkspaceIdentity } from '../core/workspace.ts'

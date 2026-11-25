@@ -51,7 +51,7 @@ describe('core isolation and contract parity', () => {
     const folded = foldIndexSources(
       [
         {
-          kind: 'dsh-memory',
+          kind: 'memloom',
           form: 'memory-index',
           mode: 'baseline',
           protocolVersion: 1,
@@ -73,5 +73,35 @@ describe('core isolation and contract parity', () => {
     })
     expect(plan.mode).toBe('delta')
     expect(plan.urgent).toBe(true)
+
+    // Legacy 'dsh-memory' baseline + new 'memloom' delta fold seamlessly
+    const legacyFolded = foldIndexSources(
+      [
+        {
+          kind: 'dsh-memory',
+          form: 'memory-index',
+          mode: 'baseline',
+          protocolVersion: 1,
+          baselineId: 'b1',
+          scopeKey: 'c:/ws',
+          changes: [{ action: 'add', memoryId: 'm1', contentRevision: 1, digest: 'd1' }],
+          invalidations: [],
+        },
+        {
+          kind: 'memloom',
+          form: 'memory-index',
+          mode: 'delta',
+          protocolVersion: 1,
+          baselineId: 'b1',
+          scopeKey: 'c:/ws',
+          changes: [{ action: 'add', memoryId: 'm2', contentRevision: 1, digest: 'd2' }],
+          invalidations: [],
+        },
+      ],
+      'c:/ws',
+      'b1',
+    )
+    expect(legacyFolded?.entries.get('m1')?.contentRevision).toBe(1)
+    expect(legacyFolded?.entries.get('m2')?.contentRevision).toBe(1)
   })
 })

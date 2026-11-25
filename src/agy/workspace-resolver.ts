@@ -6,7 +6,7 @@
  * 2. MCP `roots/list` `file://` URIs (most specific root wins)
  * 3. `AgySessionStateStore` anchor (trusted `conversationId` or unique recent workspace)
  * 4. `null` (strict global-only degradation)
- * @module dsh-memory/agy/workspace-resolver
+ * @module memloom/agy/workspace-resolver
  */
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import * as fs from 'node:fs/promises'

@@ -77,7 +77,7 @@ describe('workspace isolation', () => {
         async () => ({ kind: 'enter', messages: [humanMessage('继续工作')] }),
       )
       if (decision.kind !== 'enter') throw new Error('unreachable')
-      const injected = decision.messages.find((message) => message.source.kind === 'dsh-memory')
+      const injected = decision.messages.find((message) => message.source.kind === 'memloom')
       if (injected !== undefined) {
         const text = injected.content
           .filter((block) => block.type === 'text')

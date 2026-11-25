@@ -5,7 +5,7 @@
  * concrete: a file change, a delivery, a user correction, or an explicit
  * completion result. It is a lightweight summary built without any LLM call and
  * never includes raw tool parameters or output.
- * @module dsh-memory/core/worklog
+ * @module memloom/core/worklog
  */
 import type { MemoryConfig } from './config.ts'
 import { redactSecrets } from './redact.ts'
@@ -370,7 +370,7 @@ export async function createTurnWorklog(
       actor: 'system',
     })
   } catch (error) {
-    const message = `[dsh-memory] failed to create turn worklog: ${
+    const message = `[memloom] failed to create turn worklog: ${
       error instanceof Error ? error.message : String(error)
     }`
     if (logger?.warn !== undefined) logger.warn(message)

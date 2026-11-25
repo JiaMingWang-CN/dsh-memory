@@ -1,6 +1,6 @@
 /**
  * `memory_organize` — queue a full-store consolidation pass over active memories.
- * @module dsh-memory/host/tools/organize
+ * @module memloom/host/tools/organize
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'

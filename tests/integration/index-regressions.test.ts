@@ -99,7 +99,7 @@ function baselineSource(
   mode: 'baseline' | 'reset' = 'baseline',
 ): MemoryIndexSource {
   return {
-    kind: 'dsh-memory',
+    kind: 'memloom',
     form: 'memory-index',
     mode,
     protocolVersion: 1,
@@ -131,7 +131,7 @@ describe('missing baseline recovery', () => {
     )
     if (first.kind !== 'enter') throw new Error('expected enter')
     const reset = first.messages.at(-1)!
-    if (reset.source.kind !== 'dsh-memory') throw new Error('expected memory source')
+    if (reset.source.kind !== 'memloom') throw new Error('expected memory source')
     expect(reset.source.mode).toBe('reset')
     expect(reset.source.changes.map((change) => change.memoryId)).toContain('p1')
     fake.session.messages.push(reset)
@@ -168,7 +168,7 @@ describe('scope switch with refresh disabled', () => {
     )
     if (second.kind !== 'enter') throw new Error('expected enter')
     const reset = second.messages.at(-1)!
-    if (reset.source.kind !== 'dsh-memory') throw new Error('expected memory source')
+    if (reset.source.kind !== 'memloom') throw new Error('expected memory source')
     expect(reset.source.mode).toBe('reset')
     expect(reset.source.scopeKey).toBe(WS_B.key)
     expect(reset.source.changes.map((change) => change.memoryId)).toContain('b1')
@@ -229,7 +229,7 @@ describe('tool continuation recall', () => {
     )
     if (first.kind !== 'enter') throw new Error('expected enter')
     const baseline = first.messages.at(-1)!
-    if (baseline.source.kind !== 'dsh-memory') throw new Error('expected memory source')
+    if (baseline.source.kind !== 'memloom') throw new Error('expected memory source')
     expect(baseline.source.changes.map((change) => change.memoryId)).toContain('wiki-build')
     fake.session.messages.push(human('build'), baseline)
 

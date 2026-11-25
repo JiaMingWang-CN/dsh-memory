@@ -28,7 +28,7 @@ function indexMessage(seq: number, source: MemoryIndexSource): SessionEvent {
 /** Build a baseline source adding every supplied id. */
 function baseline(...ids: string[]): MemoryIndexSource {
   return {
-    kind: 'dsh-memory',
+    kind: 'memloom',
     form: 'memory-index',
     mode: 'baseline',
     protocolVersion: 1,

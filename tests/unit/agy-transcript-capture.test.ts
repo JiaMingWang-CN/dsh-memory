@@ -398,7 +398,7 @@ describe('captureAgyTranscript', () => {
         created_at: '2026-11-25T03:00:03.000Z',
         content: '收到，不会保存。',
       },
-      // Turn 3: oral remember WITH explicit dsh-memory_memory_write -> deduplicated
+      // Turn 3: oral remember WITH explicit memloom_memory_write -> deduplicated
       {
         step_index: 4,
         source: 'USER_EXPLICIT',
@@ -416,7 +416,7 @@ describe('captureAgyTranscript', () => {
         content: '已写入记忆。',
         tool_calls: [
           {
-            name: 'dsh-memory_memory_write',
+            name: 'memloom_memory_write',
             args: { title: 'kebab-case' },
           },
         ],
@@ -490,7 +490,7 @@ describe('captureAgyTranscript', () => {
           {
             name: 'call_mcp_tool',
             args: {
-              ServerName: JSON.stringify('dsh-memory_memory'),
+              ServerName: JSON.stringify('memloom_memory'),
               ToolName: JSON.stringify('memory_write'),
               Arguments: JSON.stringify({ title: 'Deterministic API' }),
             },

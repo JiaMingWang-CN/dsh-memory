@@ -1,6 +1,6 @@
 # 架构
 
-dsh-memory 采用同仓共享内核的双宿主分层架构：由零宿主依赖的 `src/core/` 提供统一记忆引擎，分别由 `src/host/` + `src/client/` 构成 DSH bundle，并由 `src/agy/` 构成 Antigravity（AGY）原生插件。本文描述已实现并验证的内核分层、DSH Host/Client 分层、AGY 适配层、存储 schema、operations 状态机与索引注入协议。
+memloom（原 `dsh-memory`）采用同仓共享内核的双宿主分层架构：由零宿主依赖的 `src/core/` 提供统一记忆引擎，分别由 `src/host/` + `src/client/` 构成 DSH bundle，并由 `src/agy/` 构成 Antigravity（AGY）原生插件。本文描述已实现并验证的内核分层、DSH Host/Client 分层、AGY 适配层、存储 schema、operations 状态机与索引注入协议。
 
 ## 双宿主分层架构（Core / DSH / AGY）
 
@@ -99,7 +99,7 @@ Host 业务错误在 `attachRemoteMarkers` 之后由 `remote-errors.ts` 包装�
 - 新会话首次注入一份 durable 基线；`refreshIndexOnChange=false`（默认）时后续不刷新。开启后，在每次即将产生模型请求的 pre-step 比较期望索引与可见状态，只注入差异；不主动唤醒 Agent，不调用 `followup()`。
 - 计算 `scopeKey`（`ctx.workingDirectory.ensure(agent)` + Windows 大小写归一化），用第一条直接用户消息做 BM25 查询，组合高优先级规则（最多 5 条全局 preference + 3 条高重要度 lesson）、相关候选（最多 5 条）与最近日工作日志（最多 3 条）。
 - 基线身份由 `scopeKey + protocolVersion + indexMaxBytes + 索引规则版本` 确定。
-- 状态折叠：按时间顺序处理 session surface 与本轮 claimed 中 `source.kind='dsh-memory'` 的消息；`reset` 清空旧状态后写完整快照，`add` / `replace` 写对应 id 最新版本，`remove` 删除对应 id 并记录失效版本。未知协议、缺失基线或 scope 不一致时放弃折叠并 `reset`。
+- 状态折叠：按时间顺序处理 session surface 与本轮 claimed 中 `source.kind='memloom'`（兼容旧会话 `'dsh-memory'`）的消息；`reset` 清空旧状态后写完整快照，`add` / `replace` 写对应 id 最新版本，`remove` 删除对应 id 并记录失效版本。未知协议、缺失基线或 scope 不一致时放弃折叠并 `reset`。
 - 期望状态与折叠状态按 `memoryId + contentRevision + 渲染摘要 digest` 比较；统计字段与排序变化不产生注入。相关候选锚定基线时的第一条用户消息，不随每轮话题重算。
 
 消息 source 结构（仅含恢复所需元数据，正文仍是模型可见的完整基线/差异/失效说明）：
@@ -110,7 +110,7 @@ type MemoryIndexChange =
   | { action: 'remove'; memoryId: string; contentRevision: number }
 
 interface MemoryIndexSource {
-  kind: 'dsh-memory'
+  kind: 'memloom' | 'dsh-memory'
   form: 'memory-index'
   mode: 'baseline' | 'delta' | 'reset'
   protocolVersion: 1

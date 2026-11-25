@@ -1,9 +1,9 @@
 # Antigravity（AGY）原生插件指南
 
-`dsh-memory` 在同一仓库内抽离了零宿主依赖的共享记忆内核（`src/core/`），并在 `src/agy/` 提供 **Antigravity（AGY）原生插件适配层**，让 AGY 能够以原生 MCP 工具、Hooks、Rules 与 Skills 的形式使用与 DSH 对等的长期记忆能力（`lesson` / `worklog` / `wiki` / `preference`、工作区隔离、本地 BM25 检索、操作日志状态机与崩溃恢复、脱敏与容量控制）。
+`memloom`（原 `dsh-memory`）在同一仓库内抽离了零宿主依赖的共享记忆内核（`src/core/`），并在 `src/agy/` 提供 **Antigravity（AGY）原生插件适配层**，让 AGY 能够以原生 MCP 工具、Hooks、Rules 与 Skills 的形式使用与 DSH 对等的长期记忆能力（`lesson` / `worklog` / `wiki` / `preference`、工作区隔离、本地 BM25 检索、操作日志状态机与崩溃恢复、脱敏与容量控制）。
 
 > [!NOTE]
-> **开发状态说明**：`dsh-memory` 当前仍处于 **0.x 开发版本**，尚未发布稳定版。AGY 适配层的工具参数、Hook 协议与配置仍可能随迭代调整；AGY 产物不混入 DSH `.tgz` bundle，也不发布 npm 包。
+> **开发状态说明**：`memloom` 当前仍处于 **0.x 开发版本**，尚未发布稳定版。AGY 适配层的工具参数、Hook 协议与配置仍可能随迭代调整；AGY 产物不混入 DSH `.tgz` bundle，也不发布 npm 包。
 
 ---
 
@@ -17,8 +17,8 @@
 ### 从源码构建与校验
 
 ```bash
-git clone https://github.com/JiaMingWang-CN/dsh-memory.git
-cd dsh-memory
+git clone https://github.com/JiaMingWang-CN/memloom.git
+cd memloom
 pnpm install
 pnpm build:agy        # 使用 esbuild 构建自包含插件目录 dist/agy-plugin/
 pnpm pack:agy:check   # 校验插件清单、字段合法性、脚本路径与零外部依赖隔离
@@ -28,8 +28,8 @@ pnpm pack:agy:check   # 校验插件清单、字段合法性、脚本路径与�
 
 ```text
 dist/agy-plugin/
-├── plugin.json             # 插件清单（name: "dsh-memory", displayName: "DSH Memory"）
-├── mcp_config.json         # Stdio MCP Server 配置（服务名 memory -> 命名空间 dsh-memory_memory；6 个高频工具标记为 eager，敏感/整理/导出工具按需加载）
+├── plugin.json             # 插件清单（name: "memloom", displayName: "Memloom"）
+├── mcp_config.json         # Stdio MCP Server 配置（服务名 memory -> 命名空间 memloom_memory；6 个高频工具标记为 eager，敏感/整理/导出工具按需加载）
 ├── hooks.json              # PreInvocation / Stop / PreToolUse 钩子定义
 ├── assets/logo.svg         # 插件图标
 ├── bin/
@@ -46,7 +46,7 @@ dist/agy-plugin/
 
 可采用以下任一方式挂载已构建的 `dist/agy-plugin/`：
 
-1. **复制到 AGY 插件目录**：将整个 `dist/agy-plugin/` 目录复制到 `~/.gemini/config/plugins/dsh-memory`。
+1. **复制到 AGY 插件目录**：将整个 `dist/agy-plugin/` 目录复制到 `~/.gemini/config/plugins/memloom`。
 2. **通过 `plugins.json` 引用**：在 AGY 的 `plugins.json` 中登记指向本地 `dist/agy-plugin/` 目录的插件路径。
 
 完成后重启或重新加载 AGY 插件即可生效。禁用或卸载插件后，Hooks、MCP Server、Rules 与 Skills 会停止加载；`${PLUGIN_DATA}/memory.json` 中由用户拥有的数据会继续保留，不会被卸载流程删除。
@@ -59,10 +59,10 @@ dist/agy-plugin/
 
 AGY 适配层按以下顺序解析数据存储路径（优先取第一个非空环境变量）：
 
-1. `DSH_MEMORY_STORE_PATH`：直接指定主存储 JSON 文件路径（其所在目录同时作为数据目录）。
-2. `DSH_MEMORY_DATA_DIR`：指定插件数据目录（使用 `<dir>/memory.json`）。
+1. `MEMLOOM_STORE_PATH`（向后兼容旧变量 `DSH_MEMORY_STORE_PATH`）：直接指定主存储 JSON 文件路径（其所在目录同时作为数据目录）。
+2. `MEMLOOM_DATA_DIR`（向后兼容旧变量 `DSH_MEMORY_DATA_DIR`）：指定插件数据目录（使用 `<dir>/memory.json`）。
 3. `PLUGIN_DATA`：AGY 宿主自动注入的插件数据目录（使用 `${PLUGIN_DATA}/memory.json`）。
-4. 兜底目录（未设置上述环境变量时）：`~/.gemini/config/plugin-data/dsh-memory/memory.json`。
+4. 兜底目录（未设置上述环境变量时）：`~/.gemini/config/plugin-data/memloom/memory.json`。
 
 ### `${PLUGIN_DATA}` 目录结构
 

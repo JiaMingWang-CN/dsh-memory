@@ -5,7 +5,7 @@
  * reports changes. Nothing is persisted until the user presses Save, which the
  * parent routes through `ctx.remote.memory.update` with the original
  * `contentRevision` for optimistic concurrency.
- * @module dsh-memory/client/MemoryEditor
+ * @module memloom/client/MemoryEditor
  */
 import * as React from 'react'
 import type { MemoryRecord, MemoryStatus, MemoryType } from './context.ts'

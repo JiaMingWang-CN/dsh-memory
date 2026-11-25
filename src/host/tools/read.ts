@@ -1,6 +1,6 @@
 /**
  * `memory_read` — read a full memory body and count the use.
- * @module dsh-memory/host/tools/read
+ * @module memloom/host/tools/read
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
@@ -68,7 +68,7 @@ export function memoryReadTool(ctx: Context, service: MemoryService): ToolDefini
       const record = service.readForModel(args.id, workspace?.key ?? null)
       void service.recordUse(record.id).catch((error: unknown) => {
         console.warn(
-          '[dsh-memory] failed to record read statistics',
+          '[memloom] failed to record read statistics',
           record.id,
           error instanceof Error ? error.message : String(error),
         )

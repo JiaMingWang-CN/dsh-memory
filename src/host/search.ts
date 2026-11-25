@@ -1,6 +1,6 @@
 /**
  * Re-export in-process BM25 search helpers from the shared core.
- * @module dsh-memory/host/search
+ * @module memloom/host/search
  */
 export {
   DEFAULT_SEARCH_LIMIT,

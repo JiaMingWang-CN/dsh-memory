@@ -5,7 +5,7 @@
  * its single call on consolidation instead of rediscovering queue backlogs and
  * duplicate titles. The result carries counts and titles only — never memory
  * bodies or episode text.
- * @module dsh-memory/core/dream-health
+ * @module memloom/core/dream-health
  */
 import { normalizeTitle } from './proposal.ts'
 import { redactSecrets } from './redact.ts'

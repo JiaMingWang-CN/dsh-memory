@@ -1,13 +1,15 @@
 /**
  * DSH-specific LLM message augmentation for memory index injection.
- * @module dsh-memory/host/index-types
+ * @module memloom/host/index-types
  */
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import type { MemoryIndexSource } from '../shared/types.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
-    /** Durable memory index injection produced by the dsh-memory plugin. */
+    /** Durable memory index injection produced by the Memloom plugin. */
+    memloom: MemoryIndexSource
+    /** Legacy DSH memory index injection source kind kept for session replay compatibility. */
     'dsh-memory': MemoryIndexSource
   }
 }

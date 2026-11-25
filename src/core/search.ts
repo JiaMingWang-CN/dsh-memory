@@ -5,7 +5,7 @@
  * after batch maintenance; single-record business changes update it
  * incrementally. Statistics (`matchCount` / `useCount`) never affect scoring or
  * ordering, so search/read bookkeeping cannot boost a memory into view.
- * @module dsh-memory/core/search
+ * @module memloom/core/search
  */
 import type { MemoryRecord, MemoryScope, MemoryType } from '../shared/types.ts'
 

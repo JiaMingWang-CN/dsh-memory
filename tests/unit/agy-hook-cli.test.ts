@@ -61,7 +61,7 @@ describe('resolveHookTargetTool', () => {
   it('resolves direct MCP memory tool names and wrapped call_mcp_tool payloads', () => {
     expect(
       resolveHookTargetTool({
-        name: 'dsh-memory_memory_review',
+        name: 'memloom_memory_review',
         args: { id: 'm1', action: 'accept' },
       }),
     ).toEqual({
@@ -72,7 +72,7 @@ describe('resolveHookTargetTool', () => {
 
     expect(
       resolveHookTargetTool({
-        name: 'mcp_dsh-memory_memory_export',
+        name: 'mcp_memloom_memory_export',
         args: { scope: 'all' },
       }),
     ).toEqual({
@@ -85,7 +85,7 @@ describe('resolveHookTargetTool', () => {
       resolveHookTargetTool({
         name: 'call_mcp_tool',
         args: {
-          ServerName: 'dsh-memory_memory',
+          ServerName: 'memloom_memory',
           ToolName: 'memory_review',
           Arguments: { id: 'm2', action: 'reject' },
         },
@@ -387,7 +387,7 @@ describe('handleHookEvent — PreToolUse', () => {
           workspacePaths: [ws],
           toolCall: {
             id: `direct-${toolName}`,
-            name: `dsh-memory_${toolName}`,
+            name: `memloom_${toolName}`,
             args:
               toolName === 'memory_config'
                 ? { redactSecrets: false, autoAcceptProposals: true, injectForSubagents: true }
@@ -440,7 +440,7 @@ describe('handleHookEvent — PreToolUse', () => {
             id: `wrap-${toolName}`,
             name: 'call_mcp_tool',
             args: {
-              ServerName: 'dsh-memory_memory',
+              ServerName: 'memloom_memory',
               ToolName: toolName,
               Arguments: wrappedArgs,
             },
@@ -468,7 +468,7 @@ describe('handleHookEvent — PreToolUse', () => {
         hookEventName: 'PreToolUse',
         conversationId: 'conv-reg',
         workspacePaths: [ws],
-        toolCall: { name: 'mcp_dsh-memory_memory_list', args: { scope: 'current' } },
+        toolCall: { name: 'mcp_memloom_memory_list', args: { scope: 'current' } },
       },
       env,
     )
@@ -524,7 +524,7 @@ describe('handleHookEvent — PreToolUse', () => {
         toolCall: {
           name: 'call_mcp_tool',
           args: {
-            ServerName: 'dsh-memory_memory',
+            ServerName: 'memloom_memory',
             ToolName: 'memory_export',
             Arguments: { outputPath: 'C:\\tmp\\export.json' },
           },
@@ -565,7 +565,7 @@ describe('handleHookEvent — PreToolUse', () => {
         toolCall: {
           name: 'call_mcp_tool',
           args: {
-            ServerName: 'dsh-memory_memory',
+            ServerName: 'memloom_memory',
             ToolName: 'memory_list',
             Arguments: '{broken json',
           },
@@ -834,5 +834,30 @@ describe('handleHookEvent — Stop & CLI', () => {
       env,
     )
     expect(switchedEmpty).toEqual({})
+  })
+
+  it('gates legacy dsh-memory_memory ServerName alongside memloom_memory on call_mcp_tool', async () => {
+    const dataDir = makeTempDir()
+    const env = { PLUGIN_DATA: dataDir }
+
+    for (const serverName of ['memloom_memory', 'dsh-memory_memory']) {
+      const res = await handleHookEvent(
+        {
+          hookEventName: 'PreToolUse',
+          conversationId: 'conv-compat',
+          workspacePaths: ['/ws/demo'],
+          toolCall: {
+            name: 'call_mcp_tool',
+            args: {
+              ServerName: serverName,
+              ToolName: 'memory_review',
+              Arguments: { id: 'mem-1', action: 'accept' },
+            },
+          },
+        },
+        env,
+      )
+      expect(res.decision, serverName).toBe('force_ask')
+    }
   })
 })

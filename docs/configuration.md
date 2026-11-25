@@ -1,6 +1,6 @@
 # 配置参考
 
-dsh-memory 的全部可调项都在 `src/host/config.ts` 的 `Config` schema 中定义，并由 `resolveMemoryConfig()` 解析：用户 patch 未提供的字段使用下列默认值，显式提供的值优先；未知字段会被拒绝。本文与代码逐项对齐（0.1.0 开发版本）。
+memloom 的全部可调项都在 `src/host/config.ts` 的 `Config` schema 中定义，并由 `resolveMemoryConfig()` 解析：用户 patch 未提供的字段使用下列默认值，显式提供的值优先；未知字段会被拒绝。本文与代码逐项对齐（0.1.0 开发版本）。
 
 配置通常通过 DSH 插件 patch（`cordis.patch.yml`）或 Settings → Memory 的配置子页写入；普通字段保存后插件会重启。
 

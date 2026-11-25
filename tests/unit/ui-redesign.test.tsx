@@ -400,7 +400,7 @@ describe('TransferPanel dropzone preview', () => {
     const file = new File(
       [
         JSON.stringify({
-          format: 'dsh-memory',
+          format: 'memloom',
           version: 1,
           exportedAt: '2026-11-15T00:00:00.000Z',
           scope: 'all',

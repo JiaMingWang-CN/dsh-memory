@@ -4,7 +4,7 @@
  * Mirrors every field and default of `src/host/config.ts` without any
  * DSH runtime dependency so both DSH and AGY share one canonical config
  * contract.
- * @module dsh-memory/core/config
+ * @module memloom/core/config
  */
 import { z } from 'zod'
 import { OperationError } from './operations.ts'

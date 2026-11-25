@@ -122,7 +122,7 @@ describe('Batch 1 audit regressions', () => {
     }
 
     const payload: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: { workspaceKey: WS_A.key },
@@ -241,7 +241,7 @@ describe('Batch 1 audit regressions', () => {
     try {
       const secret = 'sk-1234567890abcdefghijklmnop'
       const payload: MemoryExport = {
-        format: 'dsh-memory',
+        format: 'memloom',
         version: 1,
         exportedAt: '2026-11-15T00:00:00.000Z',
         scope: { workspaceKey: WS_A.key },
@@ -311,7 +311,7 @@ describe('Batch 1 audit regressions', () => {
       pinned: false,
     })
     const payload: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: { workspaceKey: WS_A.key },
@@ -351,7 +351,7 @@ describe('Batch 1 audit regressions', () => {
     ).rejects.toMatchObject({ code: 'MEMORY_INVALID_CONTENT' })
 
     const badPayload = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: 'all',
@@ -385,7 +385,7 @@ describe('Batch 1 audit regressions', () => {
       createdAt: '2026-11-15T00:00:00.000Z',
     }
     const payload: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: { workspaceKey: 'ws-a' },

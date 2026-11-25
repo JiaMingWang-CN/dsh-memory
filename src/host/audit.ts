@@ -1,6 +1,6 @@
 /**
  * DSH host adapter for audit queries over `memoryDomain`.
- * @module dsh-memory/host/audit
+ * @module memloom/host/audit
  */
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import {

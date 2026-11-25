@@ -1,6 +1,6 @@
 # Dreaming
 
-Dreaming 是 dsh-memory 的离线记忆整理引擎，输入是 `episodes` 队列和（可选）最近的冷会话，输出是 `pending` 记忆或 wiki 更新。0.1.0 的 dreaming 仍是单次模型调用、无工具调用、不读取会话转录原文；本文描述已实现的触发方式、启动恢复、失败处理、prompt 规则、pending 语义、`proposalKey` 去重与撤销。
+Dreaming 是 memloom 的离线记忆整理引擎，输入是 `episodes` 队列和（可选）最近的冷会话，输出是 `pending` 记忆或 wiki 更新。0.1.0 的 dreaming 仍是单次模型调用、无工具调用、不读取会话转录原文；本文描述已实现的触发方式、启动恢复、失败处理、prompt 规则、pending 语义、`proposalKey` 去重与撤销。
 
 ## 触发方式
 

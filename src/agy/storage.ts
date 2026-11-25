@@ -4,7 +4,7 @@
  * Coordinates concurrent MCP Server and short-lived Hook processes via an
  * exclusive `.memory.lock` file, SHA-256 content-hash change detection, atomic
  * temp+fsync+rename writes, and tiered per-table corruption handling.
- * @module dsh-memory/agy/storage
+ * @module memloom/agy/storage
  */
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, randomUUID } from 'node:crypto'

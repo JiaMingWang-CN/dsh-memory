@@ -70,7 +70,7 @@ describe('client build', () => {
   it('emits a module-loader bundle with the package id', async () => {
     const { text } = await buildClient()
     expect(text.startsWith('window.__ModuleLoader__.load')).toBe(true)
-    expect(text).toContain('id: "dsh-memory"')
+    expect(text).toContain('id: "memloom"')
     expect(text).not.toContain('@deepseek-ai/dsh-client-ui-primitives')
   })
 })
@@ -89,7 +89,7 @@ describe('settings registration', () => {
     })
     expect(client.mounted).toHaveLength(1)
     const contribution = client.mounted[0] as { package?: string; descriptors?: unknown[] }
-    expect(contribution.package).toBe('dsh-memory')
+    expect(contribution.package).toBe('memloom')
     expect(contribution.descriptors).toHaveLength(21)
   })
 })

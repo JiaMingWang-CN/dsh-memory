@@ -6,7 +6,7 @@
  * ordering. A status dot aligned to the title baseline, a pin glyph, a one-line
  * excerpt, type/scope/user tags and a relative timestamp make each row quick to
  * scan.
- * @module dsh-memory/client/MemoryList
+ * @module memloom/client/MemoryList
  */
 import * as React from 'react'
 import type { MemoryRecord } from './context.ts'

@@ -3,7 +3,7 @@
  *
  * All six tables are declared here from the shared zod schemas, and the domain
  * is the single declaration the service opens through `ctx.storageDomain`.
- * @module dsh-memory/host/domain
+ * @module memloom/host/domain
  */
 import { defineDomain, domainTable, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import {

@@ -3,7 +3,7 @@
  *
  * Slot components do not receive the Client context as a prop, so `apply`
  * stores it here once. Components read services through this accessor.
- * @module dsh-memory/client/runtime
+ * @module memloom/client/runtime
  */
 import * as React from 'react'
 import type { ClientContext, MemoryRemote } from './context.ts'
@@ -58,7 +58,7 @@ export function remoteMountError(): string | undefined {
 /** Read the active Client context, failing loudly if the plugin never applied. */
 export function clientContext(): ClientContext {
   if (active === undefined) {
-    throw new Error('dsh-memory Client context is not available')
+    throw new Error('Memloom Client context is not available')
   }
   return active
 }

@@ -7,7 +7,7 @@
  * switch, labelled text/numeric/range fields, tag chips and a focused modal.
  * They copy the host's control metrics and use host theme tokens, giving the
  * page the same feel as Settings → Plugins without a dependency edge.
- * @module dsh-memory/client/ui
+ * @module memloom/client/ui
  */
 import * as React from 'react'
 import { formatMessage, t } from './locales.ts'

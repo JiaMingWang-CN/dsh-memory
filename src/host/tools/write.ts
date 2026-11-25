@@ -1,6 +1,6 @@
 /**
  * `memory_write` — create or update a memory from an explicit model decision.
- * @module dsh-memory/host/tools/write
+ * @module memloom/host/tools/write
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'

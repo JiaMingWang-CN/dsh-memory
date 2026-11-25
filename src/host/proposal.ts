@@ -1,6 +1,6 @@
 /**
  * Re-export dream-proposal identity and duplicate policy from the shared core.
- * @module dsh-memory/host/proposal
+ * @module memloom/host/proposal
  */
 export {
   applyDuplicatePolicy,

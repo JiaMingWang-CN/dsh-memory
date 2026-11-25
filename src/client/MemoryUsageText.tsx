@@ -6,7 +6,7 @@
  * a separate card. Only non-zero counters are displayed to keep the chat row
  * calm. Purely presentational: it reads the Host `memoryUsage` projection and
  * never calls a Remote or changes model context.
- * @module dsh-memory/client/MemoryUsageText
+ * @module memloom/client/MemoryUsageText
  */
 import * as React from 'react'
 import type { MemoryUsageView } from '../shared/types.ts'

@@ -1,6 +1,6 @@
 /**
  * Shared structured output schemas and JSON text renderer for memory model tools.
- * @module dsh-memory/host/tools/schemas
+ * @module memloom/host/tools/schemas
  */
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { ValueSchemaSpec } from '@deepseek-ai/dsh-tools'

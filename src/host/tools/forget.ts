@@ -5,7 +5,7 @@
  * parameters and any forged `permanent` / `confirm` argument is rejected before
  * execution. Permanent deletion is reserved for the confirmed user management
  * surface added by a later plan.
- * @module dsh-memory/host/tools/forget
+ * @module memloom/host/tools/forget
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'

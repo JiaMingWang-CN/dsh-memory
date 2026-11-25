@@ -8,7 +8,7 @@
  * summary. All three batch operations persist their operation record before
  * touching rows, so a crash leaves an explicit `failed` marker instead of a
  * silent partial batch.
- * @module dsh-memory/core/exchange
+ * @module memloom/core/exchange
  */
 import { ZodError } from 'zod'
 import {
@@ -42,8 +42,16 @@ export interface ExportRequest {
   includeArchived?: boolean
 }
 
+export const MEMORY_EXPORT_FORMAT = 'memloom' as const
+export const LEGACY_MEMORY_EXPORT_FORMAT = 'dsh-memory' as const
+export type MemoryExportFormat = typeof MEMORY_EXPORT_FORMAT | typeof LEGACY_MEMORY_EXPORT_FORMAT
+
+export function isSupportedExportFormat(format: unknown): format is MemoryExportFormat {
+  return format === MEMORY_EXPORT_FORMAT || format === LEGACY_MEMORY_EXPORT_FORMAT
+}
+
 export interface MemoryExport {
-  format: 'dsh-memory'
+  format: MemoryExportFormat
   version: 1
   exportedAt: string
   scope: ExportScope
@@ -151,7 +159,7 @@ export function exportMemories(
     .map(([, episode]) => structuredClone(episode))
     .filter((episode) => episodeInScope(episode, request.scope))
   return {
-    format: 'dsh-memory',
+    format: MEMORY_EXPORT_FORMAT,
     version: 1,
     exportedAt: now().toISOString(),
     scope: request.scope,
@@ -340,7 +348,7 @@ export async function importMemories(
   if (
     payload === null ||
     typeof payload !== 'object' ||
-    payload.format !== 'dsh-memory' ||
+    !isSupportedExportFormat(payload.format) ||
     payload.version !== 1
   ) {
     throw new OperationError('MEMORY_INVALID_CONTENT', 'unsupported import format or version')

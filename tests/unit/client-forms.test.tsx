@@ -9,6 +9,11 @@ import { ConfigPanel } from '../../src/client/ConfigPanel.tsx'
 import { MemoryCreate } from '../../src/client/MemoryCreate.tsx'
 import { draftFromRecord, MemoryEditor, type MemoryDraft } from '../../src/client/MemoryEditor.tsx'
 import { TransferPanel } from '../../src/client/TransferPanel.tsx'
+import {
+  LEGACY_WORKSPACE_STORAGE_KEY,
+  WORKSPACE_STORAGE_KEY,
+  readStoredWorkspace,
+} from '../../src/client/WorkspaceFilter.tsx'
 import { en, setTranslate, zh } from '../../src/client/locales.ts'
 import type { ImportReport } from '../../src/client/context.ts'
 import { MemoryId } from '../../src/shared/types.ts'
@@ -137,7 +142,7 @@ describe('create form', () => {
 
 describe('transfer mapping', () => {
   const payload = {
-    format: 'dsh-memory',
+    format: 'memloom',
     version: 1,
     exportedAt: '2026-11-15T00:00:00.000Z',
     scope: { workspaceKey: 'ws-remote' },
@@ -318,5 +323,43 @@ describe('theme tokens', () => {
     expect(css).not.toMatch(/rgba?\(/)
     expect(css).not.toMatch(/hsla?\(/)
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
+  })
+})
+
+describe('workspace storage key migration', () => {
+  it('reads memloom.workspace first and falls back to legacy dsh-memory.workspace', () => {
+    const store = new Map<string, string>()
+    const originalDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage')
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          store.set(key, value)
+        },
+        removeItem: (key: string) => {
+          store.delete(key)
+        },
+        clear: () => {
+          store.clear()
+        },
+      },
+    })
+
+    try {
+      expect(readStoredWorkspace()).toBeUndefined()
+
+      window.localStorage.setItem(LEGACY_WORKSPACE_STORAGE_KEY, 'c:/legacy/ws')
+      expect(readStoredWorkspace()).toBe('c:/legacy/ws')
+
+      window.localStorage.setItem(WORKSPACE_STORAGE_KEY, 'c:/new/ws')
+      expect(readStoredWorkspace()).toBe('c:/new/ws')
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(window, 'localStorage', originalDescriptor)
+      } else {
+        delete (window as { localStorage?: unknown }).localStorage
+      }
+    }
   })
 })

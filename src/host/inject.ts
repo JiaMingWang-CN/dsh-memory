@@ -7,7 +7,7 @@
  * folding the durable surface. Injection always happens inside an
  * already-occurring pre-step: it never calls `followup()` or otherwise wakes an
  * agent, and a rejected step never becomes a durable message.
- * @module dsh-memory/host/inject
+ * @module memloom/host/inject
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
@@ -24,7 +24,11 @@ import {
 import { foldVisibleState, type IndexVisibleState } from './index-state.ts'
 import { IndexRefresher, resetInvalidations } from './index-refresh.ts'
 import type { MemoryIndexMessage } from './index-types.ts'
-import type { MemoryIndexSource } from '../shared/types.ts'
+import {
+  MEMORY_INDEX_SOURCE_KIND,
+  isMemoryIndexSourceKind,
+  type MemoryIndexSource,
+} from '../shared/types.ts'
 
 export type { MemoryIndexMessage }
 
@@ -166,7 +170,7 @@ export class MemoryIndexInjector {
   /** Build a `baseline`-mode source whose changes add every snapshot entry. */
   private baselineSource(snapshot: MemoryIndexSnapshot): MemoryIndexSource {
     return {
-      kind: 'dsh-memory',
+      kind: MEMORY_INDEX_SOURCE_KIND,
       form: 'memory-index',
       mode: 'baseline',
       protocolVersion: PROTOCOL_VERSION,
@@ -214,7 +218,7 @@ export class MemoryIndexInjector {
     const surface = surfaceUserMessages(agent)
     const history = [...surface, ...decision.messages]
     const visible = foldVisibleState(history)
-    const hasSurfaceMemory = surface.some((message) => message.source.kind === 'dsh-memory')
+    const hasSurfaceMemory = surface.some((message) => isMemoryIndexSourceKind(message.source.kind))
     const sessionObj = agent.session as object | undefined
     const sessionId = (agent.session as { id?: string } | undefined)?.id
     const rememberInjected = (): void => {
@@ -285,7 +289,7 @@ export class MemoryIndexInjector {
     const invalidations = visible === undefined ? [] : resetInvalidations(visible, target)
     const text = renderReset(target, invalidations)
     const source: MemoryIndexSource = {
-      kind: 'dsh-memory',
+      kind: MEMORY_INDEX_SOURCE_KIND,
       form: 'memory-index',
       mode: 'reset',
       protocolVersion: PROTOCOL_VERSION,
@@ -310,7 +314,7 @@ export class MemoryIndexInjector {
 
   private logFailure(error: unknown): void {
     const logger = (this.ctx as unknown as { logger?: { warn?: (message: string) => void } }).logger
-    logger?.warn?.(`dsh-memory: index injection failed: ${String(error)}`)
+    logger?.warn?.(`memloom: index injection failed: ${String(error)}`)
   }
 }
 

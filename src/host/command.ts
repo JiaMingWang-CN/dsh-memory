@@ -4,7 +4,7 @@
  * Subcommands: `status`, `search <query>`, `dream [--since <iso>]`,
  * `forget <id>`, and `export`. Every branch returns a stable {@link CommandResult}
  * so the command surface never throws a raw error at the UI.
- * @module dsh-memory/host/command
+ * @module memloom/host/command
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { MemoryService } from './service.ts'
@@ -58,7 +58,7 @@ export function registerMemoryCommands(ctx: Context, service: MemoryService): ()
   const commands = (ctx as unknown as { commands?: CommandsLike }).commands
   if (commands === undefined) return () => undefined
   return commands.register({
-    definitionId: 'dsh-memory/memory' as never,
+    definitionId: 'memloom/memory' as never,
     name: 'memory',
     description: 'Inspect and manage long-term memory.',
     input: { hint: 'status | search <query> | dream | organize | forget <id> | export' },

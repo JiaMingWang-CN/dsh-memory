@@ -5,7 +5,7 @@
  * Pure TypeScript with zero runtime dependencies. Inputs larger than the LCS
  * cap fall back to a simple old-removed / new-added pair so very long bodies
  * never stall the Settings thread.
- * @module dsh-memory/client/diff
+ * @module memloom/client/diff
  */
 
 /** One line in a computed diff. */

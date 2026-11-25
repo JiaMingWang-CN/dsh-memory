@@ -7,7 +7,7 @@
  * cheap to render. Only host theme tokens (`--dsw-alias-*`, `--dsw-radius-*`,
  * `--dsw-focus-ring-*`) are referenced, so light/dark and every accent follow
  * the application automatically.
- * @module dsh-memory/client/styles
+ * @module memloom/client/styles
  */
 import * as React from 'react'
 import { t } from './locales.ts'

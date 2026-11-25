@@ -1,6 +1,6 @@
 /**
  * DSH host adapter for export, import, rebuild and purge over `memoryDomain`.
- * @module dsh-memory/host/exchange
+ * @module memloom/host/exchange
  */
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import {

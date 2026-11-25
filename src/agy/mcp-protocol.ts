@@ -5,7 +5,7 @@
  * go strictly to `stderr`. Supports `initialize`, `notifications/initialized`,
  * `ping`, `tools/list`, `tools/call`, and bidirectional server-to-client
  * `roots/list` requests with timeout fallback.
- * @module dsh-memory/agy/mcp-protocol
+ * @module memloom/agy/mcp-protocol
  */
 import { OperationError } from '../core/operations.ts'
 import type { AgyToolDefinition } from './tools.ts'
@@ -159,7 +159,7 @@ export class StdioMcpServer {
 
   private logDiagnostic(message: string): void {
     try {
-      this.stderr.write(`[dsh-memory] ${message}\n`)
+      this.stderr.write(`[memloom] ${message}\n`)
     } catch {
       // Never crash on diagnostic stream errors.
     }

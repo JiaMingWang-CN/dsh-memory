@@ -70,8 +70,8 @@ describe('AGY plugin manifest and isolation', () => {
     for (const key of Object.keys(plugin)) {
       expect(ALLOWED_PLUGIN_KEYS.has(key), `unexpected plugin.json key: ${key}`).toBe(true)
     }
-    expect(plugin.name).toBe('dsh-memory')
-    expect(plugin.displayName).toBe('DSH Memory')
+    expect(plugin.name).toBe('memloom')
+    expect(plugin.displayName).toBe('Memloom')
     expect(plugin.version).toBe(pkg.version)
     expect(plugin.logo).toBe('assets/logo.svg')
     expect(Array.isArray(plugin.suggestedPrompts)).toBe(true)

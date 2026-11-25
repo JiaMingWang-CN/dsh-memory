@@ -199,8 +199,8 @@ function validatePluginManifest(outDir, problems) {
       problems.push(`unknown plugin.json top-level key: ${key}`)
     }
   }
-  if (plugin.name !== 'dsh-memory') {
-    problems.push(`plugin.json name must be "dsh-memory" (got ${JSON.stringify(plugin.name)})`)
+  if (plugin.name !== 'memloom') {
+    problems.push(`plugin.json name must be "memloom" (got ${JSON.stringify(plugin.name)})`)
   }
   if (typeof plugin.displayName !== 'string' || plugin.displayName.trim() === '') {
     problems.push('plugin.json displayName must be a non-empty string')
@@ -342,14 +342,14 @@ function validateHooksConfig(outDir, problems) {
     problems.push('hooks.json must be a JSON object')
     return
   }
-  const spec = rootObj['dsh-memory']
+  const spec = rootObj.memloom
   if (spec === null || typeof spec !== 'object' || Array.isArray(spec)) {
-    problems.push('hooks.json must define top-level hook entry "dsh-memory"')
+    problems.push('hooks.json must define top-level hook entry "memloom"')
     return
   }
-  validateHookEntries(spec.PreInvocation, 'dsh-memory.PreInvocation', false, outDir, problems)
-  validateHookEntries(spec.Stop, 'dsh-memory.Stop', false, outDir, problems)
-  validateHookEntries(spec.PreToolUse, 'dsh-memory.PreToolUse', true, outDir, problems)
+  validateHookEntries(spec.PreInvocation, 'memloom.PreInvocation', false, outDir, problems)
+  validateHookEntries(spec.Stop, 'memloom.Stop', false, outDir, problems)
+  validateHookEntries(spec.PreToolUse, 'memloom.PreToolUse', true, outDir, problems)
 }
 
 /**

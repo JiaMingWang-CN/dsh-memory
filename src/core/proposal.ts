@@ -6,7 +6,7 @@
  * status. A reworded proposal for the same scope/type/title whose source
  * episodes overlap is a *semantic* duplicate handled by
  * {@link applyDuplicatePolicy}.
- * @module dsh-memory/core/proposal
+ * @module memloom/core/proposal
  */
 import { createHash } from 'node:crypto'
 import type { MemoryRecord, MemoryScope, MemoryType, WorklogKind } from '../shared/types.ts'

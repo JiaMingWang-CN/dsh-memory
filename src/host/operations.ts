@@ -1,6 +1,6 @@
 /**
  * DSH host adapter for the crash-recoverable operation log.
- * @module dsh-memory/host/operations
+ * @module memloom/host/operations
  */
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
 import {

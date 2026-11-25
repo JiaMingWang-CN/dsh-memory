@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for improving dsh-memory.
+Thanks for improving memloom.
 
 ## Development environment
 

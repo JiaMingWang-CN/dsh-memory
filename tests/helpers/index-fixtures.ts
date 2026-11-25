@@ -93,7 +93,7 @@ export function baselineSource(
   } = {},
 ): unknown {
   return {
-    kind: 'dsh-memory',
+    kind: 'memloom',
     form: 'memory-index',
     mode: options.mode ?? 'baseline',
     protocolVersion: options.protocolVersion ?? 1,

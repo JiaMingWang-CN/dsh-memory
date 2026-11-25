@@ -1,6 +1,6 @@
 - insert:
-    - id: dsh-memory
-      name: dsh-memory
+    - id: memloom
+      name: memloom
       config:
         indexMaxBytes: 4096
         autoDream: false

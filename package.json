@@ -1,8 +1,8 @@
 {
-  "name": "dsh-memory",
+  "name": "memloom",
   "version": "0.1.3",
   "private": true,
-  "description": "A DSH-native long-term memory plugin: durable, scoped memory storage with audit, crash recovery, capacity control, BM25 retrieval, explicit memory tools and import/export.",
+  "description": "Local-first long-term experience memory for coding agents (DSH & Antigravity): durable scoped storage, BM25 retrieval, dreaming & human review.",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -10,15 +10,17 @@
     "dsh": "^0.2.2-rc.5"
   },
   "keywords": [
-    "dsh",
-    "dsh-plugin",
+    "memloom",
     "memory",
     "long-term-memory",
-    "agent"
+    "agent",
+    "dsh",
+    "antigravity",
+    "mcp"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/JiaMingWang-CN/dsh-memory.git"
+    "url": "git+https://github.com/JiaMingWang-CN/memloom.git"
   },
   "main": "./dist/host/index.js",
   "exports": {

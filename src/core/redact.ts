@@ -1,6 +1,6 @@
 /**
  * Secret detection and redaction applied before text is persisted.
- * @module dsh-memory/core/redact
+ * @module memloom/core/redact
  */
 const REDACTED = '[REDACTED]'
 

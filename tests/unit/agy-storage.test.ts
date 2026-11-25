@@ -90,14 +90,27 @@ afterEach(() => {
 })
 
 describe('resolveAgyDataPaths', () => {
-  it('resolves paths strictly by priority DSH_MEMORY_STORE_PATH > DSH_MEMORY_DATA_DIR > PLUGIN_DATA > homedir fallback', () => {
+  it('resolves paths strictly by priority MEMLOOM_* > DSH_MEMORY_* > PLUGIN_DATA > homedir fallback', () => {
     const base = makeTempDir('agy-paths-')
+    const memloomStore = join(base, 'memloom-override', 'custom.json')
     const storeFile = join(base, 'override', 'custom.json')
+    const memloomDir = join(base, 'memloom-dir')
     const dataDir = join(base, 'data-dir')
     const pluginData = join(base, 'plugin-data')
 
+    const p0 = resolveAgyDataPaths({
+      MEMLOOM_STORE_PATH: `  ${memloomStore}  `,
+      DSH_MEMORY_STORE_PATH: storeFile,
+      MEMLOOM_DATA_DIR: memloomDir,
+      DSH_MEMORY_DATA_DIR: dataDir,
+      PLUGIN_DATA: pluginData,
+    })
+    expect(p0.storePath).toBe(memloomStore)
+    expect(p0.dataDir).toBe(join(base, 'memloom-override'))
+
     const p1 = resolveAgyDataPaths({
       DSH_MEMORY_STORE_PATH: `  ${storeFile}  `,
+      MEMLOOM_DATA_DIR: memloomDir,
       DSH_MEMORY_DATA_DIR: dataDir,
       PLUGIN_DATA: pluginData,
     })
@@ -110,14 +123,25 @@ describe('resolveAgyDataPaths', () => {
     expect(p1.logPath).toBe(join(base, 'override', 'logs', 'hook-errors.log'))
 
     const p2 = resolveAgyDataPaths({
+      MEMLOOM_STORE_PATH: '   ',
+      DSH_MEMORY_STORE_PATH: '   ',
+      MEMLOOM_DATA_DIR: memloomDir,
+      DSH_MEMORY_DATA_DIR: dataDir,
+      PLUGIN_DATA: pluginData,
+    })
+    expect(p2.dataDir).toBe(memloomDir)
+    expect(p2.storePath).toBe(join(memloomDir, 'memory.json'))
+
+    const p2Legacy = resolveAgyDataPaths({
       DSH_MEMORY_STORE_PATH: '   ',
       DSH_MEMORY_DATA_DIR: dataDir,
       PLUGIN_DATA: pluginData,
     })
-    expect(p2.dataDir).toBe(dataDir)
-    expect(p2.storePath).toBe(join(dataDir, 'memory.json'))
+    expect(p2Legacy.dataDir).toBe(dataDir)
+    expect(p2Legacy.storePath).toBe(join(dataDir, 'memory.json'))
 
     const p3 = resolveAgyDataPaths({
+      MEMLOOM_DATA_DIR: '',
       DSH_MEMORY_DATA_DIR: '',
       PLUGIN_DATA: pluginData,
     })
@@ -125,7 +149,7 @@ describe('resolveAgyDataPaths', () => {
     expect(p3.storePath).toBe(join(pluginData, 'memory.json'))
 
     const p4 = resolveAgyDataPaths({})
-    expect(p4.dataDir).toMatch(/\.gemini[/\\]config[/\\]plugin-data[/\\]dsh-memory$/)
+    expect(p4.dataDir).toMatch(/\.gemini[/\\]config[/\\]plugin-data[/\\]memloom$/)
     expect(p4.storePath).toBe(join(p4.dataDir, 'memory.json'))
   })
 })

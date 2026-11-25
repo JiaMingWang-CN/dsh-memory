@@ -80,7 +80,7 @@ describe('plugin uninstall cleanup', () => {
         role: 'user',
         content: [{ type: 'text', text: 'old memory index' }],
         source: {
-          kind: 'dsh-memory',
+          kind: 'memloom',
           form: 'memory-index',
           mode: 'baseline',
           protocolVersion: 1,
@@ -107,7 +107,7 @@ describe('plugin uninstall cleanup', () => {
       expect(decision.kind).toBe('enter')
       if (decision.kind !== 'enter') throw new Error('unreachable')
       expect(decision.messages).toHaveLength(1)
-      expect(decision.messages.some((message) => message.source.kind === 'dsh-memory')).toBe(false)
+      expect(decision.messages.some((message) => message.source.kind === 'memloom')).toBe(false)
 
       // No capture after uninstall: emitting another turn adds nothing.
       emitCapturedTurn(emit, captureSession('s2', 'C:/ws/a'), 10)
@@ -125,7 +125,7 @@ describe('plugin uninstall cleanup', () => {
 
       // History is still replayable from the durable surface.
       expect(
-        fake.session.deriveMessages().some((message) => message.source.kind === 'dsh-memory'),
+        fake.session.deriveMessages().some((message) => message.source.kind === 'memloom'),
       ).toBe(true)
     } finally {
       // Disposing twice is safe when the first dispose already ran.

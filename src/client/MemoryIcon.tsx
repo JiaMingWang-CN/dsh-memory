@@ -3,7 +3,7 @@
  *
  * The settings shell supplies `size` and `active`; the glyph inherits the
  * current text color so it follows light/dark themes without literal colors.
- * @module dsh-memory/client/MemoryIcon
+ * @module memloom/client/MemoryIcon
  */
 import * as React from 'react'
 

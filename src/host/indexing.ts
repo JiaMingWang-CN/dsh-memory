@@ -1,6 +1,6 @@
 /**
  * DSH host adapter for durable memory index composition and rendering.
- * @module dsh-memory/host/indexing
+ * @module memloom/host/indexing
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'

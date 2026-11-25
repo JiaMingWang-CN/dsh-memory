@@ -5,7 +5,7 @@
  *
  * The single entry point lets later plans add tools without changing how the
  * service owns and disposes the tool set.
- * @module dsh-memory/host/tools
+ * @module memloom/host/tools
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { MemoryService } from '../service.ts'

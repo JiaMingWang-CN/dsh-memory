@@ -1,6 +1,6 @@
 /**
  * Re-export deterministic `worklog(turn)` generation from the shared core.
- * @module dsh-memory/host/worklog
+ * @module memloom/host/worklog
  */
 export {
   buildWorklogContent,

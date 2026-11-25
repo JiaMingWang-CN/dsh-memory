@@ -255,7 +255,7 @@ describe('remote import safety', () => {
       const service = host.service
       const keep = await seedActive(service, 'must survive')
       const payload = {
-        format: 'dsh-memory' as const,
+        format: 'memloom' as const,
         version: 1 as const,
         exportedAt: '2026-11-15T00:00:00.000Z',
         scope: { workspaceKey: 'ws-a' },

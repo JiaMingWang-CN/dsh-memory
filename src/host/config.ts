@@ -3,7 +3,7 @@
  *
  * Every tunable lives here with the documented default; the loader validates a
  * user patch against this schema and later versions retain the user patch layer.
- * @module dsh-memory/host/config
+ * @module memloom/host/config
  */
 import z from '@deepseek-ai/schemastery'
 import {

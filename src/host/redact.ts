@@ -1,6 +1,6 @@
 /**
  * Re-export secret detection and redaction helpers from the shared core.
- * @module dsh-memory/host/redact
+ * @module memloom/host/redact
  */
 export {
   detectStrongSecret,

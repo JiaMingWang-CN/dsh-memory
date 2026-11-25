@@ -2,9 +2,10 @@
  * AGY plugin data directory and file path resolution.
  *
  * Resolves paths strictly in priority order:
- * `DSH_MEMORY_STORE_PATH` > `DSH_MEMORY_DATA_DIR` > `PLUGIN_DATA` >
- * `~/.gemini/config/plugin-data/dsh-memory`.
- * @module dsh-memory/agy/paths
+ * `MEMLOOM_STORE_PATH` > `DSH_MEMORY_STORE_PATH` >
+ * `MEMLOOM_DATA_DIR` > `DSH_MEMORY_DATA_DIR` > `PLUGIN_DATA` >
+ * `~/.gemini/config/plugin-data/memloom`.
+ * @module memloom/agy/paths
  */
 import os from 'node:os'
 import path from 'node:path'
@@ -32,7 +33,7 @@ function nonEmpty(value: string | undefined): string | undefined {
  * @returns Fully resolved {@link AgyDataPaths}.
  */
 export function resolveAgyDataPaths(env: NodeJS.ProcessEnv = process.env): AgyDataPaths {
-  const storeOverride = nonEmpty(env.DSH_MEMORY_STORE_PATH)
+  const storeOverride = nonEmpty(env.MEMLOOM_STORE_PATH) ?? nonEmpty(env.DSH_MEMORY_STORE_PATH)
   let dataDir: string
   let storePath: string
 
@@ -40,11 +41,14 @@ export function resolveAgyDataPaths(env: NodeJS.ProcessEnv = process.env): AgyDa
     storePath = path.resolve(storeOverride)
     dataDir = path.dirname(storePath)
   } else {
-    const dirOverride = nonEmpty(env.DSH_MEMORY_DATA_DIR) ?? nonEmpty(env.PLUGIN_DATA)
+    const dirOverride =
+      nonEmpty(env.MEMLOOM_DATA_DIR) ??
+      nonEmpty(env.DSH_MEMORY_DATA_DIR) ??
+      nonEmpty(env.PLUGIN_DATA)
     dataDir =
       dirOverride !== undefined
         ? path.resolve(dirOverride)
-        : path.join(os.homedir(), '.gemini', 'config', 'plugin-data', 'dsh-memory')
+        : path.join(os.homedir(), '.gemini', 'config', 'plugin-data', 'memloom')
     storePath = path.join(dataDir, 'memory.json')
   }
 

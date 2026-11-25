@@ -9,7 +9,7 @@
  * A call that never settles would otherwise leave the page spinning forever,
  * so the wait is bounded: a stuck carrier surfaces a retryable error instead of
  * an infinite loading state.
- * @module dsh-memory/client/rpc
+ * @module memloom/client/rpc
  */
 
 interface RemoteSuccess<T> {

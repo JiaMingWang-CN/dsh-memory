@@ -6,7 +6,7 @@
  * every claimed episode, the related memories and any pre-computed health
  * checks. Episode summaries are clipped per episode, never by keeping a
  * transcript.
- * @module dsh-memory/core/dream-prompt
+ * @module memloom/core/dream-prompt
  */
 import type { EpisodeRecord, MemoryRecord } from '../shared/types.ts'
 import { renderDreamHealth, type DreamHealth } from './dream-health.ts'

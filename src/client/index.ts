@@ -1,11 +1,11 @@
 /**
- * Client entry for the dsh-memory bundle.
+ * Client entry for the Memloom bundle.
  *
  * The build script wraps the compiled module in
- * `window.__ModuleLoader__.load({ id: 'dsh-memory', factory(require) {…} })`.
+ * `window.__ModuleLoader__.load({ id: 'memloom', factory(require) {…} })`.
  * React comes from the browser module table through `require('react')`; this
  * module never imports a Harness Client package.
- * @module dsh-memory/client
+ * @module memloom/client
  */
 import type { ClientContext } from './context.ts'
 import { MemoryIcon } from './MemoryIcon.tsx'

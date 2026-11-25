@@ -6,13 +6,18 @@
  * and the memory tool `tool/call` / `tool/result` pair — and never touches the
  * memory store, the model context or any statistics. The value is published to
  * the Client through `wire.view`, for the chat activity card.
- * @module dsh-memory/host/projection
+ * @module memloom/host/projection
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ToolResultMessage } from '@deepseek-ai/dsh-llm'
 import { z } from 'zod'
-import type { MemoryIndexSource, MemoryUsageTurn, MemoryUsageView } from '../shared/types.ts'
+import {
+  isMemoryIndexSourceKind,
+  type MemoryIndexSource,
+  type MemoryUsageTurn,
+  type MemoryUsageView,
+} from '../shared/types.ts'
 
 /** Projection key registered on `ctx.sessionProjections`. */
 export const MEMORY_USAGE_KEY = 'memoryUsage'
@@ -104,7 +109,7 @@ export function applyMemoryUsage(state: MemoryUsageState, event: SessionEvent): 
     }
     case 'user/message': {
       const source = (event.data as { source?: { kind?: string } }).source
-      if (source?.kind !== 'dsh-memory') return state
+      if (!isMemoryIndexSourceKind(source?.kind)) return state
       const index = source as MemoryIndexSource
       if (!Array.isArray(index.changes)) return state
       const ids = index.changes
@@ -252,5 +257,5 @@ export function registerMemoryUsageProjection(ctx: Context): void {
 /** Log a projection registration failure without breaking service startup. */
 function warn(ctx: Context, error: unknown): void {
   const logger = (ctx as unknown as { logger?: { warn?: (message: string) => void } }).logger
-  logger?.warn?.(`dsh-memory: memoryUsage projection registration failed: ${String(error)}`)
+  logger?.warn?.(`memloom: memoryUsage projection registration failed: ${String(error)}`)
 }

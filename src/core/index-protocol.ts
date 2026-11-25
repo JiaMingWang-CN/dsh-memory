@@ -3,9 +3,14 @@
  *
  * Pure state-machine over {@link MemoryIndexSource} records without any DSH
  * `UserMessage` or `Session` dependencies.
- * @module dsh-memory/core/index-protocol
+ * @module memloom/core/index-protocol
  */
-import type { MemoryIndexChange, MemoryIndexSource } from '../shared/types.ts'
+import {
+  MEMORY_INDEX_SOURCE_KIND,
+  isMemoryIndexSourceKind,
+  type MemoryIndexChange,
+  type MemoryIndexSource,
+} from '../shared/types.ts'
 import { PROTOCOL_VERSION, renderDelta, renderReset, type MemoryIndexSnapshot } from './indexing.ts'
 
 /** One entry currently visible to the model, tracked by its rendered digest. */
@@ -55,7 +60,7 @@ export interface PlannedIndexRefresh {
 export function parseMemoryIndexSource(raw: unknown): MemoryIndexSource | undefined {
   if (raw === null || typeof raw !== 'object') return undefined
   const source = raw as Record<string, unknown>
-  if (source.kind !== 'dsh-memory' || source.form !== 'memory-index') return undefined
+  if (!isMemoryIndexSourceKind(source.kind) || source.form !== 'memory-index') return undefined
   if (source.protocolVersion !== 1) return undefined
   if (typeof source.baselineId !== 'string' || source.baselineId === '') return undefined
   if (typeof source.scopeKey !== 'string') return undefined
@@ -135,7 +140,7 @@ export function foldRawIndexSources(
     if (
       rawSource === null ||
       typeof rawSource !== 'object' ||
-      (rawSource as { kind?: unknown }).kind !== 'dsh-memory'
+      !isMemoryIndexSourceKind((rawSource as { kind?: unknown }).kind)
     ) {
       continue
     }
@@ -271,7 +276,7 @@ function makeSource(
   refreshedAt: string,
 ): MemoryIndexSource {
   return {
-    kind: 'dsh-memory',
+    kind: MEMORY_INDEX_SOURCE_KIND,
     form: 'memory-index',
     mode,
     protocolVersion: PROTOCOL_VERSION,

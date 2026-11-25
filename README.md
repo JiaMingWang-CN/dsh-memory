@@ -1,10 +1,10 @@
 <div align="center">
 
-# dsh-memory
+# memloom
 
 ### 下一个会话，不必从零开始。
 
-**为 DSH 打造的原生长期记忆插件。**
+**面向编码 Agent（DSH & Antigravity）的本地优先长期记忆插件（原 `dsh-memory`）。**
 
 记住做过的项目、踩过的坑、形成的规则与你的偏好。<br>
 在需要的时候想起，在不需要的时候安静。
@@ -26,7 +26,7 @@
 ---
 
 <p align="center">
-  <strong>赞助商 · 感谢支持 dsh-memory 开源开发</strong>
+  <strong>赞助商 · 感谢支持 memloom 开源开发</strong>
   <br>
   <a href="https://api.lwxiaoye.top/">
     <img src="assets/sponsor-k.png" alt="XiaoyeyeyeyeyeAPI 赞助商 Logo" width="120">
@@ -39,9 +39,9 @@
 
 每个新会话，编程 Agent 都可能从零开始：重新理解项目，重新询问约定，甚至再次犯下已经被纠正过的错误。
 
-**dsh-memory 想让经验跨会话留下来。**
+**memloom（原 `dsh-memory`）想让经验跨会话留下来。**
 
-它不是另一份完整聊天记录，也不是把全部历史塞进上下文，而是一套围绕 DSH 会话生命周期设计的经验记忆系统：
+它不是另一份完整聊天记录，也不是把全部历史塞进上下文，而是一套面向编码 Agent（DSH 与 Antigravity）会话生命周期设计的经验记忆系统：
 
 - **记住纠正**：一次踩坑，沉淀为以后可以复用的教训。
 - **记住工作**：知道上次做了什么、做到哪里、留下了什么结果。
@@ -63,13 +63,13 @@
 
 > 构建前先运行 typecheck，不要等到打包时才发现类型错误。
 
-在新的会话中，当你再次处理构建相关任务，dsh-memory 的目标是把这条与当前请求相关的教训带回上下文。你不必重新解释，Agent 也不必用一次失败来重新学习。
+在新的会话中，当你再次处理构建相关任务，memloom 的目标是把这条与当前请求相关的教训带回上下文。你不必重新解释，Agent 也不必用一次失败来重新学习。
 
 ### 接着上次的工作继续
 
 > 上次我们把这个模块改到哪里了？
 
-通过工作日志、项目知识与来源会话，dsh-memory 将帮助 Agent 找到之前的工作摘要和关键结果，而不是从头阅读全部历史对话。
+通过工作日志、项目知识与来源会话，memloom 将帮助 Agent 找到之前的工作摘要和关键结果，而不是从头阅读全部历史对话。
 
 ### 让项目知识自己沉淀
 
@@ -94,7 +94,7 @@
 
 ### 1. 在关键时刻捕获，而不是复制整场对话
 
-dsh-memory 的设计是监听真正值得沉淀的信号：
+memloom 的设计是监听真正值得沉淀的信号：
 
 - 用户明确纠正了一个错误；
 - 工具失败后，在同一目标上找到了有效做法；
@@ -199,7 +199,7 @@ Dreaming 的可靠性行为（已实现）：
 
 长期记忆不仅要“能写”，还要在异常情况下保持可信。
 
-dsh-memory 以结构化记录、Markdown 正文和本地检索索引组成记忆库，通过操作日志协调多步写入：
+memloom 以结构化记录、Markdown 正文和本地检索索引组成记忆库，通过操作日志协调多步写入：
 
 - 每次业务修改保留结构化前后快照与操作者信息；
 - 使用业务版本号避免覆盖用户的后续编辑；
@@ -242,11 +242,11 @@ dsh-memory 以结构化记录、Markdown 正文和本地检索索引组成记忆
 
 ## 安装
 
-> dsh-memory **仅以 GitHub 插件形式发布（通过 GitHub 仓库与 GitHub Releases 分发），不发布 npm 包**。0.1.0 仍是 0.x 开发版本。
+> memloom **仅以 GitHub 插件形式发布（通过 GitHub 仓库与 GitHub Releases 分发），不发布 npm 包**。0.1.0 仍是 0.x 开发版本。
 
 **环境要求**
 
-- 本机安装版 DSH `0.2.2-rc.5`（`package.json` 的 `engines.dsh` 声明兼容范围 `^0.2.2-rc.5`）
+- 本机安装版 DSH `0.2.2-rc.5`（`package.json` 的 `engines.dsh` 声明兼容范围 `^0.2.2-rc.5`），或使用 Antigravity（AGY）原生插件模式
 - Node.js `>=24.9.0`
 - pnpm（仅源码构建/本地开发需要）
 
@@ -255,16 +255,16 @@ dsh-memory 以结构化记录、Markdown 正文和本地检索索引组成记忆
 发布对应版本的 GitHub Release 后，直接通过 DSH CLI 安装 Release 中附带的预构建 bundle 包（`.tgz`），无需在本地编译：
 
 ```bash
-dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/dsh-memory/releases/download/v0.1.3/dsh-memory-0.1.3.tgz
+dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/memloom/releases/download/v0.1.3/memloom-0.1.3.tgz
 ```
 
-也可在 GitHub Releases 页面下载 `dsh-memory-0.1.3.tgz` 后，通过 DSH 的 Plugins 页面安装。
+也可在 GitHub Releases 页面下载 `memloom-0.1.3.tgz` 后，通过 DSH 的 Plugins 页面安装。
 
 **方式二：从 GitHub 源码构建并本地安装**
 
 ```bash
-git clone https://github.com/JiaMingWang-CN/dsh-memory.git
-cd dsh-memory
+git clone https://github.com/JiaMingWang-CN/memloom.git
+cd memloom
 pnpm install
 pnpm build          # 产出 dist/host 与 dist/client.js
 
@@ -272,15 +272,15 @@ pnpm build          # 产出 dist/host 与 dist/client.js
 dsh plugin --profile desktop add link:./
 
 # 方式 B：打包为本地 bundle 文件后安装
-pnpm pack           # 生成 dsh-memory-0.1.3.tgz
+pnpm pack           # 生成 memloom-0.1.3.tgz
 ```
 
-安装/启用属于 profile 变更，完成后重启 DSH，Settings 中会出现 Memory 页与图标。最小 patch 配置示例见 [`examples/cordis.patch.yml`](examples/cordis.patch.yml)。卸载可执行 `dsh plugin --profile desktop remove dsh-memory`（记忆数据仍保留在 `$DSH_HOME/storages/memory.json`）。
+安装/启用属于 profile 变更，完成后重启 DSH，Settings 中会出现 Memory 页与图标。最小 patch 配置示例见 [`examples/cordis.patch.yml`](examples/cordis.patch.yml)。卸载可执行 `dsh plugin --profile desktop remove memloom`（记忆数据仍保留在 `$DSH_HOME/storages/memory.json`）。
 
 ## 快速开始
 
 1. **写入一条记忆**：在新会话里让 Agent 记住一条经验（它调用 `memory_write`），或在 Settings → Memory 新建。显式写入直接生效。
-2. **在新会话召回**：开启新会话时，dsh-memory 会在第一次请求前注入一份小型记忆索引；Agent 也可以调用 `memory_search` 搜索摘要，再用 `memory_read` 读取完整正文与来源。
+2. **在新会话召回**：开启新会话时，memloom 会在第一次请求前注入一份小型记忆索引；Agent 也可以调用 `memory_search` 搜索摘要，再用 `memory_read` 读取完整正文与来源。
 3. **整理与审阅**：运行 `/memory dream` 或点击 Settings → Memory 的 `Dream now`。整理结果先进入“待审阅”，接受或修改后接受才转为可检索的长期记忆。
 4. **遗忘**：用 `memory_forget` 或管理页做软遗忘，之后不再召回，必要时可恢复。
 
@@ -311,8 +311,8 @@ pnpm pack           # 生成 dsh-memory-0.1.3.tgz
 
 ```yaml
 - insert:
-    - id: dsh-memory
-      name: dsh-memory
+    - id: memloom
+      name: memloom
       config:
         autoDream: false
         autoCaptureEpisodes: true
@@ -321,12 +321,12 @@ pnpm pack           # 生成 dsh-memory-0.1.3.tgz
 
 ## 架构说明
 
-dsh-memory 采用同仓共享内核的双宿主分层架构，核心记忆引擎（`src/core/`）零宿主依赖，同时支撑 DSH bundle 与 Antigravity（AGY）原生插件：
+memloom 采用同仓共享内核的双宿主分层架构，核心记忆引擎（`src/core/`）零宿主依赖，同时支撑 DSH bundle 与 Antigravity（AGY）原生插件：
 
 - **Host（DSH）**：以单一 `MemoryService` 注册 `memory` 服务，负责存储、BM25 检索、episode 捕获、dreaming 整理、已有记忆整理（organize）、`agent/pre-step` 索引注入、六个模型工具与 `/memory` 命令。
 - **Client（DSH）**：注册 Settings → Memory 管理页与图标，并在助手动作行（用量/时间旁）以小字显示记忆用量；记忆工具使用 DSH 原生工具调用行，不注入自定义卡片。通过 `ctx.remote.memory.*` 读写，文案走 zh/en，样式只用主题 token。
 - **AGY 原生插件（`src/agy/`）**：复用同一共享内核，以跨进程文件锁 JSON 存储（`${PLUGIN_DATA}/memory.json`）、20 个分级 MCP 工具、统一 Hooks（`PreInvocation` / `Stop` / `PreToolUse`）及内置 Skills 打包为自包含目录 `dist/agy-plugin/`。
-- **存储**：DSH 使用 `storageDomain` 的 JSON 域持久化（默认 `$DSH_HOME/storages/memory.json`），AGY 默认使用 `${PLUGIN_DATA}/memory.json`；两者共享六张表 schema（记忆、episode、dream、审计、操作日志与会话游标）及兼容的导入/导出 JSON 格式。
+- **存储**：DSH 使用 `storageDomain` 的 JSON 域持久化（默认 `$DSH_HOME/storages/memory.json`），AGY 默认使用 `${PLUGIN_DATA}/memory.json`；两者共享六张表 schema（记忆、episode、dream、审计、操作日志与会话游标）及兼容的导入/导出 JSON 格式（兼容导入旧版 `dsh-memory` 导出）。
 - **一致性与恢复**：没有跨表事务，多表写入通过 `operations` 操作日志状态机完成，崩溃后按操作矩阵恢复；单行损坏不会阻止其余操作恢复。
 - **索引注入**：首次注入 baseline，开启刷新后只注入 `add` / `replace` / `remove` / `reset` 差异，不主动唤醒 Agent。
 - **错误契约**：Host 业务错误映射为稳定的 `memory/*` Remote 失败码，details 保留原始 `OperationError` code。
@@ -338,7 +338,7 @@ dsh-memory 采用同仓共享内核的双宿主分层架构，核心记忆引擎
 
 除 DSH bundle 外，本仓库同时提供 **Antigravity（AGY）原生插件**构建能力（同属 0.x 开发版本，与 DSH 打包产物相互隔离）：
 
-- **自包含构建**：运行 `pnpm build:agy` 与 `pnpm pack:agy:check` 生成并校验零外部 `node_modules` 依赖的 `dist/agy-plugin/` 目录（运行仅需本机 Node.js `>=24.9.0`），可复制到 `~/.gemini/config/plugins/dsh-memory` 或通过 `plugins.json` 引用启用；
+- **自包含构建**：运行 `pnpm build:agy` 与 `pnpm pack:agy:check` 生成并校验零外部 `node_modules` 依赖的 `dist/agy-plugin/` 目录（运行仅需本机 Node.js `>=24.9.0`），可复制到 `~/.gemini/config/plugins/memloom` 或通过 `plugins.json` 引用启用；
 - **分层工具与确认门禁**：通过 Stdio MCP Server 暴露 12 个常规工具与 8 个敏感管理工具，后者及跨工作区/写盘导出操作均经 `PreToolUse` `force_ask` 强制弹窗确认；
 - **自动注入、捕获与两阶段整理**：`PreInvocation` 负责首轮基线注入与快速跳过，`Stop` 从 `transcript.jsonl` 白名单增量捕获片段；通过 `prepare` / `commit` 两阶段工具配合内置 Skills（`memory`、`memory-dream`、`memory-review`）完成整理与审阅，无需额外配置外部 LLM API Key；
 - **跨宿主互通**：AGY 默认独立持久化于 `${PLUGIN_DATA}/memory.json`（不与 DSH 共享在线存储文件），支持通过兼容 JSON 导出/导入与 DSH 无损迁移。
@@ -347,7 +347,7 @@ dsh-memory 采用同仓共享内核的双宿主分层架构，核心记忆引擎
 
 ## 明确不做什么
 
-dsh-memory 的首个完整版本不以以下能力为目标：
+memloom 的首个完整版本不以以下能力为目标：
 
 - 外部 Embedding 服务或向量数据库；
 - 云端账户与跨设备同步；
@@ -382,12 +382,12 @@ Settings → Memory 管理页、审阅界面，以及会话中的记忆用量摘
 
 ## 发布说明
 
-- **分发渠道**：本项目仅以 **GitHub 插件**形式通过 [GitHub Releases](https://github.com/JiaMingWang-CN/dsh-memory/releases) 分发预构建的 bundle 包（`.tgz`）与源码仓库，**不发布 npm 包**。
+- **分发渠道**：本项目仅以 **GitHub 插件**形式通过 [GitHub Releases](https://github.com/JiaMingWang-CN/memloom/releases) 分发预构建的 bundle 包（`.tgz`）与源码仓库，**不发布 npm 包**。
 - **变更记录**：详细变更见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ## FAQ
 
-**dsh-memory 现在可以用来长期使用吗？**
+**memloom 现在可以用来长期使用吗？**
 仓库处于 0.1.0 开发版本（0.x），尚未发布正式版本。功能可用，但接口、配置与行为仍可能调整。
 
 **会自动整理我的记忆吗？**
@@ -424,6 +424,6 @@ Settings → Memory 管理页、审阅界面，以及会话中的记忆用量摘
 
 **让经验留下来，让每个新会话接着前进。**
 
-dsh-memory · DSH-native long-term memory · 0.1.0-dev
+memloom · Local-first long-term memory · 0.1.0-dev
 
 </div>

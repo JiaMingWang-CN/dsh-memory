@@ -69,7 +69,7 @@ describe('end-to-end recall', () => {
       if (decision.kind !== 'enter') throw new Error('unreachable')
       expect(decision.messages).toHaveLength(2)
       const injected = decision.messages[1]!
-      expect(injected.source.kind).toBe('dsh-memory')
+      expect(injected.source.kind).toBe('memloom')
 
       const context = textOf(injected)
       expect(context).toContain('typecheck')

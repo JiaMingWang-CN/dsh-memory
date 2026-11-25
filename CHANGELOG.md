@@ -48,6 +48,7 @@ written only when that version is actually released.
 
 ### Changed
 
+- Renamed the project from `dsh-memory` to `memloom` (Memloom) to reflect multi-host support across DSH and Antigravity, while keeping backward compatibility for legacy `dsh-memory` export JSON, session index sources, local-storage keys, and `DSH_MEMORY_*` environment variables.
 - Extracted host-agnostic memory logic from `src/host/` into `src/core/` with ESLint import boundaries forbidding `@deepseek-ai/*` in `src/shared/`, `src/core/`, and `src/agy/`, while preserving `src/host/` exports, DSH behavior, and strict DSH `.tgz` bundle isolation in `scripts/pack-check.mjs`.
 
 - Tightened `memory_write` tool description and dreaming system prompt rules to forbid copying or summarizing already auto-loaded docs (`AGENTS.md`, `CLAUDE.md`, `README`, or injected skills lists), keep each memory concise on a single independent topic, and avoid filling the store when given a broad memory request with no new findings.
@@ -146,4 +147,4 @@ written only when that version is actually released.
 - Index refresh anchors BM25 candidates to the first human request across tool continuations, skips an emptied first decision, and never emits a baseline for a request another listener consumed.
 - Index rendering escapes `memoryId` in baseline, reset and delta output, and daily worklogs expose only their title and date rather than their body summary.
 
-[Unreleased]: https://github.com/JiaMingWang-CN/dsh-memory/commits/main
+[Unreleased]: https://github.com/JiaMingWang-CN/memloom/commits/main

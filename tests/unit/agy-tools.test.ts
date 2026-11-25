@@ -306,7 +306,7 @@ describe('agy tiered MCP memory tools', () => {
       { includeArchived: true },
       alphaCtx,
     )) as { format: string; memories: { id: string }[] }
-    expect(exported.format).toBe('dsh-memory')
+    expect(exported.format).toBe('memloom')
     expect(exported.memories.some((m) => m.id === alphaNote.id)).toBe(true)
 
     const statusAfterExport = (await getTool('memory_status').execute({}, alphaCtx)) as {

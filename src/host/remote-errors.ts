@@ -6,7 +6,7 @@
  * `OperationError` code the Client branches on (for example a concurrent-edit
  * conflict). Wrapping the Remote methods turns each `OperationError` into a
  * `memory/*` failure whose `details.code` keeps the precise domain code.
- * @module dsh-memory/host/remote-errors
+ * @module memloom/host/remote-errors
  */
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { ZodError } from 'zod'
@@ -55,7 +55,7 @@ const REMOTE_CODE: Record<OperationErrorCode, MemoryRemoteErrorCode> = {
 }
 
 /** Marker kept on a wrapped method so re-registration cannot wrap twice. */
-const BOUNDARY = Symbol.for('dsh-memory/remote-error-boundary')
+const BOUNDARY = Symbol.for('memloom/remote-error-boundary')
 
 /**
  * Translate one caught value into the wire failure the Client can branch on.

@@ -4,7 +4,7 @@
  * The Host maps business failures onto stable `memory/*` codes
  * (`src/host/remote-errors.ts`); transport faults arrive as `gateway/*`.
  * Unknown codes keep the Host message for diagnosis.
- * @module dsh-memory/client/errors
+ * @module memloom/client/errors
  */
 import { t } from './locales.ts'
 

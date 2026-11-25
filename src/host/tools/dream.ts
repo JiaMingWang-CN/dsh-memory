@@ -1,6 +1,6 @@
 /**
  * `memory_dream` — enqueue a manual dreaming run for the caller's scope.
- * @module dsh-memory/host/tools/dream
+ * @module memloom/host/tools/dream
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'

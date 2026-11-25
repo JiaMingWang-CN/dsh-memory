@@ -77,7 +77,7 @@ describe('baseline first turn', () => {
     expect(built).toBeDefined()
     expect(built!.source.mode).toBe('baseline')
     expect(built!.source.protocolVersion).toBe(1)
-    expect(built!.source.kind).toBe('dsh-memory')
+    expect(built!.source.kind).toBe('memloom')
     expect(built!.source.changes.map((change) => change.memoryId).sort()).toEqual([
       'lesson-1',
       'pref-1',

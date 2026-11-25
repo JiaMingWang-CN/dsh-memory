@@ -3,7 +3,7 @@
  *
  * Persists lightweight index folding state, capture turn/assistant summary,
  * and workspace anchor metadata across short-lived AGY Hook processes.
- * @module dsh-memory/agy/session-state
+ * @module memloom/agy/session-state
  */
 import * as fs from 'node:fs/promises'
 import path from 'node:path'

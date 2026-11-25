@@ -35,7 +35,7 @@ async function primeBaseline(injector: MemoryIndexInjector, fake: FakeAgent): Pr
   if (first.kind !== 'enter') throw new Error('expected enter')
   expect(first.messages).toHaveLength(2)
   const baseline = first.messages[1]!
-  if (baseline.source.kind !== 'dsh-memory') throw new Error('expected dsh-memory baseline')
+  if (baseline.source.kind !== 'memloom') throw new Error('expected memloom baseline')
   fake.session.messages.push(baseline)
   return baseline
 }
@@ -107,7 +107,7 @@ describe('index refresh on', () => {
       if (second.kind !== 'enter') throw new Error('expected enter')
       expect(second.messages).toHaveLength(2)
       const delta = second.messages[1]!
-      if (delta.source.kind !== 'dsh-memory') throw new Error('expected dsh-memory delta')
+      if (delta.source.kind !== 'memloom') throw new Error('expected memloom delta')
       expect(delta.source.mode).toBe('delta')
       expect(delta.source.changes.map((change) => change.memoryId)).toContain(lesson.id)
       fake.session.messages.push(delta)

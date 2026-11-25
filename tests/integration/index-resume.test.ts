@@ -67,8 +67,8 @@ describe('resume missing baseline', () => {
     if (decision.kind !== 'enter') throw new Error('expected enter')
     expect(decision.messages).toHaveLength(2)
     const injected = decision.messages[1]!
-    expect(injected.source.kind).toBe('dsh-memory')
-    if (injected.source.kind !== 'dsh-memory') throw new Error('unreachable')
+    expect(injected.source.kind).toBe('memloom')
+    if (injected.source.kind !== 'memloom') throw new Error('unreachable')
     expect(injected.source.mode).toBe('reset')
   })
 })
@@ -88,7 +88,7 @@ describe('compaction', () => {
     )
     if (decision.kind !== 'enter') throw new Error('expected enter')
     const injected = decision.messages[1]!
-    if (injected.source.kind !== 'dsh-memory') throw new Error('unreachable')
+    if (injected.source.kind !== 'memloom') throw new Error('unreachable')
     expect(injected.source.mode).toBe('reset')
     // The reset describes only the new (empty) snapshot.
     expect(injected.source.changes).toEqual([])

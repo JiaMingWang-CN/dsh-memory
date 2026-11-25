@@ -4,7 +4,7 @@
  * Encapsulates startup recovery, CRUD, BM25 search, retention, import/export/
  * rebuild/purge, and the two-stage prepare/commit workflows for dreaming and
  * full-store organization without any dependency on a host runtime.
- * @module dsh-memory/core/engine
+ * @module memloom/core/engine
  */
 import { z } from 'zod'
 import {
@@ -1615,7 +1615,7 @@ export class MemoryEngine {
         acceptedCount += 1
       } catch (error) {
         this.logger?.warn?.(
-          `dsh-memory: auto-accept left proposal ${id} pending: ${
+          `memloom: auto-accept left proposal ${id} pending: ${
             error instanceof Error ? error.message : String(error)
           }`,
         )

@@ -5,7 +5,7 @@
  * `memory/conflict` failure is surfaced as a reload prompt instead of silently
  * overwriting either side. Nothing here calls the Remote directly: the section
  * owns every call and reports failures back into the panel.
- * @module dsh-memory/client/MemoryDetail
+ * @module memloom/client/MemoryDetail
  */
 import * as React from 'react'
 import type { MemoryRecord, MemorySourceRef } from './context.ts'

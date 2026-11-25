@@ -1,6 +1,6 @@
 /**
  * DSH host adapter for delta/reset planning on `agent/pre-step`.
- * @module dsh-memory/host/index-refresh
+ * @module memloom/host/index-refresh
  */
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'

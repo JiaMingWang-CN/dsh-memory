@@ -7,7 +7,7 @@
  * after each durable write, and `commit` finalizes. `recover` replays interrupted
  * operations from their last persisted step using `contentRevision` checks, so a
  * user edit made after a crash is never overwritten.
- * @module dsh-memory/core/operations
+ * @module memloom/core/operations
  */
 import {
   AuditId,

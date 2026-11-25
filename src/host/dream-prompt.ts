@@ -1,6 +1,6 @@
 /**
  * Re-export dream prompt assembly from the shared core.
- * @module dsh-memory/host/dream-prompt
+ * @module memloom/host/dream-prompt
  */
 export {
   buildDreamPrompt,

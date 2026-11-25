@@ -54,7 +54,7 @@ describe('export / purge / import round-trip', () => {
   it('skips and reports memories whose workspace is not mapped', async () => {
     const { store, domain } = await openStore()
     const payload: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: { workspaceKey: 'ws-remote' },
@@ -83,7 +83,7 @@ describe('export / purge / import round-trip', () => {
       sourceRefs: [{ sessionId: 's-1', quote: `password=hunter2` }],
     })
     const payload: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: { workspaceKey: 'ws-a' },
@@ -110,7 +110,7 @@ describe('export / purge / import round-trip', () => {
     const { store, domain } = await openStore()
     await store.create({ type: 'lesson', title: 'same', body: 'body', scope: workspace })
     const payload: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: { workspaceKey: 'ws-a' },
@@ -209,7 +209,7 @@ describe('import safety', () => {
       scope: workspace,
     })
     const malformed = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: 'all',
@@ -234,7 +234,7 @@ describe('import safety', () => {
       scope: { kind: 'global' },
     })
     const payload: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: 'global',
@@ -277,7 +277,7 @@ describe('import safety', () => {
       scope: workspace,
     })
     const payload: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: 'all',
@@ -319,7 +319,7 @@ describe('import safety', () => {
     const { store, domain } = await openStore()
     await store.create({ type: 'lesson', title: 'same', body: 'body', scope: workspace })
     const payload: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: { workspaceKey: 'ws-remote' },
@@ -353,7 +353,7 @@ describe('import safety', () => {
       scope: workspace,
     })
     const payload: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: { workspaceKey: 'ws-a' },
@@ -383,7 +383,7 @@ describe('import safety', () => {
       scope: workspace,
     })
     const empty: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: { workspaceKey: 'ws-a' },
@@ -407,7 +407,7 @@ describe('import safety', () => {
   it('remaps imported episode session ids so they cannot move a local backfill cursor', async () => {
     const { store, domain } = await openStore()
     const payload: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: { workspaceKey: 'ws-a' },
@@ -460,7 +460,7 @@ describe('import safety', () => {
       return create(input, requestId)
     }
     const payload: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: { workspaceKey: 'ws-a' },
@@ -498,7 +498,7 @@ describe('import safety', () => {
       scope: workspaceB,
     })
     const payload: MemoryExport = {
-      format: 'dsh-memory',
+      format: 'memloom',
       version: 1,
       exportedAt: '2026-11-15T00:00:00.000Z',
       scope: { workspaceKey: 'ws-a' },
@@ -520,5 +520,28 @@ describe('import safety', () => {
 
     await store.acceptProposal(MemoryId('proposal-1'))
     expect(store.get(foreign.id)?.status).toBe('active')
+  })
+
+  it('accepts legacy dsh-memory export format for lossless migration', async () => {
+    const { store, domain } = await openStore()
+    const payload = {
+      format: 'dsh-memory' as const,
+      version: 1 as const,
+      exportedAt: '2026-11-15T00:00:00.000Z',
+      scope: { workspaceKey: 'ws-a' },
+      includeArchived: true,
+      memories: [
+        makeMemoryRecord({
+          id: MemoryId('legacy-1'),
+          title: 'Legacy exported rule',
+          body: 'Still imports cleanly after rename.',
+          scope: workspace,
+        }),
+      ],
+      episodes: [],
+    }
+    const report = await importMemories(store, domain, payload, { mapping: identityMapping })
+    expect(report.created).toBe(1)
+    expect(store.get(MemoryId('legacy-1'))?.title).toBe('Legacy exported rule')
   })
 })

@@ -37,7 +37,7 @@ describe('workspace switch', () => {
     )
     if (first.kind !== 'enter') throw new Error('expected enter')
     const baseline = first.messages[first.messages.length - 1]!
-    if (baseline.source.kind !== 'dsh-memory') throw new Error('unreachable')
+    if (baseline.source.kind !== 'memloom') throw new Error('unreachable')
     expect(baseline.source.scopeKey).toBe(WS.key)
     fake.session.messages.push(baseline)
 
@@ -52,7 +52,7 @@ describe('workspace switch', () => {
     if (second.kind !== 'enter') throw new Error('expected enter')
     expect(second.messages).toHaveLength(2)
     const reset = second.messages[1]!
-    if (reset.source.kind !== 'dsh-memory') throw new Error('unreachable')
+    if (reset.source.kind !== 'memloom') throw new Error('unreachable')
     expect(reset.source.mode).toBe('reset')
     expect(reset.source.scopeKey).toBe(WS_B.key)
     const changedIds = reset.source.changes.map((change) => change.memoryId)

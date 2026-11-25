@@ -1,10 +1,10 @@
 <div align="center">
 
-# dsh-memory
+# memloom
 
 ### The next session should not start from zero.
 
-**A DSH-native long-term memory plugin.**
+**Local-first long-term experience memory for coding agents (DSH & Antigravity), formerly `dsh-memory`.**
 
 Remember the projects you worked on, the pitfalls you hit, the rules you settled on, and your preferences.<br>
 Recall them when needed; stay quiet when not.
@@ -26,7 +26,7 @@ Recall them when needed; stay quiet when not.
 ---
 
 <p align="center">
-  <strong>Sponsor · Thank you for supporting dsh-memory open-source development</strong>
+  <strong>Sponsor · Thank you for supporting memloom open-source development</strong>
   <br>
   <a href="https://api.lwxiaoye.top/">
     <img src="assets/sponsor-k.png" alt="XiaoyeyeyeyeyeAPI sponsor logo" width="120">
@@ -39,9 +39,9 @@ Recall them when needed; stay quiet when not.
 
 Every new session can start from zero: re-learning the project, re-asking conventions, and sometimes repeating a mistake that was already corrected.
 
-**dsh-memory wants experience to carry across sessions.**
+**memloom (formerly `dsh-memory`) wants experience to carry across sessions.**
 
-It is not another full chat transcript and it does not stuff all history into context. It is an experience-memory system designed around the DSH session lifecycle:
+It is not another full chat transcript and it does not stuff all history into context. It is an experience-memory system designed around the lifecycle of coding agents (DSH and Antigravity):
 
 - **Remember corrections**: a pitfall becomes a reusable lesson.
 - **Remember work**: know what was done, where it stopped, and what it produced.
@@ -63,13 +63,13 @@ Last week you corrected this in a project:
 
 > Run typecheck before building; don't wait for the bundle to fail on a type error.
 
-In a new session, when you work on build-related tasks again, dsh-memory aims to bring that relevant lesson back into context. You should not have to explain it again, and the agent should not have to learn it through another failure.
+In a new session, when you work on build-related tasks again, memloom aims to bring that relevant lesson back into context. You should not have to explain it again, and the agent should not have to learn it through another failure.
 
 ### Continue where the last session stopped
 
 > Where did we leave this module?
 
-Through worklogs, project knowledge and source sessions, dsh-memory will help the agent find the previous work summary and key results instead of reading the whole history.
+Through worklogs, project knowledge and source sessions, memloom will help the agent find the previous work summary and key results instead of reading the whole history.
 
 ### Let project knowledge settle
 
@@ -94,7 +94,7 @@ Not every turn deserves to become a memory. Small talk, repeated retrieval and t
 
 ### 1. Capture at the right moment, not the whole conversation
 
-dsh-memory is designed to listen for signals worth preserving:
+memloom is designed to listen for signals worth preserving:
 
 - the user explicitly corrects a mistake;
 - a tool fails and a working approach is found for the same target;
@@ -188,7 +188,7 @@ In conversation, the memory tools keep DSH's native tool-call rows (matching `me
 
 Long-term memory must remain trustworthy under failure, not just writable.
 
-dsh-memory stores structured records, Markdown bodies and a local retrieval index, coordinating multi-step writes through an operation log:
+memloom stores structured records, Markdown bodies and a local retrieval index, coordinating multi-step writes through an operation log:
 
 - every business change keeps structured before/after snapshots and the actor;
 - business revision numbers prevent overwriting later user edits;
@@ -231,11 +231,11 @@ The long-term direction is to add shadow runs, limited autonomy and ordinary una
 
 ## Install
 
-> dsh-memory is **distributed exclusively as a GitHub plugin (via this GitHub repository and GitHub Releases) and is not published to npm**. `0.1.0` remains a 0.x development version.
+> memloom is **distributed exclusively as a GitHub plugin (via this GitHub repository and GitHub Releases) and is not published to npm**. `0.1.0` remains a 0.x development version.
 
 **Requirements**
 
-- A locally installed DSH `0.2.2-rc.5` (the `engines.dsh` field in `package.json` declares the compatible range `^0.2.2-rc.5`)
+- A locally installed DSH `0.2.2-rc.5` (the `engines.dsh` field in `package.json` declares the compatible range `^0.2.2-rc.5`), or Antigravity (AGY) native plugin support
 - Node.js `>=24.9.0`
 - pnpm (only required when building from source)
 
@@ -244,16 +244,16 @@ The long-term direction is to add shadow runs, limited autonomy and ordinary una
 Once a GitHub Release is published, install its prebuilt `.tgz` bundle asset directly via the DSH CLI without building locally:
 
 ```bash
-dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/dsh-memory/releases/download/v0.1.3/dsh-memory-0.1.3.tgz
+dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/memloom/releases/download/v0.1.3/memloom-0.1.3.tgz
 ```
 
-You can also download `dsh-memory-0.1.3.tgz` from GitHub Releases and install it from the DSH Plugins page.
+You can also download `memloom-0.1.3.tgz` from GitHub Releases and install it from the DSH Plugins page.
 
 **Option 2: Build from GitHub source and install locally**
 
 ```bash
-git clone https://github.com/JiaMingWang-CN/dsh-memory.git
-cd dsh-memory
+git clone https://github.com/JiaMingWang-CN/memloom.git
+cd memloom
 pnpm install
 pnpm build          # produces dist/host and dist/client.js
 
@@ -261,15 +261,15 @@ pnpm build          # produces dist/host and dist/client.js
 dsh plugin --profile desktop add link:./
 
 # Approach B: pack into a local bundle tarball
-pnpm pack           # produces dsh-memory-0.1.3.tgz
+pnpm pack           # produces memloom-0.1.3.tgz
 ```
 
-Installing or enabling changes your profile; restart DSH afterwards and Memory will appear under Settings with its icon. See [`examples/cordis.patch.yml`](examples/cordis.patch.yml) for a minimal patch config. To remove the plugin, run `dsh plugin --profile desktop remove dsh-memory` (your memories remain safely stored in `$DSH_HOME/storages/memory.json`).
+Installing or enabling changes your profile; restart DSH afterwards and Memory will appear under Settings with its icon. See [`examples/cordis.patch.yml`](examples/cordis.patch.yml) for a minimal patch config. To remove the plugin, run `dsh plugin --profile desktop remove memloom` (your memories remain safely stored in `$DSH_HOME/storages/memory.json`).
 
 ## Quick start
 
 1. **Write a memory**: in a new session, ask the agent to remember something (it calls `memory_write`), or create one in Settings → Memory. Explicit writes take effect directly.
-2. **Recall in a new session**: dsh-memory injects a small memory index before the first request of a new session; the agent can also call `memory_search` for summaries and `memory_read` for the full body and sources.
+2. **Recall in a new session**: memloom injects a small memory index before the first request of a new session; the agent can also call `memory_search` for summaries and `memory_read` for the full body and sources.
 3. **Organize and review**: run `/memory dream`, or click `Dream now` in Settings → Memory. Results first enter "pending review" and become searchable long-term memories only after you accept or edit-before-accept.
 4. **Forget**: use `memory_forget` or the management page for a soft forget; the memory stops being recalled and can be restored later.
 
@@ -300,8 +300,8 @@ Minimal runnable config example:
 
 ```yaml
 - insert:
-    - id: dsh-memory
-      name: dsh-memory
+    - id: memloom
+      name: memloom
       config:
         autoDream: false
         autoCaptureEpisodes: true
@@ -310,12 +310,12 @@ Minimal runnable config example:
 
 ## Architecture
 
-dsh-memory uses a dual-host layered architecture in one repository, sharing a host-agnostic core (`src/core/`) across both the DSH bundle and the Antigravity (AGY) native plugin:
+memloom uses a dual-host layered architecture in one repository, sharing a host-agnostic core (`src/core/`) across both the DSH bundle and the Antigravity (AGY) native plugin:
 
 - **Host (DSH)**: a single `MemoryService` registers the `memory` service and owns storage, BM25 retrieval, episode capture, dreaming, existing-memory organization, `agent/pre-step` index injection, the six model tools and the `/memory` command.
 - **Client (DSH)**: registers the Settings → Memory page and icon, and shows a small memory-usage note in the assistant action row beside token usage; the memory tools use DSH's native tool-call rows with no custom cards. It reads and writes through `ctx.remote.memory.*`, uses zh/en copy and only theme tokens for styling.
 - **AGY native plugin (`src/agy/`)**: reuses the shared core with cross-process file-locked JSON persistence (`${PLUGIN_DATA}/memory.json`), 20 tiered MCP tools, unified Hooks (`PreInvocation` / `Stop` / `PreToolUse`), and bundled Skills built into a self-contained `dist/agy-plugin/` directory.
-- **Storage**: DSH persists through a `storageDomain` JSON domain (default `$DSH_HOME/storages/memory.json`) and AGY defaults to `${PLUGIN_DATA}/memory.json`; both share the same six-table schema (memories, episodes, dreams, audit, operation log and session cursors) and compatible export/import JSON format.
+- **Storage**: DSH persists through a `storageDomain` JSON domain (default `$DSH_HOME/storages/memory.json`) and AGY defaults to `${PLUGIN_DATA}/memory.json`; both share the same six-table schema (memories, episodes, dreams, audit, operation log and session cursors) and compatible export/import JSON format (legacy `dsh-memory` exports remain importable).
 - **Consistency and recovery**: there are no cross-table transactions; multi-table writes go through the `operations` state machine and recover from the operation matrix after a crash, and a single corrupted row does not block recovery of the remaining operations.
 - **Index injection**: a first baseline, then, when refresh is enabled, only `add` / `replace` / `remove` / `reset` deltas, without waking the agent.
 - **Error contract**: Host business errors map to stable `memory/*` remote failure codes, with details preserving the original `OperationError` code.
@@ -327,7 +327,7 @@ See [`docs/architecture.md`](docs/architecture.md), [`docs/agy.md`](docs/agy.md)
 
 Alongside the DSH bundle, this repository also builds a self-contained **Antigravity (AGY) native plugin** (also in 0.x development, kept separate from the DSH `.tgz` package):
 
-- **Self-contained build**: run `pnpm build:agy` and `pnpm pack:agy:check` to build and validate `dist/agy-plugin/` with zero runtime `node_modules` dependencies (requires only local Node.js `>=24.9.0`), then copy it to `~/.gemini/config/plugins/dsh-memory` or reference it from `plugins.json`;
+- **Self-contained build**: run `pnpm build:agy` and `pnpm pack:agy:check` to build and validate `dist/agy-plugin/` with zero runtime `node_modules` dependencies (requires only local Node.js `>=24.9.0`), then copy it to `~/.gemini/config/plugins/memloom` or reference it from `plugins.json`;
 - **Tiered MCP tools and confirmation gate**: exposes 12 regular tools and 8 sensitive management tools over a Stdio MCP server; sensitive tools as well as cross-workspace, `scope: 'all'` and file-writing export calls are gated by `PreToolUse` `force_ask` confirmation;
 - **Hooks and two-stage organization**: `PreInvocation` handles first-turn baseline injection with fast-skip on subsequent turns, `Stop` incrementally captures whitelisted fragments from `transcript.jsonl`, and `prepare` / `commit` tools pair with bundled Skills (`memory`, `memory-dream`, `memory-review`) without requiring an external LLM API key;
 - **Cross-host portability**: AGY isolates live storage under `${PLUGIN_DATA}/memory.json` by default (never sharing live disk files with DSH) and exchanges memories with DSH via compatible JSON export/import.
@@ -336,7 +336,7 @@ See [`docs/agy.md`](docs/agy.md) (Chinese) for full setup, storage layout, tool 
 
 ## FAQ
 
-**Can I rely on dsh-memory for long-term daily use now?**
+**Can I rely on memloom for long-term daily use now?**
 The repository is at 0.1.0 development (0.x) and has not reached a stable release. Features work, but interfaces, configuration and behavior may still change.
 
 **Will it organize my memories automatically?**
@@ -400,7 +400,7 @@ The Settings → Memory management page, the review UI, and the in-conversation 
 
 ## Release notes
 
-- **Distribution channel**: dsh-memory is distributed exclusively as a **GitHub plugin** via [GitHub Releases](https://github.com/JiaMingWang-CN/dsh-memory/releases) (prebuilt `.tgz` bundle asset plus repository source), with **no npm package publication**.
+- **Distribution channel**: memloom is distributed exclusively as a **GitHub plugin** via [GitHub Releases](https://github.com/JiaMingWang-CN/memloom/releases) (prebuilt `.tgz` bundle asset plus repository source), with **no npm package publication**.
 - **Changelog**: see [`CHANGELOG.md`](CHANGELOG.md) for detailed changes.
 
 ## License
@@ -413,6 +413,6 @@ This project uses the [MIT license](LICENSE). Sponsor brand and marks remain the
 
 **Let experience remain, so every new session can move forward.**
 
-dsh-memory · DSH-native long-term memory · 0.1.0-dev
+memloom · Local-first long-term memory · 0.1.0-dev
 
 </div>

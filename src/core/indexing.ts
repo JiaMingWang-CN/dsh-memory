@@ -6,7 +6,7 @@
  * candidates and recent work. Rendering never trusts memory text — it is
  * treated as untrusted background knowledge and its `</system-reminder>` guard
  * is escaped before it enters the fixed reminder frame.
- * @module dsh-memory/core/indexing
+ * @module memloom/core/indexing
  */
 import { createHash } from 'node:crypto'
 import type { MemoryIndexChange, MemoryRecord, MemoryType } from '../shared/types.ts'

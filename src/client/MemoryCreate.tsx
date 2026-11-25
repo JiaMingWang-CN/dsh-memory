@@ -3,7 +3,7 @@
  *
  * Global scope is only legal for preferences, so choosing the global layer
  * switches the type instead of letting the Host reject the write.
- * @module dsh-memory/client/MemoryCreate
+ * @module memloom/client/MemoryCreate
  */
 import * as React from 'react'
 import type { MemoryCreateInput, MemoryType } from './context.ts'

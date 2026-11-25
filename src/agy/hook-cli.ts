@@ -20,7 +20,7 @@
  * - `PreInvocation` & `Stop`: fail-open (`{}`), logging redacted diagnostics to
  *   `${PLUGIN_DATA}/logs/hook-errors.log` (size-rotated). `Stop` NEVER returns `continue`.
  * - `PreToolUse` on any memory tool: fail-closed (`decision: "force_ask"`).
- * @module dsh-memory/agy/hook-cli
+ * @module memloom/agy/hook-cli
  */
 import { realpathSync } from 'node:fs'
 import * as fs from 'node:fs/promises'
@@ -44,7 +44,7 @@ import {
 import { OperationError } from '../core/operations.ts'
 import { redactSecrets } from '../core/redact.ts'
 import { normalizeWorkspaceKey } from '../core/workspace.ts'
-import { MemoryId, type MemoryIndexSource } from '../shared/types.ts'
+import { MemoryId, MEMORY_INDEX_SOURCE_KIND, type MemoryIndexSource } from '../shared/types.ts'
 import { AgyConfigStore } from './config-store.ts'
 import { resolveAgyDataPaths } from './paths.ts'
 import { AgySessionStateStore } from './session-state.ts'
@@ -142,7 +142,9 @@ function isMemoryServerName(serverName: string | undefined): boolean {
   if (serverName === undefined) return true
   const trimmed = serverName.trim()
   if (trimmed.length === 0) return true
-  return /^(?:dsh-memory[_:-])?memory$/i.test(trimmed) || /dsh-memory/i.test(trimmed)
+  return (
+    /^(?:(?:memloom|dsh-memory)[_:-])?memory$/i.test(trimmed) || /memloom|dsh-memory/i.test(trimmed)
+  )
 }
 
 function resolveTargetDetailed(
@@ -180,7 +182,7 @@ function resolveTargetDetailed(
       if (/memory_/i.test(rawHint) && !/ServerName/i.test(rawHint)) {
         return { isMemoryTool: true, memoryToolName: 'call_mcp_tool', malformedArgs: true }
       }
-      if (/dsh-memory/i.test(rawHint)) {
+      if (/memloom|dsh-memory/i.test(rawHint)) {
         return { isMemoryTool: true, memoryToolName: 'call_mcp_tool', malformedArgs: true }
       }
       return { isMemoryTool: false, malformedArgs: false }
@@ -271,7 +273,7 @@ function isSubagentPayload(payload: Record<string, unknown>, env: NodeJS.Process
 }
 
 function parseLockTimeoutOverride(env: NodeJS.ProcessEnv): number | undefined {
-  const raw = env.DSH_MEMORY_LOCK_TIMEOUT_MS?.trim()
+  const raw = env.MEMLOOM_LOCK_TIMEOUT_MS?.trim() || env.DSH_MEMORY_LOCK_TIMEOUT_MS?.trim()
   if (raw === undefined || raw.length === 0) return undefined
   const parsed = Number(raw)
   if (Number.isInteger(parsed) && parsed > 0) return parsed
@@ -542,7 +544,7 @@ async function handlePreInvocation(
     // Case 1: First baseline injection for this conversation
     if (existingState === undefined || existingState.indexSources.length === 0) {
       const baselineSource: MemoryIndexSource = {
-        kind: 'dsh-memory',
+        kind: MEMORY_INDEX_SOURCE_KIND,
         form: 'memory-index',
         mode: 'baseline',
         protocolVersion: PROTOCOL_VERSION,
@@ -575,7 +577,7 @@ async function handlePreInvocation(
         prevVisible === undefined ? [] : resetInvalidations(prevVisible, snapshot)
       const renderedText = renderReset(snapshot, config.indexMaxBytes, invalidations)
       const resetSource: MemoryIndexSource = {
-        kind: 'dsh-memory',
+        kind: MEMORY_INDEX_SOURCE_KIND,
         form: 'memory-index',
         mode: 'reset',
         protocolVersion: PROTOCOL_VERSION,

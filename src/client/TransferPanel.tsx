@@ -5,7 +5,7 @@
  * looks like it affects export. Import supports click or drag-and-drop file
  * selection, previews the parsed document summary, and enforces workspace
  * mapping before any destructive `replace`.
- * @module dsh-memory/client/TransferPanel
+ * @module memloom/client/TransferPanel
  */
 import * as React from 'react'
 import type { ImportReport, MemoryExport, WorkspaceInfo } from './context.ts'
@@ -53,12 +53,12 @@ function workspaceKeysOf(payload: unknown): string[] {
   return [...keys]
 }
 
-/** Whether a parsed value looks like a dsh-memory export document. */
+/** Whether a parsed value looks like a Memloom (or legacy dsh-memory) export document. */
 function isExportDocument(payload: unknown): payload is MemoryExport {
   if (payload === null || typeof payload !== 'object') return false
   const document = payload as Partial<MemoryExport>
   return (
-    document.format === 'dsh-memory' &&
+    (document.format === 'memloom' || document.format === 'dsh-memory') &&
     document.version === 1 &&
     Array.isArray(document.memories) &&
     Array.isArray(document.episodes)

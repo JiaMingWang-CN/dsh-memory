@@ -6,7 +6,7 @@
  * `PLANNER_RESPONSE.thinking` or `GENERIC` body content beyond the first two
  * header lines, splits multi-turn increments at `USER_INPUT` boundaries, and
  * maintains cross-process correction context in {@link AgySessionStateStore}.
- * @module dsh-memory/agy/transcript-capture
+ * @module memloom/agy/transcript-capture
  */
 import { createHash } from 'node:crypto'
 import * as fs from 'node:fs/promises'
@@ -279,7 +279,9 @@ function isMemoryServerName(serverName: string | undefined): boolean {
   if (serverName === undefined) return true
   const trimmed = serverName.trim()
   if (trimmed.length === 0) return true
-  return /^(?:dsh-memory[_:-])?memory$/i.test(trimmed) || /dsh-memory/i.test(trimmed)
+  return (
+    /^(?:(?:memloom|dsh-memory)[_:-])?memory$/i.test(trimmed) || /memloom|dsh-memory/i.test(trimmed)
+  )
 }
 
 function resolveTranscriptToolCall(rawCall: unknown): PendingToolCall | undefined {

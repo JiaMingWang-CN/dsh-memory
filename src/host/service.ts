@@ -468,18 +468,18 @@ export class MemoryService extends TypertRemoteService {
         try {
           await dreamer.failInterruptedRuns()
         } catch (error) {
-          logger?.warn?.(`dsh-memory: failed to finalize interrupted dreams: ${String(error)}`)
+          logger?.warn?.(`memloom: failed to finalize interrupted dreams: ${String(error)}`)
         }
         try {
           await dreamer.resumeQueued()
         } catch (error) {
-          logger?.warn?.(`dsh-memory: failed to resume queued dreams: ${String(error)}`)
+          logger?.warn?.(`memloom: failed to resume queued dreams: ${String(error)}`)
         }
         searchIndex.rebuild(memoryStore.activeRecords())
         this.searchIndex = searchIndex
         this.retentionTimer = setInterval(() => {
           void memoryStore.applyRetention().catch((error: unknown) => {
-            logger?.warn?.(`dsh-memory: periodic retention failed: ${String(error)}`)
+            logger?.warn?.(`memloom: periodic retention failed: ${String(error)}`)
           })
         }, RETENTION_INTERVAL_MS)
         this.retentionTimer.unref?.()
@@ -629,7 +629,7 @@ export class MemoryService extends TypertRemoteService {
         this.startupReconcile = scheduler
           .reconcileRecentSessions(startupReconcileAbort.signal)
           .catch((error: unknown) => {
-            logger?.warn?.(`dsh-memory: startup cold session reconcile failed: ${String(error)}`)
+            logger?.warn?.(`memloom: startup cold session reconcile failed: ${String(error)}`)
             return { sessions: 0, episodes: 0 }
           })
         if (resolved.autoDream === true) {
@@ -642,7 +642,7 @@ export class MemoryService extends TypertRemoteService {
             // Cold backfill is part of autoDream, not a separate opt-in: it
             // catches sessions that ended while the plugin was not running.
             void scheduler.backfillColdSessions(workspaceKey).catch((error: unknown) => {
-              logger?.warn?.(`dsh-memory: cold session backfill failed: ${String(error)}`)
+              logger?.warn?.(`memloom: cold session backfill failed: ${String(error)}`)
             })
           })
           const offEnd = ctx.on('session/event', (session, event) => {
@@ -709,7 +709,7 @@ export class MemoryService extends TypertRemoteService {
             try {
               await activeDreamer.cancel(run.id)
             } catch (error) {
-              logger?.warn?.(`dsh-memory: failed to cancel dream ${run.id}: ${String(error)}`)
+              logger?.warn?.(`memloom: failed to cancel dream ${run.id}: ${String(error)}`)
             }
           }
         }
@@ -751,7 +751,7 @@ export class MemoryService extends TypertRemoteService {
     const register = (typert as { register?: (contribution: unknown) => unknown }).register
     if (typeof register !== 'function') return
     const contribution = {
-      package: 'dsh-memory',
+      package: 'memloom',
       face: 'host',
       schemas: [],
       model: { services: [], events: [], objects: [] },
@@ -1251,7 +1251,7 @@ export class MemoryService extends TypertRemoteService {
       } catch (error) {
         const logger = (this.ctx as unknown as { logger?: { warn?: (message: string) => void } })
           .logger
-        logger?.warn?.(`dsh-memory: rebuild replay failed for ${key}: ${String(error)}`)
+        logger?.warn?.(`memloom: rebuild replay failed for ${key}: ${String(error)}`)
       }
     }
     return total

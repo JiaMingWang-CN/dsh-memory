@@ -7,7 +7,7 @@ description: >-
 
 # 长期记忆管理（Memory）
 
-本技能提供与 `dsh-memory` MCP 工具（在插件命名空间下通常呈现为 `memory_*` 或 `dsh-memory_memory_*`）配合使用的标准管理流程。
+本技能提供与 Memloom MCP 工具（在插件命名空间下通常呈现为 `memory_*` 或 `memloom_memory_*`）配合使用的标准管理流程。
 
 ## 1. 常用操作路由
 
