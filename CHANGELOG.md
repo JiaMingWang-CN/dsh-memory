@@ -146,5 +146,6 @@ written only when that version is actually released.
 - Workspace switches invalidate the previous index even when `refreshIndexOnChange` is disabled; non-urgent refreshes wait for a later pre-step instead of entering a waking inbox or forcing another model step.
 - Index refresh anchors BM25 candidates to the first human request across tool continuations, skips an emptied first decision, and never emits a baseline for a request another listener consumed.
 - Index rendering escapes `memoryId` in baseline, reset and delta output, and daily worklogs expose only their title and date rather than their body summary.
+- AGY `roots/list` `file:` URIs are parsed host-independently in the workspace resolver instead of via `fileURLToPath`, so Windows drive roots (`file:///C:/ws`) resolve to the lowercase drive key on every host (previously `/c:/ws` on POSIX, breaking CI and workspace scoping on non-Windows hosts); UNC roots (`file://server/share`) keep `//server/share` semantics.
 
 [Unreleased]: https://github.com/JiaMingWang-CN/memloom/commits/main

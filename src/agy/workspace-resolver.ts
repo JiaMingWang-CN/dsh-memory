@@ -11,7 +11,6 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { normalizeWorkspaceKey, type WorkspaceIdentity } from '../core/workspace.ts'
 import type { AgySessionStateStore } from './session-state.ts'
 import { readFileWithRetry } from './storage.ts'
@@ -74,24 +73,28 @@ function parseRootEntry(entry: string): WorkspaceIdentity | null {
   if (trimmed.length === 0) return null
 
   if (/^file:\/\//i.test(trimmed)) {
+    // Parse file: URIs host-independently: fileURLToPath maps Windows drive
+    // roots to host-local semantics (e.g. file:///C:/ws on POSIX becomes
+    // /C:/ws), which breaks workspace keys on non-Windows hosts.
     try {
-      const converted = fileURLToPath(trimmed)
-      return toWorkspaceIdentity(converted)
-    } catch {
-      // Allow POSIX-style file:///path URIs even when evaluated on Windows.
-      try {
-        const parsed = new URL(trimmed)
-        if (
-          parsed.protocol === 'file:' &&
-          parsed.hostname === '' &&
-          parsed.pathname.startsWith('/')
-        ) {
-          const decoded = decodeURIComponent(parsed.pathname)
-          return toWorkspaceIdentity(decoded)
-        }
-      } catch {
-        return null
+      const parsed = new URL(trimmed)
+      if (parsed.protocol !== 'file:') return null
+      const decoded = decodeURIComponent(parsed.pathname)
+      if (!decoded.startsWith('/')) return null
+      const host = parsed.hostname.toLowerCase()
+      if (host !== '') {
+        // file://server/share is a UNC root and keeps //server/share
+        // semantics on every host.
+        return toWorkspaceIdentity(path.win32.normalize(`//${host}${decoded}`))
       }
+      // POSIX path "/C:/ws" from "file:///C:/ws" is a Windows drive path.
+      if (/^\/[a-zA-Z]:\//.test(decoded)) {
+        return toWorkspaceIdentity(path.win32.normalize(decoded.slice(1)))
+      }
+      // file:///server/share is a local UNC path; file:///C:/ has been handled
+      // above, so what remains is an absolute POSIX (or local UNC) path.
+      return toWorkspaceIdentity(decoded)
+    } catch {
       return null
     }
   }

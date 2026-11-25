@@ -215,4 +215,58 @@ describe('agy workspace resolver and runtime nonce', () => {
     expect(byConversationId.conversationId).toBe('conv-other')
     expect(byConversationId.workspace?.key).toBe('c:/projects/other')
   })
+
+  it('parses file: URIs host-independently without relying on fileURLToPath', async () => {
+    const dataDir = await makeTempDir()
+    const sessionStore = new AgySessionStateStore(path.join(dataDir, 'sessions'))
+
+    // Windows drive URIs must resolve to a lowercase drive key on every host,
+    // including POSIX where fileURLToPath would yield "/C:/ws".
+    const windowsDrive = await resolveCallContext({
+      args: {},
+      dataDir,
+      sessionStore,
+      listRoots: async () => ['file:///C:/Ws/Alpha'],
+    })
+    expect(windowsDrive.workspace?.key).toBe('c:/ws/alpha')
+    expect(windowsDrive.workspace?.root).toBe('C:\\Ws\\Alpha')
+
+    // Percent-encoded segments are decoded before normalization.
+    const encoded = await resolveCallContext({
+      args: {},
+      dataDir,
+      sessionStore,
+      listRoots: async () => ['file:///c:/ws/my%20project'],
+    })
+    expect(encoded.workspace?.key).toBe('c:/ws/my project')
+
+    // POSIX paths keep their absolute form.
+    const posix = await resolveCallContext({
+      args: {},
+      dataDir,
+      sessionStore,
+      listRoots: async () => ['file:///home/user/project'],
+    })
+    expect(posix.workspace?.key).toBe('/home/user/project')
+    expect(posix.workspace?.root).toBe('/home/user/project')
+
+    // UNC roots with an explicit host keep //server/share semantics.
+    const unc = await resolveCallContext({
+      args: {},
+      dataDir,
+      sessionStore,
+      listRoots: async () => ['file://server/share/project'],
+    })
+    expect(unc.workspace?.key).toBe('//server/share/project')
+    expect(unc.workspace?.root).toBe('\\\\server\\share\\project')
+
+    // Non-file schemes are rejected; a remote file:// host is a UNC root.
+    const rejected = await resolveCallContext({
+      args: {},
+      dataDir,
+      sessionStore,
+      listRoots: async () => ['http://example.com/x'],
+    })
+    expect(rejected.workspace).toBeNull()
+  })
 })
