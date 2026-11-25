@@ -1,28 +1,19 @@
 /**
- * Audit helpers over the `audit` table.
+ * DSH host adapter for audit queries over `memoryDomain`.
  * @module dsh-memory/host/audit
  */
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
-import type { AuditRecord } from '../shared/types.ts'
-import type { memoryDomain } from './domain.ts'
+import {
+  DEFAULT_AUDIT_LIMIT,
+  listAudit as coreListAudit,
+  MAX_AUDIT_LIMIT,
+  type AuditListRequest,
+  type AuditListResult,
+} from '../core/audit.ts'
+import type { MemoryDomainHandle } from '../core/storage-contract.ts'
+import { asMemoryDomainHandle, type memoryDomain } from './domain.ts'
 
-/** Default page size of an audit listing. */
-export const DEFAULT_AUDIT_LIMIT = 100
-/** Largest page size of one audit listing. */
-export const MAX_AUDIT_LIMIT = 500
-
-export interface AuditListRequest {
-  memoryId?: string
-  limit?: number
-  offset?: number
-}
-
-export interface AuditListResult {
-  items: AuditRecord[]
-  total: number
-  limit: number
-  offset: number
-}
+export { DEFAULT_AUDIT_LIMIT, MAX_AUDIT_LIMIT, type AuditListRequest, type AuditListResult }
 
 /**
  * List audit records newest-first with a bounded page.
@@ -31,18 +22,8 @@ export interface AuditListResult {
  * @returns The requested page and total matching count.
  */
 export function listAudit(
-  domain: Domain<typeof memoryDomain>,
+  domain: Domain<typeof memoryDomain> | MemoryDomainHandle,
   request: AuditListRequest = {},
 ): AuditListResult {
-  const limit = Math.min(Math.max(request.limit ?? DEFAULT_AUDIT_LIMIT, 1), MAX_AUDIT_LIMIT)
-  const offset = Math.max(request.offset ?? 0, 0)
-  const all = [...domain.table('audit').entries()]
-    .map(([, record], index) => ({ record, index }))
-    .filter(({ record }) => request.memoryId === undefined || record.memoryId === request.memoryId)
-    // Newest first; equal timestamps fall back to later insertion (stable recency).
-    .sort(
-      (left, right) => right.record.at.localeCompare(left.record.at) || right.index - left.index,
-    )
-    .map(({ record }) => structuredClone(record))
-  return { items: all.slice(offset, offset + limit), total: all.length, limit, offset }
+  return coreListAudit(asMemoryDomainHandle(domain), request)
 }

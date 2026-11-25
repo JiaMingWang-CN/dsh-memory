@@ -24,6 +24,7 @@ const FORBIDDEN = [
   /(^|\/)\.codegraph\//,
   /(^|\/)\.agents\//,
   /(^|\/)node_modules\//,
+  /(^|\/)dist\/agy(-plugin)?\//,
   /\.map$/,
   /\.tgz$/,
   /\.tsbuildinfo$/,

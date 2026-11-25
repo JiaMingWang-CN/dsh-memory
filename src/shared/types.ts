@@ -8,7 +8,6 @@
  * @module dsh-memory/shared/types
  */
 import { z } from 'zod'
-import type { UserMessage } from '@deepseek-ai/dsh-llm'
 
 /* ------------------------------------------------------------------ *
  * Branded identifiers
@@ -375,16 +374,6 @@ export interface MemoryIndexSource {
   /** ISO timestamp when this delta was admitted, for interval recovery. */
   refreshedAt?: string
 }
-
-declare module '@deepseek-ai/dsh-llm' {
-  interface MessageSourceMap {
-    /** Durable memory index injection produced by the dsh-memory plugin. */
-    'dsh-memory': MemoryIndexSource
-  }
-}
-
-/** A durable user message carrying a {@link MemoryIndexSource}. */
-export type MemoryIndexMessage = UserMessage & { readonly source: MemoryIndexSource }
 
 /* ------------------------------------------------------------------ *
  * Memory usage projection (design §6.10, UI only)

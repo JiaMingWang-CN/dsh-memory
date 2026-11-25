@@ -321,17 +321,29 @@ pnpm pack           # 生成 dsh-memory-0.1.3.tgz
 
 ## 架构说明
 
-dsh-memory 是一个同时包含 Host 与 Client 的单一 DSH bundle：
+dsh-memory 采用同仓共享内核的双宿主分层架构，核心记忆引擎（`src/core/`）零宿主依赖，同时支撑 DSH bundle 与 Antigravity（AGY）原生插件：
 
-- **Host**：以单一 `MemoryService` 注册 `memory` 服务，负责存储、BM25 检索、episode 捕获、dreaming 整理、已有记忆整理（organize）、`agent/pre-step` 索引注入、六个模型工具与 `/memory` 命令。
-- **Client**：注册 Settings → Memory 管理页与图标，并在助手动作行（用量/时间旁）以小字显示记忆用量；记忆工具使用 DSH 原生工具调用行，不注入自定义卡片。通过 `ctx.remote.memory.*` 读写，文案走 zh/en，样式只用主题 token。
-- **存储**：记忆使用 `storageDomain` 的 JSON 域持久化（默认 `$DSH_HOME/storages/memory.json`），六张表分别存储记忆、episode、dream、审计、操作日志与会话游标。
+- **Host（DSH）**：以单一 `MemoryService` 注册 `memory` 服务，负责存储、BM25 检索、episode 捕获、dreaming 整理、已有记忆整理（organize）、`agent/pre-step` 索引注入、六个模型工具与 `/memory` 命令。
+- **Client（DSH）**：注册 Settings → Memory 管理页与图标，并在助手动作行（用量/时间旁）以小字显示记忆用量；记忆工具使用 DSH 原生工具调用行，不注入自定义卡片。通过 `ctx.remote.memory.*` 读写，文案走 zh/en，样式只用主题 token。
+- **AGY 原生插件（`src/agy/`）**：复用同一共享内核，以跨进程文件锁 JSON 存储（`${PLUGIN_DATA}/memory.json`）、20 个分级 MCP 工具、统一 Hooks（`PreInvocation` / `Stop` / `PreToolUse`）及内置 Skills 打包为自包含目录 `dist/agy-plugin/`。
+- **存储**：DSH 使用 `storageDomain` 的 JSON 域持久化（默认 `$DSH_HOME/storages/memory.json`），AGY 默认使用 `${PLUGIN_DATA}/memory.json`；两者共享六张表 schema（记忆、episode、dream、审计、操作日志与会话游标）及兼容的导入/导出 JSON 格式。
 - **一致性与恢复**：没有跨表事务，多表写入通过 `operations` 操作日志状态机完成，崩溃后按操作矩阵恢复；单行损坏不会阻止其余操作恢复。
 - **索引注入**：首次注入 baseline，开启刷新后只注入 `add` / `replace` / `remove` / `reset` 差异，不主动唤醒 Agent。
 - **错误契约**：Host 业务错误映射为稳定的 `memory/*` Remote 失败码，details 保留原始 `OperationError` code。
 - **兼容性**：`engines.dsh` 声明兼容的 DSH 版本范围，`prepack` 保证打包前完成构建。
 
-详见 [`docs/architecture.md`](docs/architecture.md)、[`docs/memory-model.md`](docs/memory-model.md)、[`docs/dreaming.md`](docs/dreaming.md) 与 [`docs/security.md`](docs/security.md)。
+详见 [`docs/architecture.md`](docs/architecture.md)、[`docs/agy.md`](docs/agy.md)、[`docs/memory-model.md`](docs/memory-model.md)、[`docs/dreaming.md`](docs/dreaming.md) 与 [`docs/security.md`](docs/security.md)。
+
+## Antigravity（AGY）支持
+
+除 DSH bundle 外，本仓库同时提供 **Antigravity（AGY）原生插件**构建能力（同属 0.x 开发版本，与 DSH 打包产物相互隔离）：
+
+- **自包含构建**：运行 `pnpm build:agy` 与 `pnpm pack:agy:check` 生成并校验零外部 `node_modules` 依赖的 `dist/agy-plugin/` 目录（运行仅需本机 Node.js `>=24.9.0`），可复制到 `~/.gemini/config/plugins/dsh-memory` 或通过 `plugins.json` 引用启用；
+- **分层工具与确认门禁**：通过 Stdio MCP Server 暴露 12 个常规工具与 8 个敏感管理工具，后者及跨工作区/写盘导出操作均经 `PreToolUse` `force_ask` 强制弹窗确认；
+- **自动注入、捕获与两阶段整理**：`PreInvocation` 负责首轮基线注入与快速跳过，`Stop` 从 `transcript.jsonl` 白名单增量捕获片段；通过 `prepare` / `commit` 两阶段工具配合内置 Skills（`memory`、`memory-dream`、`memory-review`）完成整理与审阅，无需额外配置外部 LLM API Key；
+- **跨宿主互通**：AGY 默认独立持久化于 `${PLUGIN_DATA}/memory.json`（不与 DSH 共享在线存储文件），支持通过兼容 JSON 导出/导入与 DSH 无损迁移。
+
+完整构建、存储配置、工具清单与已知限制见 [`docs/agy.md`](docs/agy.md)。
 
 ## 明确不做什么
 
@@ -363,7 +375,8 @@ dsh-memory 的首个完整版本不以以下能力为目标：
 - `/memory status | search | dream | organize | forget | export` 命令（`export` 返回摘要）；
 - Settings → Memory 4-Tab 管理页：顶栏统计与索引容量条、关键词搜索与分片筛选、新建记忆与居中详情/编辑弹窗（标签胶囊、重要度滑块、内置未保存确认、已归档隐藏归档按钮）、待审阅提案行级 Diff / 并排对比与「保存并接受」/连续审阅、`Dream now` 与详细运行状态/取消/撤销、拖拽导入预览与工作区映射、分组横排配置页；
 - Remote 管理接口使用稳定的 `memory/*` 失败码（冲突、找不到、内容无效、禁止、容量、不可用），客户端据此本地化并识别并发编辑冲突；
-- `engines.dsh` 声明兼容的 DSH 版本范围，`prepack` 在打包前构建，CI 覆盖打包文件校验。
+- `engines.dsh` 声明兼容的 DSH 版本范围，`prepack` 在打包前构建，CI 覆盖打包文件校验；
+- Antigravity（AGY）原生插件适配：同仓抽离零宿主依赖共享内核，提供跨进程文件锁持久化、20 个分级 MCP 工具、`PreInvocation`/`Stop`/`PreToolUse` Hooks、两阶段整理 Skills 与 `pnpm build:agy` / `pnpm pack:agy:check` 自包含产物校验（详见 [`docs/agy.md`](docs/agy.md)）。
 
 Settings → Memory 管理页、审阅界面，以及会话中的记忆用量摘要均已交付（记忆工具沿用 DSH 原生工具调用行）。0.1.0 仍是 **0.x 开发版本**，默认 `autoDream=false`、`refreshIndexOnChange=false`、`autoCaptureEpisodes=true`；安装与使用说明见上文[安装](#安装)与[快速开始](#快速开始)。
 

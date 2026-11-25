@@ -6,86 +6,62 @@
  * @module dsh-memory/host/config
  */
 import z from '@deepseek-ai/schemastery'
+import {
+  MEMORY_CONFIG_DEFAULTS,
+  type MemoryConfig,
+  type ResolvedMemoryConfig,
+} from '../core/config.ts'
 
-/** Resolved plugin configuration. */
-export interface MemoryConfig {
-  enabled?: boolean
-  indexMaxBytes?: number
-  autoCaptureEpisodes?: boolean
-  autoDream?: boolean
-  autoAcceptProposals?: boolean
-  dreamIdleDelayMs?: number
-  autoDreamMinIntervalMs?: number
-  dreamModelMode?: 'follow-session' | 'fixed'
-  dreamProvider?: string
-  dreamModel?: string
-  dreamReasoningEffort?: string
-  dreamMaxEpisodes?: number
-  dreamMaxSessionsPerRun?: number
-  dreamMaxTokens?: number
-  dreamLookbackDays?: number
-  requestDedupeTtlMs?: number
-  dreamProcessingTimeoutMs?: number
-  refreshIndexOnChange?: boolean
-  refreshMinIntervalMs?: number
-  refreshMaxBytes?: number
-  refreshResetBytes?: number
-  worklogCapture?: 'significant' | 'off'
-  worklogRetentionDays?: number
-  episodeRetentionDays?: number
-  maxActiveMemories?: number
-  maxArchivedMemories?: number
-  maxStoredMemories?: number
-  maxQueuedEpisodes?: number
-  maxAuditRecords?: number
-  maxOperationRecords?: number
-  archivePurgePolicy?: 'manual' | 'after-export' | 'age'
-  archiveRetentionDays?: number
-  rebuildLookbackDays?: number
-  injectForSubagents?: boolean
-  redactSecrets?: boolean
-  searchLimit?: number
-}
+export type { MemoryConfig, ResolvedMemoryConfig }
 
 const fields = {
-  enabled: z.boolean().default(true),
-  indexMaxBytes: z.number().min(1024).max(32768).step(1).default(4096),
-  autoCaptureEpisodes: z.boolean().default(true),
-  autoDream: z.boolean().default(false),
-  autoAcceptProposals: z.boolean().default(false),
-  dreamIdleDelayMs: z.natural().default(30_000),
-  autoDreamMinIntervalMs: z.natural().default(300_000),
-  dreamModelMode: z.union([z.const('follow-session'), z.const('fixed')]).default('follow-session'),
+  enabled: z.boolean().default(MEMORY_CONFIG_DEFAULTS.enabled),
+  indexMaxBytes: z
+    .number()
+    .min(1024)
+    .max(32768)
+    .step(1)
+    .default(MEMORY_CONFIG_DEFAULTS.indexMaxBytes),
+  autoCaptureEpisodes: z.boolean().default(MEMORY_CONFIG_DEFAULTS.autoCaptureEpisodes),
+  autoDream: z.boolean().default(MEMORY_CONFIG_DEFAULTS.autoDream),
+  autoAcceptProposals: z.boolean().default(MEMORY_CONFIG_DEFAULTS.autoAcceptProposals),
+  dreamIdleDelayMs: z.natural().default(MEMORY_CONFIG_DEFAULTS.dreamIdleDelayMs),
+  autoDreamMinIntervalMs: z.natural().default(MEMORY_CONFIG_DEFAULTS.autoDreamMinIntervalMs),
+  dreamModelMode: z
+    .union([z.const('follow-session'), z.const('fixed')])
+    .default(MEMORY_CONFIG_DEFAULTS.dreamModelMode),
   dreamProvider: z.string(),
   dreamModel: z.string(),
   dreamReasoningEffort: z.string(),
-  dreamMaxEpisodes: z.natural().default(40),
-  dreamMaxSessionsPerRun: z.natural().default(10),
-  dreamMaxTokens: z.natural().default(4096),
-  dreamLookbackDays: z.natural().default(7),
-  requestDedupeTtlMs: z.natural().default(86_400_000),
-  dreamProcessingTimeoutMs: z.natural().default(600_000),
-  refreshIndexOnChange: z.boolean().default(false),
-  refreshMinIntervalMs: z.natural().default(60_000),
-  refreshMaxBytes: z.natural().default(2048),
-  refreshResetBytes: z.natural().default(8192),
-  worklogCapture: z.union([z.const('significant'), z.const('off')]).default('significant'),
-  worklogRetentionDays: z.natural().default(90),
-  episodeRetentionDays: z.natural().default(30),
-  maxActiveMemories: z.natural().default(5000),
-  maxArchivedMemories: z.natural().default(20_000),
-  maxStoredMemories: z.natural().default(25_000),
-  maxQueuedEpisodes: z.natural().default(5000),
-  maxAuditRecords: z.natural().default(20_000),
-  maxOperationRecords: z.natural().default(10_000),
+  dreamMaxEpisodes: z.natural().default(MEMORY_CONFIG_DEFAULTS.dreamMaxEpisodes),
+  dreamMaxSessionsPerRun: z.natural().default(MEMORY_CONFIG_DEFAULTS.dreamMaxSessionsPerRun),
+  dreamMaxTokens: z.natural().default(MEMORY_CONFIG_DEFAULTS.dreamMaxTokens),
+  dreamLookbackDays: z.natural().default(MEMORY_CONFIG_DEFAULTS.dreamLookbackDays),
+  requestDedupeTtlMs: z.natural().default(MEMORY_CONFIG_DEFAULTS.requestDedupeTtlMs),
+  dreamProcessingTimeoutMs: z.natural().default(MEMORY_CONFIG_DEFAULTS.dreamProcessingTimeoutMs),
+  refreshIndexOnChange: z.boolean().default(MEMORY_CONFIG_DEFAULTS.refreshIndexOnChange),
+  refreshMinIntervalMs: z.natural().default(MEMORY_CONFIG_DEFAULTS.refreshMinIntervalMs),
+  refreshMaxBytes: z.natural().default(MEMORY_CONFIG_DEFAULTS.refreshMaxBytes),
+  refreshResetBytes: z.natural().default(MEMORY_CONFIG_DEFAULTS.refreshResetBytes),
+  worklogCapture: z
+    .union([z.const('significant'), z.const('off')])
+    .default(MEMORY_CONFIG_DEFAULTS.worklogCapture),
+  worklogRetentionDays: z.natural().default(MEMORY_CONFIG_DEFAULTS.worklogRetentionDays),
+  episodeRetentionDays: z.natural().default(MEMORY_CONFIG_DEFAULTS.episodeRetentionDays),
+  maxActiveMemories: z.natural().default(MEMORY_CONFIG_DEFAULTS.maxActiveMemories),
+  maxArchivedMemories: z.natural().default(MEMORY_CONFIG_DEFAULTS.maxArchivedMemories),
+  maxStoredMemories: z.natural().default(MEMORY_CONFIG_DEFAULTS.maxStoredMemories),
+  maxQueuedEpisodes: z.natural().default(MEMORY_CONFIG_DEFAULTS.maxQueuedEpisodes),
+  maxAuditRecords: z.natural().default(MEMORY_CONFIG_DEFAULTS.maxAuditRecords),
+  maxOperationRecords: z.natural().default(MEMORY_CONFIG_DEFAULTS.maxOperationRecords),
   archivePurgePolicy: z
     .union([z.const('manual'), z.const('after-export'), z.const('age')])
-    .default('manual'),
-  archiveRetentionDays: z.natural().default(365),
-  rebuildLookbackDays: z.natural().default(90),
-  injectForSubagents: z.boolean().default(false),
-  redactSecrets: z.boolean().default(true),
-  searchLimit: z.natural().default(20),
+    .default(MEMORY_CONFIG_DEFAULTS.archivePurgePolicy),
+  archiveRetentionDays: z.natural().default(MEMORY_CONFIG_DEFAULTS.archiveRetentionDays),
+  rebuildLookbackDays: z.natural().default(MEMORY_CONFIG_DEFAULTS.rebuildLookbackDays),
+  injectForSubagents: z.boolean().default(MEMORY_CONFIG_DEFAULTS.injectForSubagents),
+  redactSecrets: z.boolean().default(MEMORY_CONFIG_DEFAULTS.redactSecrets),
+  searchLimit: z.natural().default(MEMORY_CONFIG_DEFAULTS.searchLimit),
 } as const
 
 const CONFIG_KEYS = new Set(Object.keys(fields))

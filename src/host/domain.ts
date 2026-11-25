@@ -5,8 +5,7 @@
  * is the single declaration the service opens through `ctx.storageDomain`.
  * @module dsh-memory/host/domain
  */
-import { createHash } from 'node:crypto'
-import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
+import { defineDomain, domainTable, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import {
   auditRecordSchema,
   dreamRunSchema,
@@ -26,12 +25,14 @@ import {
   type OperationRecord,
   type SessionCursor,
 } from '../shared/types.ts'
+import {
+  MEMORY_DOMAIN_NAME,
+  MEMORY_DOMAIN_VERSION,
+  contentDigest,
+  type MemoryDomainHandle,
+} from '../core/storage-contract.ts'
 
-/** Domain identifier for memory data. */
-export const MEMORY_DOMAIN_NAME = 'memory'
-
-/** Domain format version. */
-export const MEMORY_DOMAIN_VERSION = 1
+export { MEMORY_DOMAIN_NAME, MEMORY_DOMAIN_VERSION, contentDigest }
 
 export const memoryDomain = defineDomain({
   name: MEMORY_DOMAIN_NAME,
@@ -49,42 +50,11 @@ export const memoryDomain = defineDomain({
 })
 
 /**
- * Reduce a memory's scope to a stable plain shape for hashing and comparison.
- * @param scope - Stored scope.
- * @returns A canonical object with fixed keys.
+ * Adapt an opened DSH `memoryDomain` handle to the host-agnostic
+ * {@link MemoryDomainHandle} contract.
  */
-function canonicalScope(scope: MemoryRecord['scope']): Record<string, string> {
-  return scope.kind === 'global'
-    ? { kind: 'global' }
-    : { kind: 'workspace', key: scope.key, root: scope.root }
-}
-
-/**
- * Digest of only the business fields of a memory record.
- *
- * Statistics (`matchCount`, `useCount`, timestamps, `statsRevision`) are
- * intentionally excluded, so search/read bookkeeping never changes the digest
- * while any user-visible content edit does.
- * @param record - Memory record to digest.
- * @returns Lowercase hex SHA-256 of the canonical business fields.
- */
-export function contentDigest(record: MemoryRecord): string {
-  const material = JSON.stringify({
-    type: record.type,
-    title: record.title,
-    body: record.body,
-    tags: [...record.tags],
-    scope: canonicalScope(record.scope),
-    status: record.status,
-    importance: record.importance,
-    confidence: record.confidence,
-    pinned: record.pinned,
-    sourceRefs: record.sourceRefs.map((ref) => ({
-      sessionId: ref.sessionId,
-      ...(ref.turn === undefined ? {} : { turn: ref.turn }),
-      ...(ref.eventSeq === undefined ? {} : { eventSeq: ref.eventSeq }),
-      ...(ref.quote === undefined ? {} : { quote: ref.quote }),
-    })),
-  })
-  return createHash('sha256').update(material, 'utf8').digest('hex')
+export function asMemoryDomainHandle(
+  domain: Domain<typeof memoryDomain> | MemoryDomainHandle,
+): MemoryDomainHandle {
+  return domain as unknown as MemoryDomainHandle
 }

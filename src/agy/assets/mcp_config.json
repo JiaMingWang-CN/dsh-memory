@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "memory": {
+      "command": "node",
+      "args": ["${PLUGIN_ROOT}/bin/mcp-server.mjs"],
+      "env": {
+        "PLUGIN_DATA": "${PLUGIN_DATA}",
+        "PLUGIN_ROOT": "${PLUGIN_ROOT}"
+      },
+      "tools": {
+        "memory_search": { "eager": true },
+        "memory_read": { "eager": true },
+        "memory_write": { "eager": true },
+        "memory_forget": { "eager": true },
+        "memory_list": { "eager": true },
+        "memory_status": { "eager": true }
+      }
+    }
+  }
+}

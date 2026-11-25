@@ -51,6 +51,7 @@ const REMOTE_CODE: Record<OperationErrorCode, MemoryRemoteErrorCode> = {
   MEMORY_CAPACITY: 'memory/capacity',
   MEMORY_RECOVERING: 'memory/unavailable',
   MEMORY_STOPPED: 'memory/unavailable',
+  MEMORY_UNAVAILABLE: 'memory/unavailable',
 }
 
 /** Marker kept on a wrapped method so re-registration cannot wrap twice. */

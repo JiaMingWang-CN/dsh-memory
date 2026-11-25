@@ -3,7 +3,7 @@ dist/
 coverage/
 .codegraph/
 .agents/
-AGENTS.md
+/AGENTS.md
 *.tsbuildinfo
 *.log
 .DS_Store

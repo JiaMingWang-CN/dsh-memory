@@ -1,0 +1,30 @@
+{
+  "dsh-memory": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node ./bin/hook.mjs",
+        "timeout": 10
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node ./bin/hook.mjs",
+        "timeout": 15
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": ".*memory_.*|call_mcp_tool",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./bin/hook.mjs",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

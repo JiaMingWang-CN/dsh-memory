@@ -7,35 +7,13 @@
  * @module dsh-memory/host/workspace
  */
 import type { Context } from '@deepseek-ai/cordis'
+import { normalizeWorkspaceKey, type WorkspaceIdentity } from '../core/workspace.ts'
 
-/** Stable workspace identity stored in a memory scope. */
-export interface WorkspaceIdentity {
-  /** Normalized key used for filtering and equality. */
-  key: string
-  /** Absolute root path as resolved for the agent. */
-  root: string
-}
+export { normalizeWorkspaceKey, type WorkspaceIdentity }
 
 /** The subset of `ctx.workingDirectory` this plugin reads. */
 export interface WorkingDirectoryService {
   ensure(agent: unknown): Promise<string>
-}
-
-/**
- * Normalize a working-directory path into a stable workspace key.
- *
- * Backslashes become forward slashes, trailing separators are removed, and
- * Windows absolute paths (drive-letter or UNC) are lower-cased so casing
- * differences resolve to one workspace.
- * @param root - Absolute working-directory path.
- * @returns The normalized workspace key.
- */
-export function normalizeWorkspaceKey(root: string): string {
-  let path = root.trim().replace(/\\/g, '/')
-  while (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1)
-  if (/^[a-z]:$/i.test(path)) path = `${path}/`
-  if (/^[a-z]:\//i.test(path) || path.startsWith('//')) path = path.toLowerCase()
-  return path
 }
 
 /**

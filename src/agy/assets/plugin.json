@@ -1,0 +1,18 @@
+{
+  "name": "dsh-memory",
+  "displayName": "DSH Memory",
+  "version": "0.1.3",
+  "description": "长期记忆插件：按作用域隔离的持久化记忆存储、BM25 检索、增量会话捕获、两阶段 Dreaming 整理与人工审阅门禁。",
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "查看当前记忆状态并检索与当前项目相关的关键规则",
+    "整理近期工作片段为记忆提案（Dream）或合并重复记忆",
+    "审阅待确认的记忆提案并逐条查看变更对比"
+  ],
+  "author": "JiaMingWang-CN",
+  "homepage": "https://github.com/JiaMingWang-CN/dsh-memory",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JiaMingWang-CN/dsh-memory.git"
+  }
+}

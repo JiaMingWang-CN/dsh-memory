@@ -54,10 +54,12 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/build-client.mjs",
     "build:client": "node scripts/build-client.mjs",
+    "build:agy": "node scripts/build-agy.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "lint": "eslint .",
     "pack:check": "node scripts/pack-check.mjs",
+    "pack:agy:check": "node scripts/pack-agy-check.mjs",
     "prepack": "pnpm build",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

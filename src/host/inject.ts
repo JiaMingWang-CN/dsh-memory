@@ -23,7 +23,10 @@ import {
 } from './indexing.ts'
 import { foldVisibleState, type IndexVisibleState } from './index-state.ts'
 import { IndexRefresher, resetInvalidations } from './index-refresh.ts'
+import type { MemoryIndexMessage } from './index-types.ts'
 import type { MemoryIndexSource } from '../shared/types.ts'
+
+export type { MemoryIndexMessage }
 
 /** One synthetic memory-index user message and its source. */
 export interface BuiltIndexMessage {

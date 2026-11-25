@@ -310,17 +310,29 @@ Minimal runnable config example:
 
 ## Architecture
 
-dsh-memory is a single DSH bundle containing both Host and Client:
+dsh-memory uses a dual-host layered architecture in one repository, sharing a host-agnostic core (`src/core/`) across both the DSH bundle and the Antigravity (AGY) native plugin:
 
-- **Host**: a single `MemoryService` registers the `memory` service and owns storage, BM25 retrieval, episode capture, dreaming, existing-memory organization, `agent/pre-step` index injection, the six model tools and the `/memory` command.
-- **Client**: registers the Settings → Memory page and icon, and shows a small memory-usage note in the assistant action row beside token usage; the memory tools use DSH's native tool-call rows with no custom cards. It reads and writes through `ctx.remote.memory.*`, uses zh/en copy and only theme tokens for styling.
-- **Storage**: memories persist through a `storageDomain` JSON domain (default `$DSH_HOME/storages/memory.json`); six tables hold memories, episodes, dreams, audit, operation log and session cursors.
+- **Host (DSH)**: a single `MemoryService` registers the `memory` service and owns storage, BM25 retrieval, episode capture, dreaming, existing-memory organization, `agent/pre-step` index injection, the six model tools and the `/memory` command.
+- **Client (DSH)**: registers the Settings → Memory page and icon, and shows a small memory-usage note in the assistant action row beside token usage; the memory tools use DSH's native tool-call rows with no custom cards. It reads and writes through `ctx.remote.memory.*`, uses zh/en copy and only theme tokens for styling.
+- **AGY native plugin (`src/agy/`)**: reuses the shared core with cross-process file-locked JSON persistence (`${PLUGIN_DATA}/memory.json`), 20 tiered MCP tools, unified Hooks (`PreInvocation` / `Stop` / `PreToolUse`), and bundled Skills built into a self-contained `dist/agy-plugin/` directory.
+- **Storage**: DSH persists through a `storageDomain` JSON domain (default `$DSH_HOME/storages/memory.json`) and AGY defaults to `${PLUGIN_DATA}/memory.json`; both share the same six-table schema (memories, episodes, dreams, audit, operation log and session cursors) and compatible export/import JSON format.
 - **Consistency and recovery**: there are no cross-table transactions; multi-table writes go through the `operations` state machine and recover from the operation matrix after a crash, and a single corrupted row does not block recovery of the remaining operations.
 - **Index injection**: a first baseline, then, when refresh is enabled, only `add` / `replace` / `remove` / `reset` deltas, without waking the agent.
 - **Error contract**: Host business errors map to stable `memory/*` remote failure codes, with details preserving the original `OperationError` code.
 - **Compatibility**: `engines.dsh` declares the compatible DSH version range, and `prepack` builds before packing.
 
-See [`docs/architecture.md`](docs/architecture.md), [`docs/memory-model.md`](docs/memory-model.md), [`docs/dreaming.md`](docs/dreaming.md) and [`docs/security.md`](docs/security.md).
+See [`docs/architecture.md`](docs/architecture.md), [`docs/agy.md`](docs/agy.md), [`docs/memory-model.md`](docs/memory-model.md), [`docs/dreaming.md`](docs/dreaming.md) and [`docs/security.md`](docs/security.md).
+
+## Antigravity (AGY) support
+
+Alongside the DSH bundle, this repository also builds a self-contained **Antigravity (AGY) native plugin** (also in 0.x development, kept separate from the DSH `.tgz` package):
+
+- **Self-contained build**: run `pnpm build:agy` and `pnpm pack:agy:check` to build and validate `dist/agy-plugin/` with zero runtime `node_modules` dependencies (requires only local Node.js `>=24.9.0`), then copy it to `~/.gemini/config/plugins/dsh-memory` or reference it from `plugins.json`;
+- **Tiered MCP tools and confirmation gate**: exposes 12 regular tools and 8 sensitive management tools over a Stdio MCP server; sensitive tools as well as cross-workspace, `scope: 'all'` and file-writing export calls are gated by `PreToolUse` `force_ask` confirmation;
+- **Hooks and two-stage organization**: `PreInvocation` handles first-turn baseline injection with fast-skip on subsequent turns, `Stop` incrementally captures whitelisted fragments from `transcript.jsonl`, and `prepare` / `commit` tools pair with bundled Skills (`memory`, `memory-dream`, `memory-review`) without requiring an external LLM API key;
+- **Cross-host portability**: AGY isolates live storage under `${PLUGIN_DATA}/memory.json` by default (never sharing live disk files with DSH) and exchanges memories with DSH via compatible JSON export/import.
+
+See [`docs/agy.md`](docs/agy.md) (Chinese) for full setup, storage layout, tool matrix and known limitations.
 
 ## FAQ
 
@@ -381,7 +393,8 @@ The repository is at **0.1.0 development (0.x)**. Implemented and test-covered c
 - the `/memory status | search | dream | organize | forget | export` command (`export` returns a summary);
 - the 4-tab Settings → Memory management page: header overview with index budget meter, keyword search and filter pills, centered create/detail/edit modals (tag chips, importance slider, inline unsaved confirmation, archived records hiding Archive), proposal diff/side-by-side comparison with `Save & accept` and sequential review, `Dream now` with detailed run status/cancel/undo, drag-and-drop import preview with workspace mapping, and grouped horizontal settings;
 - stable `memory/*` failure codes for the remote management API (conflict, not found, invalid content, forbidden, capacity, unavailable), which the client uses to localize messages and detect concurrent-edit conflicts;
-- `engines.dsh` declares the compatible DSH version range, `prepack` builds before packing, and CI validates the packed files.
+- `engines.dsh` declares the compatible DSH version range, `prepack` builds before packing, and CI validates the packed files;
+- Antigravity (AGY) native plugin adapter: shared host-agnostic core, cross-process file-locked JSON persistence, 20 tiered MCP tools, `PreInvocation`/`Stop`/`PreToolUse` Hooks, two-stage organization Skills, and `pnpm build:agy` / `pnpm pack:agy:check` bundle verification (see [`docs/agy.md`](docs/agy.md)).
 
 The Settings → Memory management page, the review UI, and the in-conversation memory-usage summary (the memory tools use DSH's native tool-call rows) are all delivered. 0.1.0 remains a **0.x development version** with `autoDream=false`, `refreshIndexOnChange=false` and `autoCaptureEpisodes=true`; see [Install](#install) and [Quick start](#quick-start) above.
 

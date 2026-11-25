@@ -23,6 +23,17 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/shared/**/*.ts', 'src/core/**/*.ts', 'src/agy/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['@deepseek-ai/*'],
+        },
+      ],
+    },
+  },
+  {
     files: ['scripts/**/*.mjs'],
     languageOptions: {
       ecmaVersion: 2023,
