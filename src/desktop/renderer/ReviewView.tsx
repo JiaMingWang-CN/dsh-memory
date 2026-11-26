@@ -64,17 +64,21 @@ export function ReviewView(props: ReviewViewProps): React.ReactElement {
   React.useEffect(() => {
     let cancelled = false
     setLoading(true)
+    let allSucceeded = true
+    let totalPending = 0
     Promise.all(
       healthyClients.map(async (client) => {
         try {
           const res = unwrapIpc(
             await bridge.memory.list({
               clientId: client.id,
+              workspaceKey: 'all',
               status: 'pending',
-              limit: 50,
+              limit: 200,
               management: true,
             }),
           )
+          totalPending += res.total
           return res.items.map((record) => ({
             clientId: client.id,
             clientName: client.name,
@@ -83,6 +87,7 @@ export function ReviewView(props: ReviewViewProps): React.ReactElement {
             record,
           }))
         } catch {
+          allSucceeded = false
           return []
         }
       }),
@@ -93,7 +98,9 @@ export function ReviewView(props: ReviewViewProps): React.ReactElement {
           .flat()
           .sort((a, b) => b.record.updatedAt.localeCompare(a.record.updatedAt))
         setProposals(flat)
-        onPendingCountChange(flat.length)
+        if (allSucceeded) {
+          onPendingCountChange(totalPending)
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

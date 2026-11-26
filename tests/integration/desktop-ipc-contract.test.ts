@@ -178,7 +178,7 @@ async function createTestHarness(
   const handlers = createDesktopIpcHandlers({
     service,
     dialog,
-    appInfo: { version: '0.2.0', platform: 'win32', systemTheme: 'dark' },
+    appInfo: { version: '0.2.1', platform: 'win32', systemTheme: 'dark' },
     openExternal: async (url) => {
       openedUrls.push(url)
     },
@@ -732,7 +732,7 @@ describe('desktop IPC contract & security boundary', () => {
     const infoRes = await handlers[IPC_CHANNELS.appGetInfo]!()
     expect(infoRes).toEqual({
       ok: true,
-      value: { version: '0.2.0', platform: 'win32', systemTheme: 'dark' },
+      value: { version: '0.2.1', platform: 'win32', systemTheme: 'dark' },
     })
     const prefRes = await handlers[IPC_CHANNELS.appUpdatePreferences]!({
       locale: 'en',

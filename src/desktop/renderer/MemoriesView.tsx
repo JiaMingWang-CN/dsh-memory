@@ -114,7 +114,7 @@ export function MemoriesView(props: MemoriesViewProps): React.ReactElement {
   const [debouncedQuery, setDebouncedQuery] = React.useState('')
   const [workspaceFilter, setWorkspaceFilter] = React.useState<string>('all')
   const [typeFilter, setTypeFilter] = React.useState<MemoryType | 'all'>('all')
-  const [statusFilter, setStatusFilter] = React.useState<MemoryStatus | 'all'>('active')
+  const [statusFilter, setStatusFilter] = React.useState<MemoryStatus | 'all'>('all')
   const [ownershipFilter, setOwnershipFilter] = React.useState<MemoryOwnership | 'all'>('all')
   const [offset, setOffset] = React.useState(0)
 
@@ -846,6 +846,16 @@ export function MemoriesView(props: MemoriesViewProps): React.ReactElement {
                                 'div',
                                 { className: 'ml-row-title-wrap' },
                                 h('span', { className: 'ml-row-title' }, item.record.title),
+                                item.record.status !== 'active'
+                                  ? h(
+                                      'span',
+                                      {
+                                        className: 'ml-row-status-pill',
+                                        'data-status': item.record.status,
+                                      },
+                                      t(`status.${item.record.status}`),
+                                    )
+                                  : null,
                                 item.record.pinned
                                   ? h(
                                       'span',

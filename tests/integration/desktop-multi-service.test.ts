@@ -876,4 +876,29 @@ describe('MultiClientService integration', () => {
     await service.refreshAll()
     await service.closeAll()
   })
+
+  it('defaults MultiClientService.list to workspaceKey="all" when omitted', async () => {
+    const { homeDir, service } = setupHarness({ initialRunning: false })
+    const agyPath = join(homeDir, '.gemini', 'config', 'plugin-data', 'memloom', 'memory.json')
+    const wsPending = makeRecord({
+      id: 'ws-pending-1',
+      title: 'Workspace Pending Proposal',
+      body: 'Stored in workspace scope',
+      status: 'pending',
+      ownership: 'derived',
+      origin: 'dream',
+      sourceEpisodeIds: ['ep-1'],
+      scope: { kind: 'workspace', key: 'c:/ws/demo', root: 'C:/ws/demo' },
+    })
+    writeAgyFlatFile(agyPath, {
+      memories: { [wsPending.id]: wsPending },
+    })
+
+    await service.initialize()
+
+    const listed = await service.list('agy-default', { status: 'pending' })
+    expect(listed.total).toBe(1)
+    expect(listed.items.map((r) => r.id)).toEqual(['ws-pending-1'])
+    await service.closeAll()
+  })
 })

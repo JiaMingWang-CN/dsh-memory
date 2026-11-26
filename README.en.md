@@ -15,7 +15,7 @@ Recall them when needed; stay quiet when not.
 
 [Overview](#overview) · [Use cases](#use-cases) · [How it works](#how-it-works) · [Management](#management) · [Privacy and security](#privacy-and-security) · [Install](#install) · [Configuration](#configuration) · [Architecture](#architecture) · [FAQ](#faq) · [Release notes](#release-notes)
 
-[![Status](https://img.shields.io/badge/status-0.2.0--dev-blue)](#development-progress)
+[![Status](https://img.shields.io/badge/status-0.2.1--dev-blue)](#development-progress)
 [![Distribution](https://img.shields.io/badge/distribution-GitHub%20Releases-black)](#install)
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![Local first](https://img.shields.io/badge/data-local--first-brightgreen)](#privacy-and-security)
@@ -23,7 +23,7 @@ Recall them when needed; stay quiet when not.
 </div>
 
 > [!NOTE]
-> **Currently at `0.2.0` development (0.x), distributed exclusively via GitHub Releases (Antigravity native plugin, DSH bundle, and Memloom Desktop app) — not published to npm.**
+> **Currently at `0.2.1` development (0.x), distributed exclusively via GitHub Releases (Antigravity native plugin, DSH bundle, and Memloom Desktop app) — not published to npm.**
 >
 > This document tracks the implemented capabilities in this repository. Before a stable release, interfaces, configuration and behavior may still change. See [`CHANGELOG.md`](CHANGELOG.md) for detailed changes.
 
@@ -158,7 +158,7 @@ Refresh is merged only before a later real model request and never wakes the age
 
 ## Management
 
-`0.2.0` provides three complementary management surfaces covering cross-host desktop orchestration, in-host UI, and conversational workflows:
+`0.2.1` provides three complementary management surfaces covering cross-host desktop orchestration, in-host UI, and conversational workflows:
 
 ### 1. Memloom Desktop (standalone cross-host workbench)
 
@@ -244,13 +244,13 @@ The long-term direction is to add shadow runs, limited autonomy and ordinary una
 
 ## Install
 
-> memloom is **distributed exclusively via this GitHub repository and GitHub Releases (not published to npm)**. `0.2.0` remains a 0.x development release.
+> memloom is **distributed exclusively via this GitHub repository and GitHub Releases (not published to npm)**. `0.2.1` remains a 0.x development release.
 
-**Common requirement**: Node.js `>=24.9.0` (`pnpm` is only needed when building from source). Download prebuilt artifacts from [GitHub Releases v0.2.0](https://github.com/JiaMingWang-CN/memloom/releases/tag/v0.2.0) or build each target independently:
+**Common requirement**: Node.js `>=24.9.0` (`pnpm` is only needed when building from source). Download prebuilt artifacts from [GitHub Releases v0.2.1](https://github.com/JiaMingWang-CN/memloom/releases/tag/v0.2.1) or build each target independently:
 
 ### Option A: Antigravity (AGY) native plugin
 
-- **From Release (recommended)**: download [`memloom-agy-plugin-0.2.0.zip`](https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.0/memloom-agy-plugin-0.2.0.zip), extract to `~/.gemini/config/plugins/memloom`, and reference it in `plugins.json` (zero runtime `node_modules` dependencies; requires only local Node.js).
+- **From Release (recommended)**: download [`memloom-agy-plugin-0.2.1.zip`](https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.1/memloom-agy-plugin-0.2.1.zip), extract to `~/.gemini/config/plugins/memloom`, and reference it in `plugins.json` (zero runtime `node_modules` dependencies; requires only local Node.js).
 - **From source**:
   ```bash
   git clone https://github.com/JiaMingWang-CN/memloom.git
@@ -264,20 +264,20 @@ Requires locally installed DSH `0.2.2-rc.5` (`engines.dsh` declares `^0.2.2-rc.5
 
 - **From Release (recommended)**:
   ```bash
-  dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.0/memloom-0.2.0.tgz
+  dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.1/memloom-0.2.1.tgz
   ```
-  You can also download `memloom-0.2.0.tgz` and install it from the DSH Plugins page, then restart DSH.
+  You can also download `memloom-0.2.1.tgz` and install it from the DSH Plugins page, then restart DSH.
 - **From source**:
   ```bash
   pnpm build          # produces dist/host and dist/client.js
   dsh plugin --profile desktop add link:./
-  # or run `pnpm pack` to produce memloom-0.2.0.tgz
+  # or run `pnpm pack` to produce memloom-0.2.1.tgz
   ```
   See [`examples/cordis.patch.yml`](examples/cordis.patch.yml) for a minimal patch config, and `dsh plugin --profile desktop remove memloom` to uninstall.
 
 ### Option C: Memloom Desktop (standalone app)
 
-- **Windows `win-x64` installer**: download and run [`memloom-desktop-0.2.0-win-x64-setup.exe`](https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.0/memloom-desktop-0.2.0-win-x64-setup.exe) to discover and manage both local AGY and DSH stores side by side.
+- **Windows `win-x64` installer**: download and run [`memloom-desktop-0.2.1-win-x64-setup.exe`](https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.1/memloom-desktop-0.2.1-win-x64-setup.exe) to discover and manage both local AGY and DSH stores side by side.
 - **Local browser-app mode / build from source**:
   ```bash
   pnpm run start:desktop   # launches via signed local Node.js + Edge app window (shares desktop-state.json)
@@ -307,7 +307,7 @@ A typical loop:
 
 ## Configuration
 
-Canonical defaults live in [`src/core/config.ts`](src/core/config.ts); see [`docs/configuration.md`](docs/configuration.md) for every field. Key `0.2.0` defaults:
+Canonical defaults live in [`src/core/config.ts`](src/core/config.ts); see [`docs/configuration.md`](docs/configuration.md) for every field. Key `0.2.1` defaults:
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -356,14 +356,14 @@ In `0.x`, memloom does not aim at:
 
 ## Development progress
 
-The repository is at **`0.2.0` development (0.x)**. Implemented and test-covered capabilities include:
+The repository is at **`0.2.1` development (0.x)**. Implemented and test-covered capabilities include:
 
 - host-agnostic shared memory core (`src/core/`): domain storage, CRUD, scope isolation, version control, operation log, audit, capacity control, import/export and crash recovery;
 - local BM25 retrieval, new-session index injection (baseline and optional delta refresh), whitelisted Episode capture, conditional `worklog(turn)`, spoken "remember" direct writes, and Dreaming / Organize consolidation;
 - dream queue startup recovery and cold-session startup reconciliation, failure classification/backoff/process-local pause, health checks, evidence grading, worklog budgets, strong-secret refusal, and per-run undo;
 - **Antigravity (AGY) native plugin**: cross-process file-locked JSON persistence, 20 tiered MCP tools, `PreInvocation`/`Stop`/`PreToolUse` Hooks, two-stage organization Skills, and `pnpm build:agy` / `pnpm pack:agy:check` bundle verification ([`docs/agy.md`](docs/agy.md));
 - **DSH bundle plugin**: six structured-output tools, `/memory` commands, 4-tab Settings → Memory management page, session-memory usage note, and `engines.dsh` compatibility range;
-- **Memloom Desktop (`0.2.0` full UI redesign)**: `--ml-*` floating-island workbench with zero native controls, official DSH & AGY vector logos, five core workflows (`Memories`, `Review`, `Migrate`, `Dreams & Audit`, `Host Config`), DSH `WriteGuard`, 20 rotated backups, and Windows `win-x64` NSIS installer packaging ([`docs/desktop.md`](docs/desktop.md)).
+- **Memloom Desktop (`0.2.1` full UI redesign)**: `--ml-*` floating-island workbench with zero native controls, official DSH & AGY vector logos, five core workflows (`Memories`, `Review`, `Migrate`, `Dreams & Audit`, `Host Config`), DSH `WriteGuard`, 20 rotated backups, and Windows `win-x64` NSIS installer packaging ([`docs/desktop.md`](docs/desktop.md)).
 
 The default policy keeps `autoDream=false`, `refreshIndexOnChange=false` and `autoCaptureEpisodes=true`; see [Install](#install) and [Quick start](#quick-start) above.
 
@@ -375,7 +375,7 @@ The default policy keeps `autoDream=false`, `refreshIndexOnChange=false` and `au
 ## FAQ
 
 **Can I rely on memloom for long-term daily use now?**
-The repository is at `0.2.0` development (0.x) and has not reached a stable release. Features work and are covered by automated tests, but interfaces, configuration and behavior may still change.
+The repository is at `0.2.1` development (0.x) and has not reached a stable release. Features work and are covered by automated tests, but interfaces, configuration and behavior may still change.
 
 **Will it organize my memories automatically?**
 Not by default. `autoDream=false`, so you trigger organization manually (via the `memory-dream` Skill in AGY, or `/memory dream` / `Dream now` in DSH); even when automatic organization is enabled, outputs enter `pending` review first.
@@ -411,6 +411,6 @@ This project uses the [MIT license](LICENSE). Sponsor brand and marks remain the
 
 **Let experience remain, so every new session can move forward.**
 
-memloom · Local-first long-term memory · 0.2.0-dev
+memloom · Local-first long-term memory · 0.2.1-dev
 
 </div>

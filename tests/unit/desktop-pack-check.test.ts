@@ -35,7 +35,7 @@ function createMinimalValidArtifact(baseDir: string): void {
     'package.json',
     JSON.stringify({
       name: 'memloom-desktop',
-      version: '0.2.0',
+      version: '0.2.1',
       main: './main.cjs',
       private: true,
     }),
@@ -180,14 +180,14 @@ describe('desktop packaging and isolation checks', () => {
         { path: 'desktop/package.json' },
         { path: 'desktop/electron-builder.yml' },
         { path: 'dist/desktop-app/main.cjs' },
-        { path: 'dist/desktop-release/memloom-desktop-0.2.0-win-x64-setup.exe' },
+        { path: 'dist/desktop-release/memloom-desktop-0.2.1-win-x64-setup.exe' },
       ],
     })
     expect(problems).toContain('forbidden file: desktop/package.json')
     expect(problems).toContain('forbidden file: desktop/electron-builder.yml')
     expect(problems).toContain('forbidden file: dist/desktop-app/main.cjs')
     expect(problems).toContain(
-      'forbidden file: dist/desktop-release/memloom-desktop-0.2.0-win-x64-setup.exe',
+      'forbidden file: dist/desktop-release/memloom-desktop-0.2.1-win-x64-setup.exe',
     )
   })
 

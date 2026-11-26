@@ -566,7 +566,11 @@ export class MultiClientService {
 
   async list(clientId: string, request: ListRequest = {}): Promise<ListResult> {
     const { entry } = await this.ensureEngine(clientId, 'read')
-    return entry.engine.list({ ...request, management: true })
+    return entry.engine.list({
+      workspaceKey: 'all',
+      ...request,
+      management: true,
+    })
   }
 
   async view(

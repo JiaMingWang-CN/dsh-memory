@@ -291,8 +291,17 @@ function createFakeBridge(options?: {
           index: { entries: list.length, bytes: 512 },
         })
       },
-      list: ({ clientId, status, type, query }) => {
+      list: ({ clientId, workspaceKey, status, type, query }) => {
         let list = [...(recordsByClient[clientId] ?? [])]
+        const target = workspaceKey === undefined ? null : workspaceKey
+        if (target === null) {
+          list = list.filter((r) => r.scope.kind === 'global')
+        } else if (target !== 'all') {
+          list = list.filter(
+            (r) =>
+              r.scope.kind === 'global' || (r.scope.kind === 'workspace' && r.scope.key === target),
+          )
+        }
         if (status !== undefined) list = list.filter((r) => r.status === status)
         if (type !== undefined) list = list.filter((r) => r.type === type)
         if (query !== undefined && query.trim() !== '') {
@@ -405,33 +414,29 @@ function createFakeBridge(options?: {
         const q = req?.query?.toLowerCase() ?? ''
         const allowedIds = req?.clientIds ? new Set(req.clientIds) : null
         const allowedTypes = req?.types && req.types.length > 0 ? new Set(req.types) : null
-        const items = [
-          {
-            clientId: 'dsh-default',
-            clientName: 'DSH 默认',
-            clientKind: 'dsh' as const,
-            writable: guard.mode !== 'readonly-dsh-running',
-            record: dshRecord,
-            score: 1.0,
-            normalizedScore: 1.0,
-            snippet: dshRecord.body,
-          },
-          {
-            clientId: 'agy-default',
-            clientName: 'AGY 默认',
-            clientKind: 'agy' as const,
-            writable: true,
-            record: agyRecord,
-            score: 0.8,
-            normalizedScore: 0.8,
-            snippet: agyRecord.body,
-          },
-        ].filter((item) => {
-          if (allowedIds !== null && !allowedIds.has(item.clientId)) return false
-          if (allowedTypes !== null && !allowedTypes.has(item.record.type)) return false
-          if (q !== '' && !item.record.title.toLowerCase().includes(q)) return false
-          return true
-        })
+        const allowedStatuses =
+          req?.statuses && req.statuses.length > 0 ? new Set(req.statuses) : null
+        const items = currentClients()
+          .filter((client) => client.health === 'ready')
+          .flatMap((client) =>
+            (recordsByClient[client.id] ?? []).map((record) => ({
+              clientId: client.id,
+              clientName: client.name,
+              clientKind: client.kind,
+              writable: client.writable,
+              record,
+              score: record.id === dshRecord.id ? 1.0 : 0.8,
+              normalizedScore: record.id === dshRecord.id ? 1.0 : 0.8,
+              snippet: record.body,
+            })),
+          )
+          .filter((item) => {
+            if (allowedIds !== null && !allowedIds.has(item.clientId)) return false
+            if (allowedTypes !== null && !allowedTypes.has(item.record.type)) return false
+            if (allowedStatuses !== null && !allowedStatuses.has(item.record.status)) return false
+            if (q !== '' && !item.record.title.toLowerCase().includes(q)) return false
+            return true
+          })
         return ok({
           items,
           total: items.length,
@@ -484,7 +489,7 @@ function createFakeBridge(options?: {
       saveExportJson: () => ok('C:/fake/export.json'),
     },
     app: {
-      getInfo: () => ok({ version: '0.2.0', platform: 'win32', systemTheme: 'light' }),
+      getInfo: () => ok({ version: '0.2.1', platform: 'win32', systemTheme: 'light' }),
       getPreferences: () => ok(prefs),
       updatePreferences: (patch) => {
         spies.updatePreferences(patch)
@@ -512,13 +517,13 @@ describe('Desktop renderer core interactions', () => {
     expect(container.querySelector('main.memloom-stage')).toBeTruthy()
     expect(container.querySelector('.memloom-logo-svg')).toBeTruthy()
 
-    // Official vector host logos for DSH and AGY (with unique SVG mask/filter IDs per instance)
+    // Official vector host logos for DSH and AGY (with unique SVG clipPath IDs per instance)
     const dshLogos = container.querySelectorAll('svg[data-host-logo="dsh"]')
     const agyLogos = container.querySelectorAll('svg[data-host-logo="agy"]')
     expect(dshLogos.length).toBeGreaterThanOrEqual(2)
     expect(agyLogos.length).toBeGreaterThanOrEqual(2)
     const svgDefIds = Array.from(
-      container.querySelectorAll('svg[data-host-logo="agy"] mask[id]'),
+      container.querySelectorAll('svg[data-host-logo="agy"] clipPath[id]'),
     ).map((el) => el.getAttribute('id'))
     expect(new Set(svgDefIds).size).toBe(svgDefIds.length)
 
@@ -881,5 +886,51 @@ describe('theme.css & desktopErrorText contracts', () => {
     await waitFor(() => {
       expect(screen.getAllByRole('switch')[0]!.getAttribute('aria-checked')).toBe(toggledChecked)
     })
+  })
+
+  it('loads workspace-scoped pending proposals in ReviewView with workspaceKey="all" and shows all statuses by default in MemoriesView', async () => {
+    applyDesktopLocale('zh')
+    const { bridge } = createFakeBridge({ includePendingProposal: true })
+    const listSpy = vi.spyOn(bridge.memory, 'list')
+    const onPendingCountChange = vi.fn()
+
+    const { container } = render(h(DesktopApp, { bridge }))
+    await screen.findByText('AGY Pending Proposal')
+
+    const nav = screen.getByRole('navigation')
+    // Sidebar displays stored totals (2 for AGY with active + pending, 1 for DSH) and pending badge (1)
+    expect(
+      within(within(nav).getByRole('button', { name: /AGY 默认/ })).getByText('2'),
+    ).toBeTruthy()
+    expect(
+      within(within(nav).getByRole('button', { name: /DSH 默认/ })).getByText('1'),
+    ).toBeTruthy()
+    expect(
+      within(within(nav).getByRole('button', { name: /待审阅提案/ })).getByText('1'),
+    ).toBeTruthy()
+
+    const clientsRes = await bridge.clients.list()
+    const clients = clientsRes.ok ? clientsRes.value : []
+    render(
+      h(ReviewView, {
+        bridge,
+        clients,
+        refreshToken: 0,
+        onDataChanged: async () => undefined,
+        onExternalChange: () => undefined,
+        onPendingCountChange,
+        onOpenMemories: () => undefined,
+        onNotify: () => undefined,
+      }),
+    )
+
+    await waitFor(() => expect(onPendingCountChange).toHaveBeenCalledWith(1))
+    expect(listSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceKey: 'all',
+        status: 'pending',
+      }),
+    )
+    expect(container.querySelector('.ml-row-status-pill[data-status="pending"]')).toBeTruthy()
   })
 })

@@ -88,7 +88,7 @@ describe('local desktop server (signed runtime bridge)', () => {
       assetsDir: env.assetsDir,
       service: env.service,
       dialog: env.dialog,
-      appInfo: { version: '0.2.0', platform: 'win32' },
+      appInfo: { version: '0.2.1', platform: 'win32' },
     })
 
     try {
@@ -227,6 +227,7 @@ describe('local desktop server (signed runtime bridge)', () => {
       '--user-data-dir=C:/temp/edge-profile',
       '--window-size=1280,840',
       '--new-window',
+      '--disable-extensions',
       '--disable-background-mode',
       '--no-first-run',
       '--no-default-browser-check',

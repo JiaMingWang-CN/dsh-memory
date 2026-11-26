@@ -135,6 +135,7 @@ export function DesktopApp(props: DesktopAppProps = {}): React.ReactElement {
       if (bridge === undefined) return
       const counts: Record<string, number> = {}
       let pendingSum = 0
+      let allSucceeded = true
       await Promise.all(
         list.map(async (c) => {
           if (!c.enabled || c.health !== 'ready') return
@@ -142,15 +143,17 @@ export function DesktopApp(props: DesktopAppProps = {}): React.ReactElement {
             const ov = unwrapIpc(
               await bridge.memory.overview({ clientId: c.id, workspaceKey: 'all' }),
             )
-            counts[c.id] = ov.counts.active
+            counts[c.id] = ov.counts.stored
             pendingSum += ov.counts.pending
           } catch {
-            // Keep count omitted when store cannot be read
+            allSucceeded = false
           }
         }),
       )
       setHostCounts(counts)
-      setPendingTotal(pendingSum)
+      if (allSucceeded) {
+        setPendingTotal(pendingSum)
+      }
     },
     [bridge],
   )

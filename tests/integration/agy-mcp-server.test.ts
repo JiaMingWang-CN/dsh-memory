@@ -172,7 +172,7 @@ async function createInProcessServer(
   })
 
   const server = new StdioMcpServer({
-    serverInfo: { name: 'memloom', version: '0.2.0' },
+    serverInfo: { name: 'memloom', version: '0.2.1' },
     tools,
     resolveContext: (args, listRoots) =>
       resolveCallContext({
@@ -248,7 +248,7 @@ describe('StdioMcpServer (PassThrough streams)', () => {
       expect(initRes.result).toEqual({
         protocolVersion: '2025-03-26',
         capabilities: { tools: {} },
-        serverInfo: { name: 'memloom', version: '0.2.0' },
+        serverInfo: { name: 'memloom', version: '0.2.1' },
       })
 
       // 2. notifications/initialized + ping

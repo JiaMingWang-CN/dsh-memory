@@ -3,7 +3,7 @@
 `memloom`（原 `dsh-memory`）在共享记忆内核（`src/core/`）与既有管理界面组件（`src/client/`）的基础上，在 `src/desktop/` 与隔离打包工程 `desktop/` 提供 **Memloom Desktop**——面向本地长期记忆库的可视化桌面管理客户端，支持同机管理 DSH、Antigravity（AGY）与自定义目录记忆库。
 
 > [!NOTE]
-> **开发状态说明**：`memloom` 当前仍处于 **0.x 开发版本**（`0.2.0`），尚未发布稳定版。当前桌面端仅完成 Windows `win-x64` 安装程序（NSIS `.exe`）构建与验证，macOS / Linux 目标仅在配置中预留扩展段。
+> **开发状态说明**：`memloom` 当前仍处于 **0.x 开发版本**（`0.2.1`），尚未发布稳定版。当前桌面端仅完成 Windows `win-x64` 安装程序（NSIS `.exe`）构建与验证，macOS / Linux 目标仅在配置中预留扩展段。
 
 ---
 
@@ -54,7 +54,7 @@ pnpm --dir desktop run pack:win
 打包完成后将在 `dist/desktop-release/` 下生成向导式 Windows 安装程序（支持自定义安装路径、创建桌面与开始菜单快捷方式，卸载时保留 `%APPDATA%/memloom-desktop/` 用户数据）：
 
 ```text
-dist/desktop-release/memloom-desktop-0.2.0-win-x64-setup.exe
+dist/desktop-release/memloom-desktop-0.2.1-win-x64-setup.exe
 ```
 
 > [!TIP]

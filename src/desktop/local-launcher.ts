@@ -101,6 +101,7 @@ export function buildEdgeLaunchArgs(url: string, edgeProfileDir: string): string
     `--user-data-dir=${edgeProfileDir}`,
     '--window-size=1280,840',
     '--new-window',
+    '--disable-extensions',
     '--disable-background-mode',
     '--no-first-run',
     '--no-default-browser-check',
