@@ -1,6 +1,10 @@
 <div align="center">
 
-# memloom
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-horizontal-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/logo-horizontal-light.svg">
+  <img alt="memloom" src="assets/logo-horizontal-light.svg" width="320">
+</picture>
 
 ### 下一个会话，不必从零开始。
 
@@ -11,7 +15,7 @@
 
 [项目简介](#项目简介) · [使用场景](#使用场景) · [工作方式](#工作方式) · [管理体验](#管理体验) · [隐私与安全](#隐私与安全) · [安装](#安装) · [配置](#配置) · [架构说明](#架构说明) · [发布说明](#发布说明) · [FAQ](#faq)
 
-[![Status](https://img.shields.io/badge/status-0.1.3--dev-blue)](#开发进度)
+[![Status](https://img.shields.io/badge/status-0.2.0--dev-blue)](#开发进度)
 [![Distribution](https://img.shields.io/badge/distribution-GitHub%20Plugin-black)](#安装)
 [![License](https://img.shields.io/badge/license-MIT-green)](#许可证)
 [![Local first](https://img.shields.io/badge/data-local--first-brightgreen)](#隐私与安全)
@@ -255,10 +259,10 @@ memloom 以结构化记录、Markdown 正文和本地检索索引组成记忆库
 发布对应版本的 GitHub Release 后，直接通过 DSH CLI 安装 Release 中附带的预构建 bundle 包（`.tgz`），无需在本地编译：
 
 ```bash
-dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/memloom/releases/download/v0.1.3/memloom-0.1.3.tgz
+dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.0/memloom-0.2.0.tgz
 ```
 
-也可在 GitHub Releases 页面下载 `memloom-0.1.3.tgz` 后，通过 DSH 的 Plugins 页面安装。
+也可在 GitHub Releases 页面下载 `memloom-0.2.0.tgz` 后，通过 DSH 的 Plugins 页面安装。
 
 **方式二：从 GitHub 源码构建并本地安装**
 
@@ -272,7 +276,7 @@ pnpm build          # 产出 dist/host 与 dist/client.js
 dsh plugin --profile desktop add link:./
 
 # 方式 B：打包为本地 bundle 文件后安装
-pnpm pack           # 生成 memloom-0.1.3.tgz
+pnpm pack           # 生成 memloom-0.2.0.tgz
 ```
 
 安装/启用属于 profile 变更，完成后重启 DSH，Settings 中会出现 Memory 页与图标。最小 patch 配置示例见 [`examples/cordis.patch.yml`](examples/cordis.patch.yml)。卸载可执行 `dsh plugin --profile desktop remove memloom`（记忆数据仍保留在 `$DSH_HOME/storages/memory.json`）。
@@ -326,7 +330,7 @@ memloom 采用同仓共享内核的多宿主分层架构，核心记忆引擎（
 - **Host（DSH）**：以单一 `MemoryService` 注册 `memory` 服务，负责存储、BM25 检索、episode 捕获、dreaming 整理、已有记忆整理（organize）、`agent/pre-step` 索引注入、六个模型工具与 `/memory` 命令。
 - **Client（DSH）**：注册 Settings → Memory 管理页与图标，并在助手动作行（用量/时间旁）以小字显示记忆用量；记忆工具使用 DSH 原生工具调用行，不注入自定义卡片。通过 `ctx.remote.memory.*` 读写，文案走 zh/en，样式只用主题 token。
 - **AGY 原生插件（`src/agy/`）**：复用同一共享内核，以跨进程文件锁 JSON 存储（`${PLUGIN_DATA}/memory.json`）、20 个分级 MCP 工具、统一 Hooks（`PreInvocation` / `Stop` / `PreToolUse`）及内置 Skills 打包为自包含目录 `dist/agy-plugin/`。
-- **Desktop 独立客户端（`src/desktop/` + `desktop/`）**：复用共享内核、`src/agy/` 文件锁存储与 `src/client/` 界面组件，以保真双格式读写、DSH 运行态只读写保护、写前自动备份、全端聚合检索与跨库迁移提供安全 Electron 桌面端，并通过隔离的 `desktop/` 工程构建 Windows `win-x64` 安装程序（NSIS `.exe`）。
+- **Desktop 独立客户端（`src/desktop/` + `desktop/`）**：复用共享内核与 `src/agy/` 文件锁存储，以独立桌面设计系统（`--ml-*` 双主题浮岛工作台、自定义精工控件与官方 DSH / AGY 宿主标识）、保真双格式读写、DSH 运行态只读写保护、写前自动备份、全端聚合检索与跨库迁移提供安全 Electron 桌面端，并通过隔离的 `desktop/` 工程构建 Windows `win-x64` 安装程序（NSIS `.exe`）。
 - **存储**：DSH 使用 `storageDomain` 的 JSON 域持久化（默认 `$DSH_HOME/storages/memory.json`），AGY 默认使用 `${PLUGIN_DATA}/memory.json`；两者共享六张表 schema（记忆、episode、dream、审计、操作日志与会话游标）及兼容的导入/导出 JSON 格式（兼容导入旧版 `dsh-memory` 导出）。
 - **一致性与恢复**：没有跨表事务，多表写入通过 `operations` 操作日志状态机完成，崩溃后按操作矩阵恢复；单行损坏不会阻止其余操作恢复。
 - **索引注入**：首次注入 baseline，开启刷新后只注入 `add` / `replace` / `remove` / `reset` 差异，不主动唤醒 Agent。
@@ -353,7 +357,7 @@ memloom 采用同仓共享内核的多宿主分层架构，核心记忆引擎（
 - **多客户端发现与双格式保真**：自动发现本机 DSH（默认与 profiles）、AGY 及自定义 `memory.json` 库；无损识别并往返序列化 `dsh-unit`（完整保留 `unit` 与 `global` 元数据）与 `agy-flat` 两种外层 JSON 格式，AGY 写入复用跨进程 `.memory.lock`；
 - **DSH 并发写保护与自动备份**：自动检测运行中的 DSH 进程（查询异常按 fail-closed 保护），运行期间将 DSH 库锁定为只读保护态（通过只读打开零写盘且不触发 `recover()`），支持显式风险确认后临时解锁；写入 DSH 前执行磁盘 SHA-256 外部变更检测，并按单次逻辑写批自动留存最多 20 份写前快照备份；
 - **全端聚合检索与跨库迁移**：支持跨全部已启用客户端执行只读管理态 BM25 聚合检索（自动隔离 `missing` / `corrupted` / `unreadable` 库并列出跳过原因），支持单条/多选直接 `merge` 迁移与带工作区映射及确认门禁的 `replace` 迁移向导；
-- **安全模型与本地构建**：窗口强制启用 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true` 与 `webSecurity: true`，所有 IPC 经 `zod` 校验并受原生对话框授权路径约束；运行 `pnpm run build:desktop`、`pnpm run pack:desktop:check` 与 `pnpm --dir desktop install && pnpm --dir desktop run pack:win` 可构建 `dist/desktop-release/memloom-desktop-0.1.3-win-x64-setup.exe`。
+- **安全模型与本地构建**：窗口强制启用 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true` 与 `webSecurity: true`，所有 IPC 经 `zod` 校验并受原生对话框授权路径约束；运行 `pnpm run build:desktop`、`pnpm run pack:desktop:check` 与 `pnpm --dir desktop install && pnpm --dir desktop run pack:win` 可构建 `dist/desktop-release/memloom-desktop-0.2.0-win-x64-setup.exe`。
 
 完整构建说明、隔离边界与已知限制见 [`docs/desktop.md`](docs/desktop.md)。
 

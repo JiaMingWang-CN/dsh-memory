@@ -103,22 +103,21 @@ function pngChunk(type, data) {
 }
 
 /**
- * Signed distance from a point to a line segment.
+ * Point-in-polygon hit test using the even-odd ray-casting rule.
  * @param {number} px
  * @param {number} py
- * @param {number} ax
- * @param {number} ay
- * @param {number} bx
- * @param {number} by
- * @returns {number}
+ * @param {ReadonlyArray<readonly [number, number]>} polygon
+ * @returns {boolean}
  */
-function distanceToSegment(px, py, ax, ay, bx, by) {
-  const dx = bx - ax
-  const dy = by - ay
-  const lenSq = dx * dx + dy * dy
-  if (lenSq === 0) return Math.hypot(px - ax, py - ay)
-  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq))
-  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+function pointInPolygon(px, py, polygon) {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const [xi, yi] = polygon[i]
+    const [xj, yj] = polygon[j]
+    const intersects = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi
+    if (intersects) inside = !inside
+  }
+  return inside
 }
 
 /**
@@ -141,103 +140,105 @@ function sdRoundedRect(px, py, cx, cy, halfW, halfH, radius) {
 }
 
 /**
- * Blend one white anti-aliased shape alpha over the current RGBA pixel.
- * @param {number} r
- * @param {number} g
- * @param {number} b
- * @param {number} shapeAlpha
- * @returns {[number, number, number]}
- */
-function blendWhite(r, g, b, shapeAlpha) {
-  const a = Math.max(0, Math.min(1, shapeAlpha))
-  return [
-    Math.round(r * (1 - a) + 255 * a),
-    Math.round(g * (1 - a) + 255 * a),
-    Math.round(b * (1 - a) + 255 * a),
-  ]
-}
-
-/**
- * Render a 256x256 PNG-in-ICO buffer inspired by `icon.svg` using pure Node `zlib`.
+ * Render a 256x256 PNG-in-ICO buffer matching the Warp & Weft M `icon.svg`
+ * using 4x4 supersampling and pure Node `zlib`.
  * @returns {Buffer}
  */
 function createDesktopIconIco() {
   const size = 256
-  const scale = size / 128
   const stride = 1 + size * 4
   const raw = Buffer.alloc(stride * size)
+  const subOffsets = [0.125, 0.375, 0.625, 0.875]
 
-  const nodes = [
-    [64, 34, 5],
-    [50, 52, 4],
-    [78, 52, 4],
-    [48, 70, 4],
-    [80, 70, 4],
-    [64, 92, 4],
+  const mLeftPoly = [
+    [35, 28],
+    [53, 28],
+    [128, 157.9],
+    [130.5, 153.5],
+    [162.9, 153.5],
+    [128, 213.9],
+    [64.8, 104.5],
+    [35, 104.5],
   ]
-  const segments = [
-    [64, 34, 64, 92],
-    [50, 52, 58, 52],
-    [70, 52, 78, 52],
-    [48, 70, 56, 70],
-    [72, 70, 80, 70],
-    [64, 34, 48, 44],
-    [48, 44, 44, 60],
-    [44, 60, 48, 82],
-    [48, 82, 64, 92],
-    [64, 34, 80, 44],
-    [80, 44, 84, 60],
-    [84, 60, 80, 82],
-    [80, 82, 64, 92],
+  const mRightPoly = [
+    [203, 28],
+    [221, 28],
+    [221, 228],
+    [193, 228],
+    [193, 101.3],
+    [191.2, 104.5],
+    [158.8, 104.5],
   ]
+  const weftLeftPoly = [
+    [20, 117],
+    [57.6, 117],
+    [71.5, 141],
+    [20, 141],
+  ]
+  const weftMidPoly = [
+    [118.8, 117],
+    [180.5, 117],
+    [180.5, 141],
+    [132.7, 141],
+  ]
+
+  const sampleColor = (sx, sy) => {
+    if (sdRoundedRect(sx, sy, 128, 128, 128, 128, 57.6) > 0) {
+      return null
+    }
+    const lx = (sx - 37.89) / 0.704
+    const ly = (sy - 35.33) / 0.704
+
+    if (
+      (lx >= 35 && lx <= 63 && ly >= 153.5 && ly <= 228) ||
+      pointInPolygon(lx, ly, mLeftPoly) ||
+      pointInPolygon(lx, ly, mRightPoly)
+    ) {
+      return [255, 255, 255]
+    }
+    if (
+      (lx <= 20 && (lx - 20) * (lx - 20) + (ly - 129) * (ly - 129) <= 144) ||
+      pointInPolygon(lx, ly, weftLeftPoly) ||
+      pointInPolygon(lx, ly, weftMidPoly) ||
+      (lx >= 233.5 && lx <= 236 && ly >= 117 && ly <= 141) ||
+      (lx >= 236 && (lx - 236) * (lx - 236) + (ly - 129) * (ly - 129) <= 144)
+    ) {
+      return [229, 122, 68]
+    }
+    return [24, 36, 48]
+  }
 
   for (let y = 0; y < size; y += 1) {
     const rowStart = y * stride
     raw[rowStart] = 0
     for (let x = 0; x < size; x += 1) {
-      const sx = (x + 0.5) / scale
-      const sy = (y + 0.5) / scale
-      const dist = sdRoundedRect(sx, sy, 64, 64, 60, 60, 26)
-      const bgAlpha = Math.max(0, Math.min(1, 0.5 - dist))
-
+      let rSum = 0
+      let gSum = 0
+      let bSum = 0
+      let hits = 0
+      for (const oy of subOffsets) {
+        for (const ox of subOffsets) {
+          const rgb = sampleColor(x + ox, y + oy)
+          if (rgb !== null) {
+            rSum += rgb[0]
+            gSum += rgb[1]
+            bSum += rgb[2]
+            hits += 1
+          }
+        }
+      }
       const pixelOffset = rowStart + 1 + x * 4
-      if (bgAlpha <= 0) {
+      if (hits === 0) {
         raw[pixelOffset] = 0
         raw[pixelOffset + 1] = 0
         raw[pixelOffset + 2] = 0
         raw[pixelOffset + 3] = 0
-        continue
+      } else {
+        raw[pixelOffset] = Math.round(rSum / hits)
+        raw[pixelOffset + 1] = Math.round(gSum / hits)
+        raw[pixelOffset + 2] = Math.round(bSum / hits)
+        raw[pixelOffset + 3] = Math.round((hits / 16) * 255)
       }
-
-      const grad = Math.max(0, Math.min(1, (sx + sy) / 256))
-      let r = Math.round(0x4f * (1 - grad) + 0x7a * grad)
-      let g = Math.round(0x6d * (1 - grad) + 0x3f * grad)
-      let b = Math.round(0xf5 * (1 - grad) + 0xf2 * grad)
-
-      let strokeCov = 0
-      for (const [ax, ay, bx, by] of segments) {
-        const d = distanceToSegment(sx, sy, ax, ay, bx, by) - 2.0
-        const cov = Math.max(0, Math.min(1, 0.5 - d)) * 0.95
-        if (cov > strokeCov) strokeCov = cov
-      }
-      if (strokeCov > 0) {
-        ;[r, g, b] = blendWhite(r, g, b, strokeCov)
-      }
-
-      let nodeCov = 0
-      for (const [nx, ny, nr] of nodes) {
-        const d = Math.hypot(sx - nx, sy - ny) - nr
-        const cov = Math.max(0, Math.min(1, 0.5 - d))
-        if (cov > nodeCov) nodeCov = cov
-      }
-      if (nodeCov > 0) {
-        ;[r, g, b] = blendWhite(r, g, b, nodeCov)
-      }
-
-      raw[pixelOffset] = r
-      raw[pixelOffset + 1] = g
-      raw[pixelOffset + 2] = b
-      raw[pixelOffset + 3] = Math.round(bgAlpha * 255)
     }
   }
 

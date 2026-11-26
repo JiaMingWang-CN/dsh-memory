@@ -1,6 +1,10 @@
 <div align="center">
 
-# memloom
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-horizontal-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/logo-horizontal-light.svg">
+  <img alt="memloom" src="assets/logo-horizontal-light.svg" width="320">
+</picture>
 
 ### The next session should not start from zero.
 
@@ -11,7 +15,7 @@ Recall them when needed; stay quiet when not.
 
 [Overview](#overview) · [Use cases](#use-cases) · [How it works](#how-it-works) · [Management](#management) · [Privacy and security](#privacy-and-security) · [Install](#install) · [Configuration](#configuration) · [Architecture](#architecture) · [FAQ](#faq) · [Release notes](#release-notes)
 
-[![Status](https://img.shields.io/badge/status-0.1.3--dev-blue)](#development-progress)
+[![Status](https://img.shields.io/badge/status-0.2.0--dev-blue)](#development-progress)
 [![Distribution](https://img.shields.io/badge/distribution-GitHub%20Plugin-black)](#install)
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![Local first](https://img.shields.io/badge/data-local--first-brightgreen)](#privacy-and-security)
@@ -244,10 +248,10 @@ The long-term direction is to add shadow runs, limited autonomy and ordinary una
 Once a GitHub Release is published, install its prebuilt `.tgz` bundle asset directly via the DSH CLI without building locally:
 
 ```bash
-dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/memloom/releases/download/v0.1.3/memloom-0.1.3.tgz
+dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.0/memloom-0.2.0.tgz
 ```
 
-You can also download `memloom-0.1.3.tgz` from GitHub Releases and install it from the DSH Plugins page.
+You can also download `memloom-0.2.0.tgz` from GitHub Releases and install it from the DSH Plugins page.
 
 **Option 2: Build from GitHub source and install locally**
 
@@ -261,7 +265,7 @@ pnpm build          # produces dist/host and dist/client.js
 dsh plugin --profile desktop add link:./
 
 # Approach B: pack into a local bundle tarball
-pnpm pack           # produces memloom-0.1.3.tgz
+pnpm pack           # produces memloom-0.2.0.tgz
 ```
 
 Installing or enabling changes your profile; restart DSH afterwards and Memory will appear under Settings with its icon. See [`examples/cordis.patch.yml`](examples/cordis.patch.yml) for a minimal patch config. To remove the plugin, run `dsh plugin --profile desktop remove memloom` (your memories remain safely stored in `$DSH_HOME/storages/memory.json`).
@@ -315,7 +319,7 @@ memloom uses a multi-host layered architecture in one repository, sharing a host
 - **Host (DSH)**: a single `MemoryService` registers the `memory` service and owns storage, BM25 retrieval, episode capture, dreaming, existing-memory organization, `agent/pre-step` index injection, the six model tools and the `/memory` command.
 - **Client (DSH)**: registers the Settings → Memory page and icon, and shows a small memory-usage note in the assistant action row beside token usage; the memory tools use DSH's native tool-call rows with no custom cards. It reads and writes through `ctx.remote.memory.*`, uses zh/en copy and only theme tokens for styling.
 - **AGY native plugin (`src/agy/`)**: reuses the shared core with cross-process file-locked JSON persistence (`${PLUGIN_DATA}/memory.json`), 20 tiered MCP tools, unified Hooks (`PreInvocation` / `Stop` / `PreToolUse`), and bundled Skills built into a self-contained `dist/agy-plugin/` directory.
-- **Desktop app (`src/desktop/` + `desktop/`)**: reuses the shared core, `src/agy/` file-locked storage, and `src/client/` UI components to provide dual-format persistence, DSH process concurrency write-guarding, pre-write backups, all-clients aggregate search, and cross-client migration inside a hardened Electron shell, packaged via the isolated `desktop/` workspace into a Windows `win-x64` NSIS installer `.exe`.
+- **Desktop app (`src/desktop/` + `desktop/`)**: reuses the shared core and `src/agy/` file-locked storage with a dedicated desktop design system (`--ml-*` dual-theme floating-island workbench, custom precision controls, and official DSH / AGY host badges), dual-format persistence, DSH process concurrency write-guarding, pre-write backups, all-clients aggregate search, and cross-client migration inside a hardened Electron shell, packaged via the isolated `desktop/` workspace into a Windows `win-x64` NSIS installer `.exe`.
 - **Storage**: DSH persists through a `storageDomain` JSON domain (default `$DSH_HOME/storages/memory.json`) and AGY defaults to `${PLUGIN_DATA}/memory.json`; both share the same six-table schema (memories, episodes, dreams, audit, operation log and session cursors) and compatible export/import JSON format (legacy `dsh-memory` exports remain importable).
 - **Consistency and recovery**: there are no cross-table transactions; multi-table writes go through the `operations` state machine and recover from the operation matrix after a crash, and a single corrupted row does not block recovery of the remaining operations.
 - **Index injection**: a first baseline, then, when refresh is enabled, only `add` / `replace` / `remove` / `reset` deltas, without waking the agent.
@@ -342,7 +346,7 @@ This repository also includes **Memloom Desktop**, a standalone Electron managem
 - **Multi-client discovery & dual-format fidelity**: automatically discovers local DSH (default + profiles), AGY, and custom `memory.json` stores; losslessly round-trips both `dsh-unit` (preserving `unit` and `global` metadata) and `agy-flat` JSON envelopes while reusing `.memory.lock` for AGY writes;
 - **DSH concurrency write-guard & automatic backups**: detects running DSH processes (fail-closed on query errors), enters `readonly-dsh-running` (opening read-only with zero disk writes and no `recover()`), supports explicit risk-confirmed temporary unlock, checks pre-write disk SHA-256 against external edits, and keeps up to 20 rotated pre-write backups per DSH store;
 - **Aggregate read-only search & cross-client migration**: runs management-mode BM25 search across all enabled stores (isolating `missing` / `corrupted` / `unreadable` clients in `skippedClients`), and supports direct single/multi-select `merge` migration as well as a guided `merge`/`replace` wizard with workspace mapping and confirmation gates;
-- **Hardened Electron shell & local build**: enforces `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, and `webSecurity: true`, validates every IPC payload with `zod` and native-dialog authorized paths, and builds `dist/desktop-release/memloom-desktop-0.1.3-win-x64-setup.exe` via `pnpm run build:desktop`, `pnpm run pack:desktop:check`, and `pnpm --dir desktop install && pnpm --dir desktop run pack:win`.
+- **Hardened Electron shell & local build**: enforces `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, and `webSecurity: true`, validates every IPC payload with `zod` and native-dialog authorized paths, and builds `dist/desktop-release/memloom-desktop-0.2.0-win-x64-setup.exe` via `pnpm run build:desktop`, `pnpm run pack:desktop:check`, and `pnpm --dir desktop install && pnpm --dir desktop run pack:win`.
 
 See [`docs/desktop.md`](docs/desktop.md) (Chinese) for full build instructions, isolation boundaries and known limitations.
 

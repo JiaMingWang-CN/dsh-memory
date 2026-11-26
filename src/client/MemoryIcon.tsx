@@ -1,8 +1,8 @@
 /**
- * Original line icon for the Memory settings section.
+ * Monochrome Warp & Weft M mark for the Memory settings section.
  *
- * The settings shell supplies `size` and `active`; the glyph inherits the
- * current text color so it follows light/dark themes without literal colors.
+ * The settings shell supplies `size` and `active`; all paths inherit
+ * `currentColor` so the glyph follows light/dark themes without literal hex colors.
  * @module memloom/client/MemoryIcon
  */
 import * as React from 'react'
@@ -16,7 +16,7 @@ export interface MemoryIconProps {
 }
 
 /**
- * Draw the memory section icon.
+ * Draw the monochrome Warp & Weft M memory section icon.
  * @param props - Square edge and selection state from the settings shell.
  * @returns The icon element.
  */
@@ -25,32 +25,20 @@ export function MemoryIcon(props: MemoryIconProps): React.ReactElement {
   return h(
     'svg',
     {
-      viewBox: '0 0 24 24',
+      viewBox: '0 0 256 256',
       width: size,
       height: size,
+      fill: 'currentColor',
       'aria-hidden': true,
       style: { display: 'block' },
     },
     h('path', {
-      d: 'M6 4h9a3 3 0 0 1 3 3v13H6z',
-      fill: 'none',
-      stroke: 'currentColor',
-      strokeWidth: 1.5,
-      strokeLinejoin: 'round',
+      d: 'M35 28 H53 L128 157.9 L130.5 153.5 H162.9 L128 213.9 L64.8 104.5 H35 Z',
     }),
-    h('path', {
-      d: 'M9 8h6M9 12h6M9 16h3',
-      fill: 'none',
-      stroke: 'currentColor',
-      strokeWidth: 1.5,
-      strokeLinecap: 'round',
-    }),
-    h('path', {
-      d: 'M3 8v10a2 2 0 0 0 2 2',
-      fill: 'none',
-      stroke: 'currentColor',
-      strokeWidth: 1.5,
-      strokeLinecap: 'round',
-    }),
+    h('path', { d: 'M35 153.5 H63 V228 H35 Z' }),
+    h('path', { d: 'M203 28 H221 V228 H193 V101.3 L191.2 104.5 H158.8 Z' }),
+    h('path', { d: 'M20 117 H57.6 L71.5 141 H20 A12 12 0 0 1 20 117 Z' }),
+    h('path', { d: 'M118.8 117 H180.5 V141 H132.7 Z' }),
+    h('path', { d: 'M233.5 117 H236 A12 12 0 0 1 236 141 H233.5 Z' }),
   )
 }

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 256" width="960" height="256" role="img" aria-labelledby="title">
+  <title id="title">memloom horizontal logo (on dark)</title>
+  <g id="symbol" transform="translate(24.5, 46) scale(0.64)">
+    <path fill="#FFFFFF" d="M36 32 H54 L128 160.2 L133.6 150.5 H163.6 L128 212.2 L67.6 107.5 H36 Z"/>
+    <path fill="#FFFFFF" d="M36 150.5 H62 V224 H36 Z"/>
+    <path fill="#FFFFFF" d="M202 32 H220 V224 H194 V97.9 L188.4 107.5 H158.4 Z"/>
+    <path fill="#E57A44" d="M21 118 H61.5 L74.2 140 H21 A11 11 0 0 1 21 118 Z"/>
+    <path fill="#E57A44" d="M115.8 118 H183.5 V140 H128.5 Z"/>
+    <path fill="#E57A44" d="M230.5 118 H237 A11 11 0 0 1 237 140 H230.5 Z"/>
+  </g>
+  <g id="wordmark">
+    <path fill="#FFFFFF" fill-rule="evenodd" d="M244.5 186 V84 H263.5 V96 C266.5 86 263 81.5 275 81.5 C292 81.5 296 93 296 105 C296 93 300 81.5 317 81.5 C334 81.5 347.5 95 347.5 118 V186 H328.5 V116 A11.5 15 0 0 0 305.5 116 V186 H286.5 V116 A11.5 15 0 0 0 263.5 116 V186 Z"/>
+    <path fill="#FFFFFF" fill-rule="evenodd" d="M447.9 144 A42 53.5 0 1 0 441.7 164.1 L425.8 155.2 A23 37 0 0 1 384.2 144 H447.9 Z M383.8 129.5 A23 37 0 0 1 429.2 129.5 Z"/>
+    <path fill="#FFFFFF" fill-rule="evenodd" d="M465.5 186 V84 H484.5 V96 C487.5 86 484 81.5 496 81.5 C513 81.5 517 93 517 105 C517 93 521 81.5 538 81.5 C555 81.5 568.5 95 568.5 118 V186 H549.5 V116 A11.5 15 0 0 0 526.5 116 V186 H507.5 V116 A11.5 15 0 0 0 484.5 116 V186 Z"/>
+    <path fill="#FFFFFF" fill-rule="evenodd" d="M588.5 45.2 H607.5 V186 H588.5 Z"/>
+    <path fill="#FFFFFF" fill-rule="evenodd" d="M666.5 81.5 A43 53.5 0 1 1 666.4 81.5 Z M666.5 98 A24 37 0 1 0 666.6 98 Z"/>
+    <path fill="#FFFFFF" fill-rule="evenodd" d="M766.5 81.5 A43 53.5 0 1 1 766.4 81.5 Z M766.5 98 A24 37 0 1 0 766.6 98 Z"/>
+    <path fill="#FFFFFF" fill-rule="evenodd" d="M826.5 186 V84 H845.5 V96 C848.5 86 845 81.5 857 81.5 C874 81.5 878 93 878 105 C878 93 882 81.5 899 81.5 C916 81.5 929.5 95 929.5 118 V186 H910.5 V116 A11.5 15 0 0 0 887.5 116 V186 H868.5 V116 A11.5 15 0 0 0 845.5 116 V186 Z"/>
+  </g>
+</svg>

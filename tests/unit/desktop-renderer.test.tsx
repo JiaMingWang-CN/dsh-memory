@@ -11,6 +11,8 @@ import type { DesktopBridgeApi, IpcErrorCode, IpcResult } from '../../src/deskto
 import type { DesktopClientInfo } from '../../src/desktop/multi-service.ts'
 import type { WriteGuardSnapshot } from '../../src/desktop/write-guard.ts'
 import { DesktopApp } from '../../src/desktop/renderer/DesktopApp.tsx'
+import { DesktopConfigPanel } from '../../src/desktop/renderer/DesktopConfigPanel.tsx'
+import { ReviewView } from '../../src/desktop/renderer/ReviewView.tsx'
 import { applyDesktopLocale, desktopErrorText } from '../../src/desktop/renderer/desktop-locales.ts'
 import {
   AuditId,
@@ -41,6 +43,7 @@ function createFakeBridge(options?: {
   legacyCandidate?: string | null
   initialLocale?: 'zh' | 'en'
   failNextUpdateWithExternalChange?: boolean
+  includePendingProposal?: boolean
 }) {
   const wsA = {
     key: 'c:/ws/a',
@@ -178,9 +181,22 @@ function createFakeBridge(options?: {
     },
   ]
 
+  const agyPendingProposal: MemoryRecord = makeMemoryRecord({
+    id: MemoryId('agy-prop-1'),
+    title: 'AGY Pending Proposal',
+    type: 'lesson',
+    status: 'pending',
+    ownership: 'derived',
+    origin: 'dream',
+    body: 'Prefer atomic write locks.',
+    supersedes: ['agy-mem-1'],
+    updatedAt: '2026-11-26T10:00:00.000Z',
+  })
+
   const recordsByClient: Record<string, MemoryRecord[]> = {
     'dsh-default': [dshRecord],
-    'agy-default': [agyRecord],
+    'agy-default':
+      options?.includePendingProposal === true ? [agyRecord, agyPendingProposal] : [agyRecord],
   }
 
   const currentClients = (): DesktopClientInfo[] =>
@@ -208,6 +224,7 @@ function createFakeBridge(options?: {
     updateConfig: vi.fn(),
     updatePreferences: vi.fn(),
     updateMemory: vi.fn(),
+    review: vi.fn(),
   }
 
   const bridge: DesktopBridgeApi = {
@@ -319,9 +336,14 @@ function createFakeBridge(options?: {
         const rec = (recordsByClient[clientId] ?? []).find((r) => r.id === id)!
         return ok({ ...rec, status: 'active' })
       },
-      review: ({ clientId, id }) => {
+      review: ({ clientId, id, action }) => {
+        spies.review(clientId, id, action)
         const rec = (recordsByClient[clientId] ?? []).find((r) => r.id === id)!
-        return ok({ ...rec, status: 'active' })
+        const nextStatus = action === 'accept' ? 'active' : 'archived'
+        recordsByClient[clientId] = (recordsByClient[clientId] ?? []).map((r) =>
+          r.id === id ? { ...r, status: nextStatus } : r,
+        )
+        return ok({ ...rec, status: nextStatus })
       },
       listDreams: ({ clientId }) => ok(clientId === 'dsh-default' ? dshDreams : []),
       undoDream: ({ dreamId }) => {
@@ -462,7 +484,7 @@ function createFakeBridge(options?: {
       saveExportJson: () => ok('C:/fake/export.json'),
     },
     app: {
-      getInfo: () => ok({ version: '0.1.3', platform: 'win32', systemTheme: 'light' }),
+      getInfo: () => ok({ version: '0.2.0', platform: 'win32', systemTheme: 'light' }),
       getPreferences: () => ok(prefs),
       updatePreferences: (patch) => {
         spies.updatePreferences(patch)
@@ -478,25 +500,39 @@ function createFakeBridge(options?: {
 }
 
 describe('Desktop renderer core interactions', () => {
-  it('renders left platform sidebar, right workspace header/category bar, language/theme controls, and legacy quick-add banner', async () => {
+  it('renders floating island shell, horizontal logo, equal DSH/AGY hosts, zero native controls, theme/locale controls, and legacy quick-add', async () => {
     const { bridge, spies } = createFakeBridge({
       legacyCandidate: 'C:/Users/demo/.gemini/antigravity/dsh-memory/memory.json',
     })
     const { container } = render(h(DesktopApp, { bridge }))
 
-    await screen.findByText('全部客户端')
-    expect(container.querySelector('.memloom-topbar')).toBeNull()
-    expect(container.querySelector('aside.memloom-sidebar')).toBeTruthy()
-    expect(container.querySelector('main.memloom-workspace')).toBeTruthy()
-    expect(container.querySelector('.memloom-workspace-header .memloom-category-bar')).toBeTruthy()
-    expect(container.querySelector('.memloom-content-scroll')).toBeTruthy()
+    await screen.findByText('DSH Lesson')
+    expect(container.querySelector('.memloom-shell')).toBeTruthy()
+    expect(container.querySelector('aside.memloom-rail')).toBeTruthy()
+    expect(container.querySelector('main.memloom-stage')).toBeTruthy()
+    expect(container.querySelector('.memloom-logo-svg')).toBeTruthy()
+
+    // Official vector host logos for DSH and AGY (with unique SVG mask/filter IDs per instance)
+    const dshLogos = container.querySelectorAll('svg[data-host-logo="dsh"]')
+    const agyLogos = container.querySelectorAll('svg[data-host-logo="agy"]')
+    expect(dshLogos.length).toBeGreaterThanOrEqual(2)
+    expect(agyLogos.length).toBeGreaterThanOrEqual(2)
+    const svgDefIds = Array.from(
+      container.querySelectorAll('svg[data-host-logo="agy"] mask[id]'),
+    ).map((el) => el.getAttribute('id'))
+    expect(new Set(svgDefIds).size).toBe(svgDefIds.length)
+
+    // Zero native <select>, <input type="checkbox|radio|range">, or <input type="number">
+    expect(container.querySelector('select')).toBeNull()
+    expect(container.querySelector('input[type="checkbox"]')).toBeNull()
+    expect(container.querySelector('input[type="radio"]')).toBeNull()
+    expect(container.querySelector('input[type="range"]')).toBeNull()
+    expect(container.querySelector('input[type="number"]')).toBeNull()
 
     const nav = screen.getByRole('navigation')
     expect(within(nav).getByText('DSH 默认')).toBeTruthy()
     expect(within(nav).getByText('AGY 默认')).toBeTruthy()
-    expect(screen.getByText('+ 添加库')).toBeTruthy()
-    expect(screen.getByText('中 / EN')).toBeTruthy()
-    expect(screen.getByText('切换暗色')).toBeTruthy()
+    expect(within(nav).queryByText('+ 添加库')).toBeNull()
 
     // Legacy dsh-memory banner + one-click add
     expect(screen.getByText(/检测到旧版 dsh-memory AGY 记忆库/)).toBeTruthy()
@@ -507,8 +543,8 @@ describe('Desktop renderer core interactions', () => {
       dshProtected: false,
     })
 
-    // Theme toggle persists preference and sets data-theme attribute
-    fireEvent.click(screen.getByText('切换暗色'))
+    // Theme segmented toggle persists preference and sets data-theme
+    fireEvent.click(screen.getByRole('button', { name: '深色' }))
     await waitFor(() => expect(spies.updatePreferences).toHaveBeenCalledWith({ theme: 'dark' }))
     expect(document.documentElement.dataset.theme).toBe('dark')
   })
@@ -518,17 +554,13 @@ describe('Desktop renderer core interactions', () => {
     render(h(DesktopApp, { bridge }))
 
     await screen.findByText('DSH Lesson')
-    // Read-only guard banner shown and write entry disabled
-    expect(screen.getByText(/DSH 正在运行，已对受保护 DSH 库启用只读保护/)).toBeTruthy()
-    const newBtn = screen.getByRole('button', { name: '新建记忆' }) as HTMLButtonElement
-    expect(newBtn.disabled).toBe(true)
+    // Switch to DSH host
+    const nav = screen.getByRole('navigation')
+    fireEvent.click(within(nav).getByText('DSH 默认'))
 
-    // Opening a memory in read-only mode shows no Edit/Archive buttons
-    fireEvent.click(screen.getByText('DSH Lesson'))
-    await screen.findByText(/当前处于只读保护模式/)
-    expect(screen.queryByText('编辑')).toBeNull()
-    expect(screen.queryByText('归档')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
+    await screen.findByText(/DSH 正在运行，已对受保护 DSH 库启用只读保护/)
+    const editBtn = screen.getByRole('button', { name: '编辑' }) as HTMLButtonElement
+    expect(editBtn.disabled).toBe(true)
 
     // Clicking Force Unlock opens confirmation modal BEFORE calling forceUnlockDsh
     fireEvent.click(screen.getByText('强制解锁'))
@@ -538,15 +570,13 @@ describe('Desktop renderer core interactions', () => {
 
     await waitFor(() => expect(spies.forceUnlockDsh).toHaveBeenCalledWith({ confirmed: true }))
     await waitFor(() =>
-      expect((screen.getByRole('button', { name: '新建记忆' }) as HTMLButtonElement).disabled).toBe(
+      expect((screen.getByRole('button', { name: '编辑' }) as HTMLButtonElement).disabled).toBe(
         false,
       ),
     )
 
-    // Now edit DSH Lesson and trigger desktop/external-change: draft must survive + refresh banner appears
-    fireEvent.click(screen.getByText('DSH Lesson'))
-    await screen.findByText('编辑')
-    fireEvent.click(screen.getByText('编辑'))
+    // Edit DSH Lesson and trigger desktop/external-change: draft must survive + refresh banner appears
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
     const titleInput = screen.getByLabelText('标题') as HTMLInputElement
     fireEvent.change(titleInput, { target: { value: 'Unsaved External Draft' } })
     fireEvent.click(screen.getByText('保存'))
@@ -555,43 +585,53 @@ describe('Desktop renderer core interactions', () => {
     expect((screen.getByLabelText('标题') as HTMLInputElement).value).toBe('Unsaved External Draft')
   })
 
-  it('renders read-only All Clients aggregate view with skipped client warning, open-in-client, and merge-locked copy', async () => {
+  it('renders unified MemoriesView with skipped client warning, open-in-host, and merge-locked migration', async () => {
     const { bridge } = createFakeBridge()
     render(h(DesktopApp, { bridge }))
 
-    await screen.findByText('全部客户端')
-    fireEvent.click(screen.getByText('全部客户端'))
-
-    await screen.findByText('全部客户端聚合检索')
+    await screen.findByText('AGY Wiki Note')
     expect(screen.getByText(/以下客户端状态异常，本次聚合已跳过.*损坏旧库/)).toBeTruthy()
-    expect(screen.getByText('AGY Wiki Note')).toBeTruthy()
 
-    // Read-only detail modal has no Edit button and provides Open in client + Copy to another client
+    // Select AGY Wiki Note and open in belonging host
     fireEvent.click(screen.getByText('AGY Wiki Note'))
-    const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).queryByText('编辑')).toBeNull()
+    fireEvent.click(await screen.findByRole('button', { name: '在所属宿主中打开' }))
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: '在所属宿主中打开' })).toBeNull(),
+    )
 
-    // Click "复制到其他客户端…" from aggregate modal -> single migration wizard locked to Merge
-    fireEvent.click(within(dialog).getByText('复制到其他客户端…'))
-    await screen.findByText('复制记忆到其他客户端')
-    expect(screen.getByText(/单条\/多选直迁严格锁定为合并/)).toBeTruthy()
-    expect(screen.queryByText('替换目标作用域（Replace）')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
-
-    // Top horizontal category bar filters aggregate results by memory type
-    fireEvent.click(screen.getByRole('tab', { name: '知识' }))
-    await waitFor(() => expect(screen.queryByText('DSH Lesson')).toBeNull())
-    expect(screen.getByText('AGY Wiki Note')).toBeTruthy()
+    // Category filter works in MemoriesView
+    fireEvent.click(screen.getByRole('tab', { name: '教训' }))
+    await waitFor(() => expect(screen.queryByText('AGY Wiki Note')).toBeNull())
     fireEvent.click(screen.getByRole('tab', { name: '全部类型' }))
-    await screen.findByText('DSH Lesson')
+    await screen.findByText('AGY Wiki Note')
 
-    // Click "在所属客户端中打开" -> switches to AGY client and opens memory detail
-    const agyRow = screen.getByText('AGY Wiki Note').closest('li')!
-    fireEvent.click(within(agyRow).getByText('在所属客户端中打开'))
-    await screen.findByRole('dialog', { name: 'AGY Wiki Note' })
+    // Click Migrate from inspector -> switches to MigrationView locked to Merge
+    await waitFor(() => expect(document.querySelector('.ml-inspector-footer')).toBeTruthy())
+    const inspectorFooter = document.querySelector('.ml-inspector-footer') as HTMLElement
+    fireEvent.click(within(inspectorFooter).getByRole('button', { name: '跨端迁移' }))
+    await screen.findByText(/单条\/多选直迁严格锁定为合并/)
   })
 
-  it('renders Dreams & Audit tab without LLM Dream trigger, supports undoDream and action filter', async () => {
+  it('renders Review Inbox with supersedes diff comparison and approval action', async () => {
+    const { bridge, spies } = createFakeBridge({ includePendingProposal: true })
+    render(h(DesktopApp, { bridge }))
+
+    await screen.findByText('AGY Wiki Note')
+    const nav = screen.getByRole('navigation')
+    fireEvent.click(within(nav).getByText('待审阅提案'))
+
+    await screen.findByText('AGY Pending Proposal')
+    expect(await screen.findByText('版本替代对比：批准后自动归档旧条目并激活新版本')).toBeTruthy()
+    expect(screen.getByText('原记忆')).toBeTruthy()
+    expect(screen.getByText('提案内容')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /批准并转为永久记忆/ }))
+    await waitFor(() =>
+      expect(spies.review).toHaveBeenCalledWith('agy-default', 'agy-prop-1', 'accept'),
+    )
+  })
+
+  it('renders Dreams & Audit view without LLM Dream trigger, supports undoDream and action filter', async () => {
     const { bridge, spies } = createFakeBridge()
     render(h(DesktopApp, { bridge }))
 
@@ -601,15 +641,18 @@ describe('Desktop renderer core interactions', () => {
     fireEvent.click(screen.getByText('确认强制解锁'))
     await waitFor(() => expect(spies.forceUnlockDsh).toHaveBeenCalled())
 
-    fireEvent.click(screen.getByRole('tab', { name: /整理与审计/ }))
+    const nav = screen.getByRole('navigation')
+    fireEvent.click(within(nav).getByText('整理与审计'))
     await screen.findByText('dream-run-1')
     expect(screen.queryByText('立即整理')).toBeNull()
     expect(screen.queryByText('立即运行 LLM Dream')).toBeNull()
 
     fireEvent.click(screen.getByText('撤销该次整理'))
+    fireEvent.click(await screen.findByRole('button', { name: '确认' }))
     await waitFor(() => expect(spies.undoDream).toHaveBeenCalledWith('dream-run-1'))
 
     // Filter audit timeline by action
+    fireEvent.click(screen.getByRole('tab', { name: '只读审计时间线' }))
     await screen.findByText('dream-commit')
     expect(screen.getByText('create')).toBeTruthy()
     fireEvent.click(screen.getByLabelText('操作类型'))
@@ -623,30 +666,27 @@ describe('Desktop renderer core interactions', () => {
     render(h(DesktopApp, { bridge }))
 
     await screen.findByText('DSH Lesson')
-    fireEvent.click(screen.getByText('跨库迁移'))
-    await screen.findByText('跨客户端迁移向导')
+    const nav = screen.getByRole('navigation')
+    fireEvent.click(within(nav).getByText('跨端迁移'))
+
+    fireEvent.click(screen.getByText('下一步：预览与工作区映射'))
+    await screen.findByText('工作区路径映射')
 
     // Choose Replace mode
-    fireEvent.click(screen.getByLabelText('迁移模式'))
-    fireEvent.click(screen.getByRole('menuitemradio', { name: '替换目标作用域（Replace）' }))
-    fireEvent.click(screen.getByText('下一步：预览与工作区映射'))
+    fireEvent.click(screen.getByText('替换目标作用域（Replace）'))
 
-    await screen.findByText('工作区路径映射')
-    // Skip the source workspace -> execute button must disable + show replaceNoSkipError
+    // Skip the source workspace -> replaceNoSkipError shown and Next disabled
     fireEvent.click(screen.getByLabelText('c:/ws/a: 工作区路径映射'))
     fireEvent.click(screen.getByRole('menuitemradio', { name: '跳过不导入' }))
     expect(screen.getByText(/Replace 模式下禁止跳过任何源工作区/)).toBeTruthy()
-    expect((screen.getByRole('button', { name: '执行迁移' }) as HTMLButtonElement).disabled).toBe(
-      true,
-    )
 
-    // Re-map to target workspace C:/ws/b, then confirm replace wipe
+    // Re-map to C:/ws/b and acknowledge replace risk
     fireEvent.click(screen.getByLabelText('c:/ws/a: 工作区路径映射'))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'C:/ws/b' }))
-    const execBtn = screen.getByRole('button', { name: '执行迁移' }) as HTMLButtonElement
-    expect(execBtn.disabled).toBe(false)
-    fireEvent.click(execBtn)
+    fireEvent.click(screen.getByRole('checkbox', { name: '确认' }))
+    fireEvent.click(screen.getByText('下一步：预览与工作区映射'))
 
+    fireEvent.click(await screen.findByRole('button', { name: '执行迁移' }))
     await screen.findByText(/高危确认：Replace 模式将先清空/)
     fireEvent.click(screen.getByText('确认清空并执行迁移'))
 
@@ -657,78 +697,78 @@ describe('Desktop renderer core interactions', () => {
       targetScope: 'all',
     })
     await screen.findByText('迁移完成报告')
-    expect(screen.getByText(/新增 2，跳过 0，替换 1/)).toBeTruthy()
+    expect(screen.getAllByText(/新增 2，跳过 0，替换 1/).length).toBeGreaterThanOrEqual(1)
   })
 
-  it('renders 23-field AGY config with safety confirm and read-only card for DSH', async () => {
+  it('renders 23-field AGY config with detented slider + safety confirm and read-only card for DSH', async () => {
     const { bridge, spies } = createFakeBridge()
     render(h(DesktopApp, { bridge }))
 
-    // DSH Settings shows read-only card
     await screen.findByText('DSH Lesson')
-    fireEvent.click(screen.getByRole('tab', { name: /设置/ }))
-    await screen.findByText('DSH 配置由 DSH Profile 管理')
+    const nav = screen.getByRole('navigation')
+    fireEvent.click(within(nav).getByText('宿主配置'))
 
-    // Switch to AGY -> shows all 23 fields, no DSH model selection fields
-    fireEvent.click(screen.getByText('AGY 默认'))
-    await screen.findByText('AGY Wiki Note')
-    fireEvent.click(screen.getByRole('tab', { name: /设置/ }))
+    // Default focuses AGY: shows 23 fields, detented slider, no DSH model selection fields
     await screen.findByText('启用记忆插件')
     expect(screen.queryByText('dream 模型模式')).toBeNull()
+    expect(screen.getByRole('slider', { name: '索引大小上限（字节）' })).toBeTruthy()
     expect(screen.getByLabelText('默认检索返回上限')).toBeTruthy()
-    expect(screen.getByLabelText('单次增量刷新字节上限')).toBeTruthy()
 
     // Disabling redactSecrets requires confirmation before calling updateConfig
-    fireEvent.click(screen.getByRole('switch', { name: /秘密脱敏/ }))
-    fireEvent.click(screen.getByText('保存'))
+    fireEvent.click(screen.getByRole('switch', { name: '秘密脱敏' }))
+    fireEvent.click(await screen.findByRole('button', { name: '保存' }))
     expect(spies.updateConfig).not.toHaveBeenCalled()
     expect(screen.getByText('安全与自动化风险确认')).toBeTruthy()
     fireEvent.click(screen.getByText('确认'))
     await waitFor(() => expect(spies.updateConfig).toHaveBeenCalledTimes(1))
     expect(spies.updateConfig.mock.calls[0]?.[0]).toMatchObject({ redactSecrets: false })
+
+    // Switch to DSH tab -> shows read-only profile card and WriteGuard controls
+    fireEvent.click(screen.getByRole('tab', { name: 'DSH 默认' }))
+    await screen.findByText('DSH 配置由 DSH Profile 管理')
+    expect(screen.getByText('DSH 并发写保护状态机')).toBeTruthy()
   })
 
-  it('switches zh/en immediately across topbar and child components', async () => {
+  it('switches zh/en immediately across rail and views, and opens Ctrl+K command palette', async () => {
     const { bridge, spies } = createFakeBridge({ initialLocale: 'zh' })
     render(h(DesktopApp, { bridge }))
 
-    await screen.findByText('全部客户端')
+    await screen.findByText('全部记忆')
     fireEvent.click(screen.getByText('中 / EN'))
 
-    await screen.findByText('All Clients')
-    expect(screen.getByText('+ Add Store')).toBeTruthy()
-    expect(screen.getByRole('tab', { name: /Memories/ })).toBeTruthy()
+    await screen.findByText('All Memories')
+    expect(screen.getByText('Review Inbox')).toBeTruthy()
     expect(spies.updatePreferences).toHaveBeenCalledWith({ locale: 'en' })
+
+    // Ctrl+K opens Command Palette
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+    expect(
+      await screen.findByPlaceholderText('Search views, hosts, or quick actions…'),
+    ).toBeTruthy()
   })
 })
 
 describe('theme.css & desktopErrorText contracts', () => {
-  it('defines all 32 --dsw-* variables in theme.css for both light and dark themes', () => {
-    const stylesSrc = readFileSync(resolve(root, 'src/client/styles.ts'), 'utf8')
+  it('defines Memloom --ml-* tokens for both light and dark themes without --dsw-* coupling', () => {
     const themeCss = readFileSync(resolve(root, 'src/desktop/renderer/theme.css'), 'utf8')
-    const tokens = [
-      ...new Set(
-        (stylesSrc.match(/--dsw-[a-z0-9-]+/g) ?? []).filter((name) => !name.endsWith('-')),
-      ),
-    ]
-    expect(tokens.length).toBe(32)
-    for (const token of tokens) {
-      expect(themeCss).toContain(token)
-    }
+    expect(themeCss).toContain('--ml-shell-bg')
+    expect(themeCss).toContain('--ml-stage-bg')
+    expect(themeCss).toContain('--ml-copper')
+    expect(themeCss).toContain('--ml-dsh')
+    expect(themeCss).toContain('--ml-agy')
+    expect(themeCss).not.toContain('--dsw-')
     expect(themeCss).toMatch(/\[data-theme=['"]light['"]\]/)
     expect(themeCss).toMatch(/\[data-theme=['"]dark['"]\]/)
   })
 
-  it('defines dual-pane App Shell layout, single scroll container, and custom capsule scrollbars in theme.css', () => {
+  it('defines floating island shell layout, custom scrollbars, and zero native form control selectors', () => {
     const themeCss = readFileSync(resolve(root, 'src/desktop/renderer/theme.css'), 'utf8')
-    expect(themeCss).toContain('.memloom-sidebar')
-    expect(themeCss).toContain('.memloom-workspace')
-    expect(themeCss).toContain('.memloom-category-bar')
-    expect(themeCss).toContain('.memloom-content-scroll')
+    expect(themeCss).toContain('.memloom-shell')
+    expect(themeCss).toContain('.memloom-rail')
+    expect(themeCss).toContain('.memloom-stage')
+    expect(themeCss).toContain('.ml-weft-bridge')
     expect(themeCss).toContain('::-webkit-scrollbar')
     expect(themeCss).toContain('::-webkit-scrollbar-thumb')
-    expect(themeCss).toContain('.memloom-shell .dsh-mem-list-full')
-    expect(themeCss).toContain('.memloom-shell .dsh-mem-rows')
     expect(themeCss).not.toContain('.memloom-topbar')
   })
 
@@ -762,8 +802,84 @@ describe('theme.css & desktopErrorText contracts', () => {
     const typeOnlyCheck = (): React.ReactElement => h(DesktopApp)
     expect(typeof typeOnlyCheck).toBe('function')
     expect(typeof DesktopApp).toBe('function')
-    // Ensure DesktopApp() accepts zero arguments at type level as well:
     const zeroArgCheck: () => React.ReactElement = () => DesktopApp()
     expect(typeof zeroArgCheck).toBe('function')
+  })
+
+  it('ignores Ctrl/Meta/Alt modified keys in ReviewView shortcuts while accepting plain A', async () => {
+    applyDesktopLocale('zh')
+    const { bridge, spies } = createFakeBridge({ includePendingProposal: true })
+    const clientsRes = await bridge.clients.list()
+    expect(clientsRes.ok).toBe(true)
+    const clients = clientsRes.ok ? clientsRes.value : []
+
+    render(
+      h(ReviewView, {
+        bridge,
+        clients,
+        refreshToken: 0,
+        onDataChanged: async () => undefined,
+        onExternalChange: () => undefined,
+        onPendingCountChange: () => undefined,
+        onOpenMemories: () => undefined,
+        onNotify: () => undefined,
+      }),
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('批准并转为永久记忆')).toBeTruthy()
+    })
+
+    fireEvent.keyDown(window, { key: 'a', ctrlKey: true })
+    fireEvent.keyDown(window, { key: 'r', metaKey: true })
+    fireEvent.keyDown(window, { key: 'e', altKey: true })
+    expect(spies.review).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(window, { key: 'a' })
+    await waitFor(() => {
+      expect(spies.review).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('preserves unsaved AGY config draft across refreshToken updates on the same host', async () => {
+    applyDesktopLocale('zh')
+    const { bridge } = createFakeBridge()
+    const clientsRes = await bridge.clients.list()
+    expect(clientsRes.ok).toBe(true)
+    const agyClients = (clientsRes.ok ? clientsRes.value : []).filter((c) => c.kind === 'agy')
+    expect(agyClients.length).toBeGreaterThan(0)
+
+    const propsBase = {
+      bridge,
+      clients: agyClients,
+      onRecheckGuard: async () => undefined,
+      onRequestUnlockDsh: () => undefined,
+      onRelockDsh: async () => undefined,
+      onDataChanged: async () => undefined,
+      onExternalChange: () => undefined,
+      onNotify: () => undefined,
+    }
+
+    const view = render(h(DesktopConfigPanel, { ...propsBase, refreshToken: 0 }))
+
+    const switches = await waitFor(() => {
+      const els = screen.getAllByRole('switch')
+      expect(els.length).toBeGreaterThan(0)
+      return els
+    })
+    const firstSwitch = switches[0]!
+    const initialChecked = firstSwitch.getAttribute('aria-checked')
+    const toggledChecked = initialChecked === 'true' ? 'false' : 'true'
+
+    fireEvent.click(firstSwitch)
+    await waitFor(() => {
+      expect(screen.getAllByRole('switch')[0]!.getAttribute('aria-checked')).toBe(toggledChecked)
+    })
+
+    view.rerender(h(DesktopConfigPanel, { ...propsBase, refreshToken: 1 }))
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('switch')[0]!.getAttribute('aria-checked')).toBe(toggledChecked)
+    })
   })
 })

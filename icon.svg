@@ -1,22 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="memloom">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#4f6df5"/>
-      <stop offset="1" stop-color="#7a3ff2"/>
-    </linearGradient>
-  </defs>
-  <rect x="4" y="4" width="120" height="120" rx="26" fill="url(#bg)"/>
-  <g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.95">
-    <path d="M64 34c-13 0-22 9-22 21 0 5 2 9 5 12-3 3-4 7-4 11 0 8 6 14 14 14h14c8 0 14-6 14-14 0-4-1-8-4-11 3-3 5-7 5-12 0-12-9-21-22-21z"/>
-    <path d="M64 34v58"/>
-    <path d="M50 52h8M70 52h8M48 70h8M72 70h8"/>
-  </g>
-  <g fill="#ffffff">
-    <circle cx="64" cy="34" r="5"/>
-    <circle cx="50" cy="52" r="4"/>
-    <circle cx="78" cy="52" r="4"/>
-    <circle cx="48" cy="70" r="4"/>
-    <circle cx="80" cy="70" r="4"/>
-    <circle cx="64" cy="92" r="4"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="memloom">
+  <title>memloom logo</title>
+  <rect width="256" height="256" rx="57.6" fill="#182430"/>
+  <g transform="translate(37.89 35.33) scale(0.704)">
+    <path fill="#FFFFFF" d="M35 28 H53 L128 157.9 L130.5 153.5 H162.9 L128 213.9 L64.8 104.5 H35 Z"/>
+    <path fill="#FFFFFF" d="M35 153.5 H63 V228 H35 Z"/>
+    <path fill="#FFFFFF" d="M203 28 H221 V228 H193 V101.3 L191.2 104.5 H158.8 Z"/>
+    <path fill="#E57A44" d="M20 117 H57.6 L71.5 141 H20 A12 12 0 0 1 20 117 Z"/>
+    <path fill="#E57A44" d="M118.8 117 H180.5 V141 H132.7 Z"/>
+    <path fill="#E57A44" d="M233.5 117 H236 A12 12 0 0 1 236 141 H233.5 Z"/>
   </g>
 </svg>
