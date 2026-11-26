@@ -321,18 +321,19 @@ pnpm pack           # 生成 memloom-0.1.3.tgz
 
 ## 架构说明
 
-memloom 采用同仓共享内核的双宿主分层架构，核心记忆引擎（`src/core/`）零宿主依赖，同时支撑 DSH bundle 与 Antigravity（AGY）原生插件：
+memloom 采用同仓共享内核的多宿主分层架构，核心记忆引擎（`src/core/`）零宿主依赖，同时支撑 DSH bundle、Antigravity（AGY）原生插件与 Memloom Desktop 独立桌面客户端：
 
 - **Host（DSH）**：以单一 `MemoryService` 注册 `memory` 服务，负责存储、BM25 检索、episode 捕获、dreaming 整理、已有记忆整理（organize）、`agent/pre-step` 索引注入、六个模型工具与 `/memory` 命令。
 - **Client（DSH）**：注册 Settings → Memory 管理页与图标，并在助手动作行（用量/时间旁）以小字显示记忆用量；记忆工具使用 DSH 原生工具调用行，不注入自定义卡片。通过 `ctx.remote.memory.*` 读写，文案走 zh/en，样式只用主题 token。
 - **AGY 原生插件（`src/agy/`）**：复用同一共享内核，以跨进程文件锁 JSON 存储（`${PLUGIN_DATA}/memory.json`）、20 个分级 MCP 工具、统一 Hooks（`PreInvocation` / `Stop` / `PreToolUse`）及内置 Skills 打包为自包含目录 `dist/agy-plugin/`。
+- **Desktop 独立客户端（`src/desktop/` + `desktop/`）**：复用共享内核、`src/agy/` 文件锁存储与 `src/client/` 界面组件，以保真双格式读写、DSH 运行态只读写保护、写前自动备份、全端聚合检索与跨库迁移提供安全 Electron 桌面端，并通过隔离的 `desktop/` 工程构建 Windows `win-x64` 安装程序（NSIS `.exe`）。
 - **存储**：DSH 使用 `storageDomain` 的 JSON 域持久化（默认 `$DSH_HOME/storages/memory.json`），AGY 默认使用 `${PLUGIN_DATA}/memory.json`；两者共享六张表 schema（记忆、episode、dream、审计、操作日志与会话游标）及兼容的导入/导出 JSON 格式（兼容导入旧版 `dsh-memory` 导出）。
 - **一致性与恢复**：没有跨表事务，多表写入通过 `operations` 操作日志状态机完成，崩溃后按操作矩阵恢复；单行损坏不会阻止其余操作恢复。
 - **索引注入**：首次注入 baseline，开启刷新后只注入 `add` / `replace` / `remove` / `reset` 差异，不主动唤醒 Agent。
 - **错误契约**：Host 业务错误映射为稳定的 `memory/*` Remote 失败码，details 保留原始 `OperationError` code。
 - **兼容性**：`engines.dsh` 声明兼容的 DSH 版本范围，`prepack` 保证打包前完成构建。
 
-详见 [`docs/architecture.md`](docs/architecture.md)、[`docs/agy.md`](docs/agy.md)、[`docs/memory-model.md`](docs/memory-model.md)、[`docs/dreaming.md`](docs/dreaming.md) 与 [`docs/security.md`](docs/security.md)。
+详见 [`docs/architecture.md`](docs/architecture.md)、[`docs/agy.md`](docs/agy.md)、[`docs/desktop.md`](docs/desktop.md)、[`docs/memory-model.md`](docs/memory-model.md)、[`docs/dreaming.md`](docs/dreaming.md) 与 [`docs/security.md`](docs/security.md)。
 
 ## Antigravity（AGY）支持
 
@@ -344,6 +345,17 @@ memloom 采用同仓共享内核的双宿主分层架构，核心记忆引擎（
 - **跨宿主互通**：AGY 默认独立持久化于 `${PLUGIN_DATA}/memory.json`（不与 DSH 共享在线存储文件），支持通过兼容 JSON 导出/导入与 DSH 无损迁移。
 
 完整构建、存储配置、工具清单与已知限制见 [`docs/agy.md`](docs/agy.md)。
+
+## Memloom Desktop（独立桌面客户端）
+
+本仓库同时提供基于 Electron 的 **Memloom Desktop** 独立桌面客户端（同属 0.x 开发版本，当前已验证 **Windows `win-x64` 安装程序（NSIS `.exe`）**，macOS / Linux 目标在打包配置中预留扩展段，与 DSH `.tgz` bundle 及 AGY 插件产物严格隔离）：
+
+- **多客户端发现与双格式保真**：自动发现本机 DSH（默认与 profiles）、AGY 及自定义 `memory.json` 库；无损识别并往返序列化 `dsh-unit`（完整保留 `unit` 与 `global` 元数据）与 `agy-flat` 两种外层 JSON 格式，AGY 写入复用跨进程 `.memory.lock`；
+- **DSH 并发写保护与自动备份**：自动检测运行中的 DSH 进程（查询异常按 fail-closed 保护），运行期间将 DSH 库锁定为只读保护态（通过只读打开零写盘且不触发 `recover()`），支持显式风险确认后临时解锁；写入 DSH 前执行磁盘 SHA-256 外部变更检测，并按单次逻辑写批自动留存最多 20 份写前快照备份；
+- **全端聚合检索与跨库迁移**：支持跨全部已启用客户端执行只读管理态 BM25 聚合检索（自动隔离 `missing` / `corrupted` / `unreadable` 库并列出跳过原因），支持单条/多选直接 `merge` 迁移与带工作区映射及确认门禁的 `replace` 迁移向导；
+- **安全模型与本地构建**：窗口强制启用 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true` 与 `webSecurity: true`，所有 IPC 经 `zod` 校验并受原生对话框授权路径约束；运行 `pnpm run build:desktop`、`pnpm run pack:desktop:check` 与 `pnpm --dir desktop install && pnpm --dir desktop run pack:win` 可构建 `dist/desktop-release/memloom-desktop-0.1.3-win-x64-setup.exe`（CI 通过 SignPath Foundation 签发开源代码签名，Free code signing provided by SignPath.io, certificate by SignPath Foundation，详见 [`docs/code-signing-policy.md`](docs/code-signing-policy.md)）。
+
+完整构建说明、隔离边界与已知限制见 [`docs/desktop.md`](docs/desktop.md)。
 
 ## 明确不做什么
 
@@ -376,7 +388,8 @@ memloom 的首个完整版本不以以下能力为目标：
 - Settings → Memory 4-Tab 管理页：顶栏统计与索引容量条、关键词搜索与分片筛选、新建记忆与居中详情/编辑弹窗（标签胶囊、重要度滑块、内置未保存确认、已归档隐藏归档按钮）、待审阅提案行级 Diff / 并排对比与「保存并接受」/连续审阅、`Dream now` 与详细运行状态/取消/撤销、拖拽导入预览与工作区映射、分组横排配置页；
 - Remote 管理接口使用稳定的 `memory/*` 失败码（冲突、找不到、内容无效、禁止、容量、不可用），客户端据此本地化并识别并发编辑冲突；
 - `engines.dsh` 声明兼容的 DSH 版本范围，`prepack` 在打包前构建，CI 覆盖打包文件校验；
-- Antigravity（AGY）原生插件适配：同仓抽离零宿主依赖共享内核，提供跨进程文件锁持久化、20 个分级 MCP 工具、`PreInvocation`/`Stop`/`PreToolUse` Hooks、两阶段整理 Skills 与 `pnpm build:agy` / `pnpm pack:agy:check` 自包含产物校验（详见 [`docs/agy.md`](docs/agy.md)）。
+- Antigravity（AGY）原生插件适配：同仓抽离零宿主依赖共享内核，提供跨进程文件锁持久化、20 个分级 MCP 工具、`PreInvocation`/`Stop`/`PreToolUse` Hooks、两阶段整理 Skills 与 `pnpm build:agy` / `pnpm pack:agy:check` 自包含产物校验（详见 [`docs/agy.md`](docs/agy.md)）；
+- Memloom Desktop 独立桌面客户端：同仓隔离实现双格式保真存储、DSH 运行态并发写保护与自动备份、全端聚合 BM25 检索、跨库直接迁移与安全 Electron 桌面壳，支持 `pnpm build:desktop` / `pnpm pack:desktop:check` 与 Windows `win-x64` 安装程序（NSIS `.exe`）打包（详见 [`docs/desktop.md`](docs/desktop.md)）。
 
 Settings → Memory 管理页、审阅界面，以及会话中的记忆用量摘要均已交付（记忆工具沿用 DSH 原生工具调用行）。0.1.0 仍是 **0.x 开发版本**，默认 `autoDream=false`、`refreshIndexOnChange=false`、`autoCaptureEpisodes=true`；安装与使用说明见上文[安装](#安装)与[快速开始](#快速开始)。
 

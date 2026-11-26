@@ -7,7 +7,7 @@
  * ordering, so search/read bookkeeping cannot boost a memory into view.
  * @module memloom/core/search
  */
-import type { MemoryRecord, MemoryScope, MemoryType } from '../shared/types.ts'
+import type { MemoryRecord, MemoryScope, MemoryStatus, MemoryType } from '../shared/types.ts'
 
 /** Default number of hits returned by one search. */
 export const DEFAULT_SEARCH_LIMIT = 20
@@ -162,33 +162,17 @@ export interface SearchIndexOptions {
   defaultLimit?: number
 }
 
-/** In-memory inverted index over memory records. */
-export class SearchIndex {
+/** Shared inverted-index storage and BM25 scorer used by both search indexes. */
+class InvertedBm25Core {
   private readonly docs = new Map<string, IndexedDoc>()
   private readonly inverted = new Map<string, Map<string, number>>()
-  private readonly defaultLimit: number
 
-  constructor(options: SearchIndexOptions = {}) {
-    this.defaultLimit = Math.min(
-      Math.max(options.defaultLimit ?? DEFAULT_SEARCH_LIMIT, 1),
-      MAX_SEARCH_LIMIT,
-    )
-  }
-
-  /** Number of indexed documents. */
   get size(): number {
     return this.docs.size
   }
 
-  /**
-   * Whether a record belongs in the index: only active records are searchable.
-   * Expiry is evaluated per query so a single stored flag is sufficient here.
-   */
-  private isIndexable(record: MemoryRecord): boolean {
-    if (record.status !== 'active') return false
-    // Global scope is reserved for user preferences; ignore malformed global
-    // records so one bad row cannot leak across workspaces.
-    return record.scope.kind !== 'global' || record.type === 'preference'
+  values(): IterableIterator<IndexedDoc> {
+    return this.docs.values()
   }
 
   private computeTerms(record: MemoryRecord): {
@@ -236,13 +220,108 @@ export class SearchIndex {
     this.docs.delete(id)
   }
 
+  add(record: MemoryRecord, isIndexable: (candidate: MemoryRecord) => boolean): void {
+    this.unlink(record.id)
+    if (isIndexable(record)) this.link(record)
+  }
+
+  remove(id: string): void {
+    this.unlink(id)
+  }
+
+  update(record: MemoryRecord, isIndexable: (candidate: MemoryRecord) => boolean): void {
+    const existing = this.docs.get(record.id)
+    if (existing !== undefined && existing.revision === record.contentRevision) {
+      if (!isIndexable(record)) this.unlink(record.id)
+      return
+    }
+    this.add(record, isIndexable)
+  }
+
+  rebuild(
+    records: Iterable<MemoryRecord>,
+    isIndexable: (candidate: MemoryRecord) => boolean,
+  ): void {
+    this.docs.clear()
+    this.inverted.clear()
+    for (const record of records) {
+      if (isIndexable(record)) this.link(record)
+    }
+  }
+
+  scoreRecords(
+    records: readonly MemoryRecord[],
+    queryTerms: readonly string[],
+  ): { record: MemoryRecord; score: number }[] {
+    const docCount = this.docs.size
+    let totalLength = 0
+    for (const doc of this.docs.values()) totalLength += doc.length
+    const averageLength = docCount === 0 ? 0 : totalLength / docCount
+    const scored: { record: MemoryRecord; score: number }[] = []
+    for (const record of records) {
+      const doc = this.docs.get(record.id)
+      if (doc === undefined) continue
+      let score = 0
+      for (const term of queryTerms) {
+        const postings = this.inverted.get(term)
+        if (postings === undefined) continue
+        const termFrequency = postings.get(record.id)
+        if (termFrequency === undefined || termFrequency === 0) continue
+        const documentFrequency = postings.size
+        const idf = Math.log(1 + (docCount - documentFrequency + 0.5) / (documentFrequency + 0.5))
+        const normalization =
+          K1 * (1 - B + (B * doc.length) / (averageLength === 0 ? 1 : averageLength))
+        score += (idf * termFrequency * (K1 + 1)) / (termFrequency + normalization)
+      }
+      if (score <= 0) continue
+      score *= TYPE_WEIGHT[record.type]
+      score += record.importance * IMPORTANCE_WEIGHT + (record.pinned ? PINNED_BONUS : 0)
+      scored.push({ record, score })
+    }
+    scored.sort(
+      (left, right) =>
+        right.score - left.score ||
+        right.record.updatedAt.localeCompare(left.record.updatedAt) ||
+        left.record.id.localeCompare(right.record.id),
+    )
+    return scored
+  }
+}
+
+/** In-memory inverted index over active memory records. */
+export class SearchIndex {
+  private readonly core = new InvertedBm25Core()
+  private readonly defaultLimit: number
+
+  constructor(options: SearchIndexOptions = {}) {
+    this.defaultLimit = Math.min(
+      Math.max(options.defaultLimit ?? DEFAULT_SEARCH_LIMIT, 1),
+      MAX_SEARCH_LIMIT,
+    )
+  }
+
+  /** Number of indexed documents. */
+  get size(): number {
+    return this.core.size
+  }
+
+  /**
+   * Whether a record belongs in the index: only active records are searchable.
+   * Expiry is evaluated per query so a single stored flag is sufficient here.
+   */
+  private readonly isIndexable = (record: MemoryRecord): boolean => {
+    if (record.status !== 'active') return false
+    // Global scope is reserved for user preferences; ignore malformed global
+    // records so one bad row cannot leak across workspaces.
+    return record.scope.kind !== 'global' || record.type === 'preference'
+  }
+
   /**
    * Add or replace one record in the index. Non-active records are dropped.
    * @param record - Record to (re)index.
    */
   add(record: MemoryRecord): void {
-    this.unlink(record.id)
-    if (this.isIndexable(record)) this.link(record)
+    this.core.add(record, this.isIndexable)
   }
 
   /**
@@ -250,7 +329,7 @@ export class SearchIndex {
    * @param id - Memory identity.
    */
   remove(id: string): void {
-    this.unlink(id)
+    this.core.remove(id)
   }
 
   /**
@@ -258,12 +337,7 @@ export class SearchIndex {
    * @param record - Latest record snapshot.
    */
   update(record: MemoryRecord): void {
-    const existing = this.docs.get(record.id)
-    if (existing !== undefined && existing.revision === record.contentRevision) {
-      if (!this.isIndexable(record)) this.unlink(record.id)
-      return
-    }
-    this.add(record)
+    this.core.update(record, this.isIndexable)
   }
 
   /**
@@ -272,11 +346,7 @@ export class SearchIndex {
    * @param records - All persisted records.
    */
   rebuild(records: Iterable<MemoryRecord>): void {
-    this.docs.clear()
-    this.inverted.clear()
-    for (const record of records) {
-      if (this.isIndexable(record)) this.link(record)
-    }
+    this.core.rebuild(records, this.isIndexable)
   }
 
   /** Filter indexed active records by scope, expiry, type and tag constraints. */
@@ -284,7 +354,7 @@ export class SearchIndex {
     const nowMs = (request.now ?? new Date()).getTime()
     const scopeMode = request.scope ?? 'auto'
     const visible: MemoryRecord[] = []
-    for (const doc of this.docs.values()) {
+    for (const doc of this.core.values()) {
       const record = doc.record
       if (!scopeMatches(record.scope, request.workspaceKey, scopeMode)) continue
       if (record.status !== 'active') continue
@@ -341,37 +411,7 @@ export class SearchIndex {
     const queryTerms = [...new Set(tokenize(request.query))]
     const limit = Math.min(Math.max(request.limit ?? this.defaultLimit, 1), MAX_SEARCH_LIMIT)
     if (queryTerms.length === 0) return { results: [], total: 0, truncated: false }
-    const docCount = this.docs.size
-    let totalLength = 0
-    for (const doc of this.docs.values()) totalLength += doc.length
-    const averageLength = docCount === 0 ? 0 : totalLength / docCount
-    const scored: { record: MemoryRecord; score: number }[] = []
-    for (const record of this.collectVisible(request)) {
-      const doc = this.docs.get(record.id)
-      if (doc === undefined) continue
-      let score = 0
-      for (const term of queryTerms) {
-        const postings = this.inverted.get(term)
-        if (postings === undefined) continue
-        const termFrequency = postings.get(record.id)
-        if (termFrequency === undefined || termFrequency === 0) continue
-        const documentFrequency = postings.size
-        const idf = Math.log(1 + (docCount - documentFrequency + 0.5) / (documentFrequency + 0.5))
-        const normalization =
-          K1 * (1 - B + (B * doc.length) / (averageLength === 0 ? 1 : averageLength))
-        score += (idf * termFrequency * (K1 + 1)) / (termFrequency + normalization)
-      }
-      if (score <= 0) continue
-      score *= TYPE_WEIGHT[record.type]
-      score += record.importance * IMPORTANCE_WEIGHT + (record.pinned ? PINNED_BONUS : 0)
-      scored.push({ record, score })
-    }
-    scored.sort(
-      (left, right) =>
-        right.score - left.score ||
-        right.record.updatedAt.localeCompare(left.record.updatedAt) ||
-        left.record.id.localeCompare(right.record.id),
-    )
+    const scored = this.core.scoreRecords(this.collectVisible(request), queryTerms)
     const total = scored.length
     const page = scored.slice(0, limit)
     const results: SearchHit[] = page.map(({ record, score }) => ({
@@ -385,5 +425,157 @@ export class SearchIndex {
       score,
     }))
     return { results, total, truncated: total > limit }
+  }
+}
+
+/** Request accepted by {@link ManagementSearchIndex.search}. */
+export interface ManagementSearchRequest {
+  query?: string
+  workspaceKey?: string | 'all' | null
+  types?: readonly MemoryType[]
+  statuses?: readonly MemoryStatus[]
+  limit?: number
+  offset?: number
+  includeExpired?: boolean
+  now?: Date
+}
+
+/** One management search hit with normalized BM25 score and full record. */
+export interface ManagementSearchHit {
+  record: MemoryRecord
+  score: number
+  normalizedScore: number
+  snippet: string
+}
+
+/** Paginated result returned by {@link ManagementSearchIndex.search}. */
+export interface ManagementSearchResult {
+  items: ManagementSearchHit[]
+  total: number
+  limit: number
+  offset: number
+  truncated: boolean
+}
+
+/**
+ * In-memory inverted index for the management UI covering active, pending and
+ * archived records across all workspaces with offset pagination.
+ */
+export class ManagementSearchIndex {
+  private readonly core = new InvertedBm25Core()
+  private readonly defaultLimit: number
+
+  constructor(options: SearchIndexOptions = {}) {
+    this.defaultLimit = Math.max(options.defaultLimit ?? DEFAULT_SEARCH_LIMIT, 1)
+  }
+
+  /** Number of indexed documents. */
+  get size(): number {
+    return this.core.size
+  }
+
+  private readonly isIndexable = (record: MemoryRecord): boolean => {
+    if (record.status !== 'active' && record.status !== 'pending' && record.status !== 'archived') {
+      return false
+    }
+    if (
+      typeof record.id !== 'string' ||
+      typeof record.title !== 'string' ||
+      typeof record.body !== 'string' ||
+      record.scope === undefined
+    ) {
+      return false
+    }
+    return record.scope.kind !== 'global' || record.type === 'preference'
+  }
+
+  /** Add or replace one record in the management index. */
+  add(record: MemoryRecord): void {
+    this.core.add(record, this.isIndexable)
+  }
+
+  /** Remove one record from the management index by id. */
+  remove(id: string): void {
+    this.core.remove(id)
+  }
+
+  /** Update one record in the management index when its revision changed. */
+  update(record: MemoryRecord): void {
+    this.core.update(record, this.isIndexable)
+  }
+
+  /** Rebuild the management index from all non-malformed records. */
+  rebuild(records: Iterable<MemoryRecord>): void {
+    this.core.rebuild(records, this.isIndexable)
+  }
+
+  private collectVisible(request: ManagementSearchRequest): MemoryRecord[] {
+    const nowMs = (request.now ?? new Date()).getTime()
+    const target = request.workspaceKey === undefined ? 'all' : request.workspaceKey
+    const visible: MemoryRecord[] = []
+    for (const doc of this.core.values()) {
+      const record = doc.record
+      if (target !== 'all' && record.scope.kind !== 'global') {
+        if (target === null || record.scope.key !== target) continue
+      }
+      if (request.statuses !== undefined && request.statuses.length > 0) {
+        if (!request.statuses.includes(record.status)) continue
+      }
+      if (request.types !== undefined && request.types.length > 0) {
+        if (!request.types.includes(record.type)) continue
+      }
+      if (
+        request.includeExpired !== true &&
+        record.status === 'active' &&
+        record.expiresAt !== undefined
+      ) {
+        const expiresMs = Date.parse(record.expiresAt)
+        if (!Number.isNaN(expiresMs) && expiresMs <= nowMs) continue
+      }
+      visible.push(record)
+    }
+    return visible
+  }
+
+  /**
+   * Search or browse management records across statuses and workspaces.
+   * Without a keyword query, returns visible records sorted by `updatedAt`
+   * descending with `score: 0` and `normalizedScore: 0`.
+   */
+  search(request: ManagementSearchRequest = {}): ManagementSearchResult {
+    const limit = Math.max(1, Math.floor(request.limit ?? this.defaultLimit))
+    const offset = Math.max(0, Math.floor(request.offset ?? 0))
+    const rawQuery = request.query?.trim() ?? ''
+    if (rawQuery === '') {
+      const records = this.collectVisible(request)
+      records.sort(
+        (left, right) =>
+          right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id),
+      )
+      const total = records.length
+      const page = records.slice(offset, offset + limit)
+      const items: ManagementSearchHit[] = page.map((record) => ({
+        record: structuredClone(record),
+        score: 0,
+        normalizedScore: 0,
+        snippet: makeSnippet(record.body, []),
+      }))
+      return { items, total, limit, offset, truncated: offset + limit < total }
+    }
+    const queryTerms = [...new Set(tokenize(rawQuery))]
+    if (queryTerms.length === 0) {
+      return { items: [], total: 0, limit, offset, truncated: false }
+    }
+    const scored = this.core.scoreRecords(this.collectVisible(request), queryTerms)
+    const total = scored.length
+    const maxScore = scored[0]?.score ?? 0
+    const page = scored.slice(offset, offset + limit)
+    const items: ManagementSearchHit[] = page.map(({ record, score }) => ({
+      record: structuredClone(record),
+      score,
+      normalizedScore: maxScore > 0 ? score / maxScore : 0,
+      snippet: makeSnippet(record.body, queryTerms),
+    }))
+    return { items, total, limit, offset, truncated: offset + limit < total }
   }
 }

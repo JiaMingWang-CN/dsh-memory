@@ -1,0 +1,818 @@
+/* Memloom Desktop theme tokens, dual-pane App Shell layout, and custom scrollbars.
+ * Preserves all 32 --dsw-* variables required by src/client/styles.ts in both
+ * light and dark palettes, adds desktop-specific --memloom-* surface tokens,
+ * and eliminates nested double scrollbars.
+ */
+
+:root,
+[data-theme='light'] {
+  --dsw-alias-bg-base: #f4f6fa;
+  --dsw-alias-bg-layer-3: #ffffff;
+  --dsw-alias-bg-module-platform: #eff2f7;
+  --dsw-alias-bg-overlay: #ffffff;
+  --dsw-alias-bg-skeleton: #e4e7ec;
+  --dsw-alias-border-l1: #cbd2dc;
+  --dsw-alias-border-l2: #e1e5ec;
+  --dsw-alias-border-l4: #c6ceda;
+  --dsw-alias-brand-primary: #3b66f5;
+  --dsw-alias-interactive-bg-active: rgba(15, 23, 42, 0.085);
+  --dsw-alias-interactive-bg-hover: rgba(15, 23, 42, 0.045);
+  --dsw-alias-label-caption: #64748b;
+  --dsw-alias-label-primary: #0f172a;
+  --dsw-alias-label-primary-foreground: #ffffff;
+  --dsw-alias-label-secondary: #334155;
+  --dsw-alias-label-tertiary: #64748b;
+  --dsw-alias-settings-card-fill: #ffffff;
+  --dsw-alias-settings-card-stroke: #dfe4ec;
+  --dsw-alias-state-business-primary: #3b66f5;
+  --dsw-alias-state-error-primary: #dc2626;
+  --dsw-alias-state-idle-primary: #94a3b8;
+  --dsw-alias-state-success-primary: #16a34a;
+  --dsw-alias-state-warn-primary: #d97706;
+  --dsw-alias-state-warn-tertiary: rgba(217, 119, 6, 0.12);
+  --dsw-elevation-prominent: 0 12px 32px rgba(15, 23, 42, 0.14);
+  --dsw-focus-ring-color: #3b66f5;
+  --dsw-focus-ring-width: 2px;
+  --dsw-radius-xs: 3px;
+  --dsw-radius-sm: 5px;
+  --dsw-radius-md: 7px;
+  --dsw-radius-lg: 10px;
+  --dsw-radius-xl: 12px;
+
+  --memloom-sidebar-bg: #ebeff5;
+  --memloom-sidebar-border: #dce2ec;
+  --memloom-header-bg: #ffffff;
+  --memloom-nav-active-bg: #ffffff;
+  --memloom-nav-active-shadow: 0 1px 3px rgba(15, 23, 42, 0.07), 0 0 0 0.5px rgba(15, 23, 42, 0.06);
+  --memloom-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+  --memloom-scrollbar-thumb: rgba(15, 23, 42, 0.18);
+  --memloom-scrollbar-thumb-hover: rgba(15, 23, 42, 0.34);
+  --memloom-scrollbar-thumb-active: rgba(15, 23, 42, 0.48);
+}
+
+[data-theme='dark'] {
+  --dsw-alias-bg-base: #0f1218;
+  --dsw-alias-bg-layer-3: #1b2029;
+  --dsw-alias-bg-module-platform: #161a22;
+  --dsw-alias-bg-overlay: #1e242e;
+  --dsw-alias-bg-skeleton: #282d38;
+  --dsw-alias-border-l1: #3b4252;
+  --dsw-alias-border-l2: #282e3b;
+  --dsw-alias-border-l4: #363e4e;
+  --dsw-alias-brand-primary: #6c8eff;
+  --dsw-alias-interactive-bg-active: rgba(255, 255, 255, 0.11);
+  --dsw-alias-interactive-bg-hover: rgba(255, 255, 255, 0.06);
+  --dsw-alias-label-caption: #94a3b8;
+  --dsw-alias-label-primary: #f1f5f9;
+  --dsw-alias-label-primary-foreground: #0b1120;
+  --dsw-alias-label-secondary: #cbd5e1;
+  --dsw-alias-label-tertiary: #94a3b8;
+  --dsw-alias-settings-card-fill: #171b23;
+  --dsw-alias-settings-card-stroke: #2a303d;
+  --dsw-alias-state-business-primary: #6c8eff;
+  --dsw-alias-state-error-primary: #f87171;
+  --dsw-alias-state-idle-primary: #64748b;
+  --dsw-alias-state-success-primary: #4ade80;
+  --dsw-alias-state-warn-primary: #fbbf24;
+  --dsw-alias-state-warn-tertiary: rgba(251, 191, 36, 0.14);
+  --dsw-elevation-prominent: 0 14px 36px rgba(0, 0, 0, 0.55);
+  --dsw-focus-ring-color: #6c8eff;
+  --dsw-focus-ring-width: 2px;
+  --dsw-radius-xs: 3px;
+  --dsw-radius-sm: 5px;
+  --dsw-radius-md: 7px;
+  --dsw-radius-lg: 10px;
+  --dsw-radius-xl: 12px;
+
+  --memloom-sidebar-bg: #13161e;
+  --memloom-sidebar-border: #232834;
+  --memloom-header-bg: #161a23;
+  --memloom-nav-active-bg: #1e2432;
+  --memloom-nav-active-shadow: 0 1px 4px rgba(0, 0, 0, 0.35), 0 0 0 0.5px rgba(108, 142, 255, 0.25);
+  --memloom-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  --memloom-scrollbar-thumb: rgba(226, 232, 240, 0.18);
+  --memloom-scrollbar-thumb-hover: rgba(226, 232, 240, 0.34);
+  --memloom-scrollbar-thumb-active: rgba(226, 232, 240, 0.48);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom floating capsule scrollbars across all scrollable desktop surfaces */
+.memloom-sidebar-nav::-webkit-scrollbar,
+.memloom-content-scroll::-webkit-scrollbar,
+.memloom-shell .dsh-mem-modal-body::-webkit-scrollbar,
+.memloom-shell .dsh-mem-menu::-webkit-scrollbar,
+.memloom-shell .dsh-mem-tabs::-webkit-scrollbar,
+.memloom-shell textarea.dsh-mem-input::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.memloom-sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.memloom-shell .dsh-mem-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.memloom-sidebar-nav::-webkit-scrollbar-track,
+.memloom-content-scroll::-webkit-scrollbar-track,
+.memloom-shell .dsh-mem-modal-body::-webkit-scrollbar-track,
+.memloom-shell .dsh-mem-menu::-webkit-scrollbar-track,
+.memloom-shell .dsh-mem-tabs::-webkit-scrollbar-track,
+.memloom-shell textarea.dsh-mem-input::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.memloom-sidebar-nav::-webkit-scrollbar-thumb,
+.memloom-content-scroll::-webkit-scrollbar-thumb,
+.memloom-shell .dsh-mem-modal-body::-webkit-scrollbar-thumb,
+.memloom-shell .dsh-mem-menu::-webkit-scrollbar-thumb,
+.memloom-shell .dsh-mem-tabs::-webkit-scrollbar-thumb,
+.memloom-shell textarea.dsh-mem-input::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-color: var(--memloom-scrollbar-thumb);
+  background-clip: content-box;
+}
+
+.memloom-sidebar-nav::-webkit-scrollbar-thumb:hover,
+.memloom-content-scroll::-webkit-scrollbar-thumb:hover,
+.memloom-shell .dsh-mem-modal-body::-webkit-scrollbar-thumb:hover,
+.memloom-shell .dsh-mem-menu::-webkit-scrollbar-thumb:hover,
+.memloom-shell .dsh-mem-tabs::-webkit-scrollbar-thumb:hover,
+.memloom-shell textarea.dsh-mem-input::-webkit-scrollbar-thumb:hover {
+  background-color: var(--memloom-scrollbar-thumb-hover);
+}
+
+.memloom-sidebar-nav::-webkit-scrollbar-thumb:active,
+.memloom-content-scroll::-webkit-scrollbar-thumb:active,
+.memloom-shell .dsh-mem-modal-body::-webkit-scrollbar-thumb:active,
+.memloom-shell .dsh-mem-menu::-webkit-scrollbar-thumb:active,
+.memloom-shell .dsh-mem-tabs::-webkit-scrollbar-thumb:active,
+.memloom-shell textarea.dsh-mem-input::-webkit-scrollbar-thumb:active {
+  background-color: var(--memloom-scrollbar-thumb-active);
+}
+
+.memloom-sidebar-nav::-webkit-scrollbar-corner,
+.memloom-content-scroll::-webkit-scrollbar-corner,
+.memloom-shell .dsh-mem-modal-body::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Dual-pane App Shell */
+.memloom-shell {
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Left Platform Sidebar */
+.memloom-sidebar {
+  width: 264px;
+  flex: none;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--memloom-sidebar-bg);
+  border-inline-end: 0.5px solid var(--memloom-sidebar-border);
+  user-select: none;
+}
+
+.memloom-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 16px 14px;
+  border-bottom: 0.5px solid var(--memloom-sidebar-border);
+}
+
+.memloom-brand-logo {
+  flex: none;
+  border-radius: 7px;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--dsw-alias-brand-primary) 28%, transparent);
+}
+
+.memloom-brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.memloom-brand-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.memloom-brand {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  color: var(--dsw-alias-label-primary);
+}
+
+.memloom-brand-version {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent);
+  color: var(--dsw-alias-brand-primary);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.memloom-brand-sub {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.memloom-sidebar-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 12px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.memloom-sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.memloom-sidebar-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 4px;
+}
+
+.memloom-sidebar-heading {
+  padding: 0 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.memloom-sidebar-heading-row .memloom-sidebar-heading {
+  padding: 0;
+}
+
+.memloom-sidebar-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.memloom-nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--dsw-radius-lg);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.memloom-nav-item:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.memloom-nav-item[aria-current='page'] {
+  background: var(--memloom-nav-active-bg);
+  color: var(--dsw-alias-label-primary);
+  box-shadow: var(--memloom-nav-active-shadow);
+}
+
+.memloom-nav-item:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color);
+  outline-offset: -1px;
+}
+
+.memloom-nav-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.memloom-nav-icon[data-kind='all'] {
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 13%, transparent);
+  color: var(--dsw-alias-brand-primary);
+}
+
+.memloom-nav-icon[data-kind='dsh'] {
+  background: color-mix(in srgb, #6366f1 14%, transparent);
+  color: #6366f1;
+}
+
+.memloom-nav-icon[data-kind='agy'] {
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 14%, transparent);
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.memloom-nav-icon[data-kind='custom'] {
+  background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 14%, transparent);
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.memloom-nav-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.memloom-nav-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memloom-nav-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--dsw-alias-label-tertiary);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.memloom-nav-kind {
+  margin-inline-start: auto;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--dsw-alias-interactive-bg-hover);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.memloom-sidebar-add {
+  margin-top: 6px;
+  width: 100%;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--dsw-alias-border-l4);
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.memloom-sidebar-add:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  border-color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-brand-primary);
+}
+
+.memloom-sidebar-add:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color);
+  outline-offset: 1px;
+}
+
+.memloom-sidebar-footer {
+  flex: none;
+  padding: 10px 10px 12px;
+  border-top: 0.5px solid var(--memloom-sidebar-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.memloom-sidebar-action {
+  width: 100%;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 0.5px solid var(--dsw-alias-border-l4);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-3);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.memloom-sidebar-action:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  border-color: var(--dsw-alias-border-l1);
+}
+
+.memloom-sidebar-prefs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.memloom-sidebar-pref-btn {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.memloom-sidebar-pref-btn:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.memloom-sidebar-action:focus-visible,
+.memloom-sidebar-pref-btn:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color);
+  outline-offset: 1px;
+}
+
+/* Right Workspace: Fixed Top Header + Category Bar + Independent Scroll Content */
+.memloom-workspace {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+}
+
+.memloom-workspace-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.memloom-workspace-header {
+  flex: none;
+  background: var(--memloom-header-bg);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+  z-index: 20;
+}
+
+.memloom-view-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 24px 10px;
+}
+
+.memloom-view-bar-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.memloom-view-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.memloom-category-bar {
+  border-top: 0.5px solid color-mix(in srgb, var(--dsw-alias-border-l2) 65%, transparent);
+  background: var(--memloom-header-bg);
+}
+
+.memloom-banners,
+.memloom-inline-banners {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 24px 0;
+}
+
+.memloom-guard-banner,
+.memloom-legacy-banner,
+.memloom-external-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 9px 14px;
+  border-radius: var(--dsw-radius-lg);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.memloom-guard-banner[data-mode='readonly-dsh-running'] {
+  border: 0.5px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 40%, transparent);
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-label-primary);
+}
+
+.memloom-guard-banner[data-mode='force-unlocked'] {
+  border: 0.5px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent);
+  color: var(--dsw-alias-label-primary);
+}
+
+.memloom-legacy-banner {
+  border: 0.5px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 35%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 9%, transparent);
+  color: var(--dsw-alias-label-primary);
+}
+
+.memloom-external-banner {
+  border: 0.5px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+/* Primary Scrollable Memory Content Surface */
+.memloom-content-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+  padding: 16px 24px 32px;
+}
+
+.memloom-content-inner {
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Higher-specificity overrides for shared src/client/styles.ts rules injected later in DOM */
+.memloom-shell .dsh-mem-tabs {
+  border-bottom: 0;
+  gap: 6px;
+  padding: 0 24px;
+}
+
+.memloom-shell .dsh-mem-tab {
+  height: 40px;
+  padding: 0 12px;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease;
+}
+
+.memloom-shell .dsh-mem-list-full {
+  max-height: none;
+  min-height: 0;
+}
+
+.memloom-shell .dsh-mem-rows {
+  flex: 0 0 auto;
+  overflow-y: visible;
+  padding: 8px;
+}
+
+.memloom-shell .dsh-mem-card,
+.memloom-shell .dsh-mem-section-card,
+.memloom-shell .dsh-mem-toolbar {
+  box-shadow: var(--memloom-card-shadow);
+}
+
+.memloom-shell .dsh-mem-config-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  box-shadow: 0 -6px 18px color-mix(in srgb, var(--dsw-alias-bg-base) 72%, transparent);
+}
+
+.memloom-agg-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--dsw-radius-md);
+  transition: background 120ms ease;
+}
+
+.memloom-agg-row:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.memloom-agg-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.memloom-agg-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  flex-wrap: wrap;
+}
+
+.memloom-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.memloom-timeline-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+.memloom-timeline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.memloom-wizard-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.memloom-wizard-map-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+.memloom-wizard-map-row .dsh-mem-select {
+  flex: 1 1 220px;
+}
+
+.memloom-config-readonly-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border: 0.5px solid var(--dsw-alias-settings-card-stroke);
+  border-radius: var(--dsw-radius-xl);
+  background: var(--dsw-alias-settings-card-fill);
+  box-shadow: var(--memloom-card-shadow);
+}
+
+.memloom-meta-path {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--dsw-alias-label-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .memloom-sidebar {
+    width: 224px;
+  }
+
+  .memloom-view-bar {
+    padding: 12px 16px 8px;
+  }
+
+  .memloom-shell .dsh-mem-tabs {
+    padding: 0 16px;
+  }
+
+  .memloom-banners,
+  .memloom-inline-banners {
+    padding: 8px 16px 0;
+  }
+
+  .memloom-content-scroll {
+    padding: 12px 16px 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .memloom-content-scroll {
+    scroll-behavior: auto;
+  }
+
+  .memloom-nav-item,
+  .memloom-sidebar-add,
+  .memloom-sidebar-action,
+  .memloom-sidebar-pref-btn,
+  .memloom-shell .dsh-mem-tab,
+  .memloom-agg-row {
+    transition: none;
+  }
+}

@@ -19,6 +19,7 @@ import {
   type EpisodeRecord,
   type MemoryRecord,
   type MemoryScope,
+  type MemorySourceRef,
   type MemoryType,
   type WorklogKind,
 } from '../shared/types.ts'
@@ -66,7 +67,15 @@ import {
   type DreamProposalOutput,
 } from './proposal.ts'
 import { detectStrongSecret, normalizeEscapedNewlines, redactSecrets } from './redact.ts'
-import { SearchIndex, type BrowseRequest, type SearchRequest, type SearchResult } from './search.ts'
+import {
+  ManagementSearchIndex,
+  SearchIndex,
+  type BrowseRequest,
+  type ManagementSearchRequest,
+  type ManagementSearchResult,
+  type SearchRequest,
+  type SearchResult,
+} from './search.ts'
 import type { MemoryDomainHandle } from './storage-contract.ts'
 import {
   MAX_MEMORY_BODY_BYTES,
@@ -82,7 +91,7 @@ import {
   type MemoryPatch,
   type StoreCounts,
 } from './store.ts'
-import type { WorkspaceIdentity } from './workspace.ts'
+import { normalizeWorkspaceKey, type WorkspaceIdentity } from './workspace.ts'
 
 const STRONG_SECRET_WRITE_MESSAGE =
   'memory content looks like a secret (private key, API key or token); record where it is configured instead'
@@ -226,6 +235,63 @@ export interface MemoryEngineStatus {
   config: ResolvedMemoryConfig
 }
 
+/** Management overview counters and index footprint for one workspace selector. */
+export interface MemoryOverviewResult {
+  workspaceKey: string | 'all' | null
+  counts: { active: number; pending: number; archived: number; stored: number }
+  pendingReview: number
+  recentDream: DreamRun | null
+  index: { entries: number; bytes: number }
+}
+
+/** Aggregated workspace summary derived from stored memories and episodes. */
+export interface WorkspaceSummary {
+  key: string
+  root: string
+  memoryCount: number
+  updatedAt: string
+}
+
+/** Fields accepted by {@link MemoryEngine.manageCreate}. */
+export interface ManageCreateInput {
+  type: MemoryType
+  title: string
+  body: string
+  scope?: 'workspace' | 'global'
+  workspaceKey?: string
+  workspaceRoot?: string
+  tags?: string[]
+  importance?: number
+  confidence?: number
+  pinned?: boolean
+  status?: 'active' | 'pending'
+}
+
+/** Fields accepted by {@link MemoryEngine.manageUpdate}. */
+export interface ManageUpdateInput {
+  id: string
+  expectedContentRevision: number
+  type?: MemoryType
+  title?: string
+  body?: string
+  tags?: string[]
+  importance?: number
+  confidence?: number
+  pinned?: boolean
+  status?: 'active' | 'archived'
+  scope?: 'workspace' | 'global'
+  workspaceKey?: string
+  workspaceRoot?: string
+}
+
+/** Request accepted by {@link MemoryEngine.manageDelete}. */
+export interface ManageDeleteInput {
+  id: string
+  permanent?: boolean
+  confirm?: boolean
+  actor?: 'user' | 'model'
+}
+
 function isRecordVisible(record: MemoryRecord, workspaceKey: string | null): boolean {
   if (record.scope.kind === 'global') return true
   if (workspaceKey === null) return false
@@ -293,6 +359,7 @@ export class MemoryEngine {
   private resolvedConfig: ResolvedMemoryConfig
   private capacityPolicy: CapacityPolicy
   private searchIndex: SearchIndex
+  private managementSearchIndex: ManagementSearchIndex
 
   constructor(options: MemoryEngineOptions) {
     this.domain = options.domain
@@ -301,6 +368,9 @@ export class MemoryEngine {
     this.resolvedConfig = resolveMemoryConfig(options.config)
     this.capacityPolicy = buildCapacityPolicy(this.resolvedConfig)
     this.searchIndex = new SearchIndex({ defaultLimit: this.resolvedConfig.searchLimit })
+    this.managementSearchIndex = new ManagementSearchIndex({
+      defaultLimit: this.resolvedConfig.searchLimit,
+    })
 
     const capacityDelegate: CapacityController = {
       checkCreate: (counts) => this.capacityPolicy.checkCreate(counts),
@@ -334,8 +404,13 @@ export class MemoryEngine {
       archiveRetentionDays: this.resolvedConfig.archiveRetentionDays,
       ...(this.logger === undefined ? {} : { logger: this.logger }),
       onChange: (change) => {
-        if (change.action === 'upsert') this.searchIndex.update(change.record)
-        else this.searchIndex.remove(change.id)
+        if (change.action === 'upsert') {
+          this.searchIndex.update(change.record)
+          this.managementSearchIndex.update(change.record)
+        } else {
+          this.searchIndex.remove(change.id)
+          this.managementSearchIndex.remove(change.id)
+        }
       },
     })
 
@@ -355,6 +430,40 @@ export class MemoryEngine {
 
   private redactText(text: string): string {
     return this.resolvedConfig.redactSecrets === false ? text : redactSecrets(text)
+  }
+
+  private resolveManageScope(input: {
+    type: MemoryType
+    scope?: 'workspace' | 'global'
+    workspaceKey?: string
+    workspaceRoot?: string
+  }): MemoryScope {
+    const desired = input.scope ?? 'workspace'
+    if (desired === 'global') {
+      if (input.type !== 'preference') {
+        throw new OperationError('MEMORY_FORBIDDEN_SCOPE', 'only preference memories may be global')
+      }
+      return { kind: 'global' }
+    }
+    const normalizedKey =
+      input.workspaceKey === undefined ? '' : normalizeWorkspaceKey(input.workspaceKey)
+    const rawRoot = input.workspaceRoot
+    if (normalizedKey === '' || rawRoot === undefined || rawRoot.trim() === '') {
+      throw new OperationError(
+        'MEMORY_FORBIDDEN_SCOPE',
+        'a workspace memory requires workspaceKey and workspaceRoot',
+      )
+    }
+    return { kind: 'workspace', key: normalizedKey, root: rawRoot }
+  }
+
+  /**
+   * Open the engine for read-only inspection without running crash recovery or
+   * dream expiry, producing zero domain writes.
+   */
+  openReadOnly(): void {
+    this.store.openReadOnly()
+    this.syncSearchIndex()
   }
 
   /**
@@ -417,6 +526,7 @@ export class MemoryEngine {
     this.capacityPolicy = buildCapacityPolicy(next)
     if (this.searchIndex !== undefined) {
       this.searchIndex = new SearchIndex({ defaultLimit: next.searchLimit })
+      this.managementSearchIndex = new ManagementSearchIndex({ defaultLimit: next.searchLimit })
       this.syncSearchIndex()
     }
     return structuredClone(next)
@@ -427,17 +537,24 @@ export class MemoryEngine {
     return structuredClone(this.resolvedConfig)
   }
 
-  /** Rebuild the in-memory BM25 index from `memories` table entries. */
+  /** Rebuild the in-memory BM25 indexes from `memories` table entries. */
   syncSearchIndex(): void {
-    const active = [...this.domain.table('memories').entries()]
-      .map(([, record]) => record)
-      .filter((record) => record.status === 'active')
-    this.searchIndex.rebuild(active)
+    const records = [...this.domain.table('memories').entries()].map(([, record]) => record)
+    this.searchIndex.rebuild(records.filter((record) => record.status === 'active'))
+    this.managementSearchIndex.rebuild(records)
   }
 
   /** Rank active memories matching a search query. */
   search(request: SearchRequest): SearchResult {
     return this.searchIndex.search({
+      ...request,
+      now: request.now ?? this.now(),
+    })
+  }
+
+  /** Search or browse memories across all statuses and workspaces for management UI. */
+  searchManagement(request: ManagementSearchRequest = {}): ManagementSearchResult {
+    return this.managementSearchIndex.search({
       ...request,
       now: request.now ?? this.now(),
     })
@@ -688,6 +805,206 @@ export class MemoryEngine {
       recentDream,
       config: this.getConfig(),
     }
+  }
+
+  /** Management overview counts, pending review count, latest dream and index footprint. */
+  overview(workspaceKey: string | 'all' | null): MemoryOverviewResult {
+    const counts = this.store.scopedCounts(workspaceKey)
+    const visibleActive = this.store.activeRecords().filter((record) => {
+      if (workspaceKey === 'all') return true
+      if (record.scope.kind === 'global') return true
+      return workspaceKey !== null && record.scope.key === workspaceKey
+    })
+    const bytes = visibleActive.reduce(
+      (total, record) => total + Buffer.byteLength(`${record.title}${record.body}`, 'utf8'),
+      0,
+    )
+    return {
+      workspaceKey,
+      counts,
+      pendingReview: counts.pending,
+      recentDream: this.store.dreamList(1)[0] ?? null,
+      index: { entries: visibleActive.length, bytes },
+    }
+  }
+
+  /** Read one memory record in full alongside cloned source references. */
+  view(id: string): { record: MemoryRecord; sources: MemorySourceRef[] } {
+    if (typeof id !== 'string' || id === '') {
+      throw new OperationError('MEMORY_INVALID_CONTENT', 'memory id must be a non-empty string')
+    }
+    const record = this.store.get(MemoryId(id))
+    if (record === undefined) {
+      throw new OperationError('MEMORY_NOT_FOUND', `memory '${id}' not found`)
+    }
+    return { record, sources: structuredClone(record.sourceRefs) }
+  }
+
+  /** Create one user-owned memory from the management UI with automatic secret redaction. */
+  async manageCreate(input: ManageCreateInput): Promise<MemoryRecord> {
+    await this.ensureReady()
+    if (typeof input.title !== 'string' || typeof input.body !== 'string') {
+      throw new OperationError('MEMORY_INVALID_CONTENT', 'title and body must be strings')
+    }
+    const scope = this.resolveManageScope(input)
+    const title = this.redactText(input.title)
+    const body = this.redactText(input.body)
+    const tags = input.tags?.map((tag) => this.redactText(tag))
+    return this.store.create({
+      type: input.type,
+      title,
+      body,
+      scope,
+      ...(tags === undefined ? {} : { tags }),
+      ...(input.importance === undefined ? {} : { importance: input.importance }),
+      ...(input.confidence === undefined ? {} : { confidence: input.confidence }),
+      ...(input.pinned === undefined ? {} : { pinned: input.pinned }),
+      status: input.status ?? 'active',
+      origin: 'user',
+      ownership: 'user',
+      actor: 'user',
+    })
+  }
+
+  /**
+   * Update one memory from the management UI (supports active, archived and
+   * pending proposals) with automatic secret redaction and user ownership stamp.
+   */
+  async manageUpdate(input: ManageUpdateInput): Promise<MemoryRecord> {
+    await this.ensureReady()
+    if (typeof input.id !== 'string' || input.id === '') {
+      throw new OperationError('MEMORY_INVALID_CONTENT', 'memory id must be a non-empty string')
+    }
+    const current = this.store.get(MemoryId(input.id))
+    if (current === undefined) {
+      throw new OperationError('MEMORY_NOT_FOUND', `memory '${input.id}' not found`)
+    }
+    const nextType = input.type ?? current.type
+    const scope =
+      input.scope === undefined
+        ? undefined
+        : this.resolveManageScope({
+            type: nextType,
+            scope: input.scope,
+            ...(input.workspaceKey === undefined ? {} : { workspaceKey: input.workspaceKey }),
+            ...(input.workspaceRoot === undefined ? {} : { workspaceRoot: input.workspaceRoot }),
+          })
+    const tags = input.tags?.map((tag) => this.redactText(tag))
+    return this.store.update(current.id, {
+      expectedContentRevision: input.expectedContentRevision,
+      ...(input.type === undefined ? {} : { type: input.type }),
+      ...(input.title === undefined ? {} : { title: this.redactText(input.title) }),
+      ...(input.body === undefined ? {} : { body: this.redactText(input.body) }),
+      ...(tags === undefined ? {} : { tags }),
+      ...(input.importance === undefined ? {} : { importance: input.importance }),
+      ...(input.confidence === undefined ? {} : { confidence: input.confidence }),
+      ...(input.pinned === undefined ? {} : { pinned: input.pinned }),
+      ...(input.status === undefined ? {} : { status: input.status }),
+      ...(scope === undefined ? {} : { scope }),
+      markReviewed: true,
+      actor: 'user',
+    })
+  }
+
+  /**
+   * Soft-archive or permanently delete one memory from the management UI.
+   * Permanent deletion forbids model actors and requires `confirm: true`.
+   */
+  async manageDelete(
+    input: ManageDeleteInput,
+  ): Promise<{ deleted: boolean; record: MemoryRecord | null }> {
+    await this.ensureReady()
+    if (typeof input.id !== 'string' || input.id === '') {
+      throw new OperationError('MEMORY_INVALID_CONTENT', 'memory id must be a non-empty string')
+    }
+    const id = MemoryId(input.id)
+    const current = this.store.get(id)
+    if (current === undefined) {
+      throw new OperationError('MEMORY_NOT_FOUND', `memory '${input.id}' not found`)
+    }
+    if (input.permanent === true) {
+      if (input.actor === 'model') {
+        throw new OperationError(
+          'MEMORY_FORBIDDEN',
+          'permanent delete is unavailable to model actors',
+        )
+      }
+      const actor = input.actor ?? 'user'
+      if (actor !== 'user' || input.confirm !== true) {
+        throw new OperationError(
+          'MEMORY_CONFIRM_REQUIRED',
+          'permanent delete requires a confirmed user action',
+        )
+      }
+      await this.store.delete(id, { permanent: true, actor: 'user', confirm: true })
+      return { deleted: true, record: null }
+    }
+    const record = await this.store.delete(id, { actor: 'user' })
+    return { deleted: false, record }
+  }
+
+  /** Restore one archived memory to `active` from the management UI. */
+  async manageRestore(id: string): Promise<MemoryRecord> {
+    await this.ensureReady()
+    if (typeof id !== 'string' || id === '') {
+      throw new OperationError('MEMORY_INVALID_CONTENT', 'memory id must be a non-empty string')
+    }
+    return this.store.restore(MemoryId(id), { actor: 'user' })
+  }
+
+  /** Accept or reject one pending proposal from the management UI. */
+  async manageReview(input: { id: string; action: 'accept' | 'reject' }): Promise<MemoryRecord> {
+    await this.ensureReady()
+    if (typeof input.id !== 'string' || input.id === '') {
+      throw new OperationError('MEMORY_INVALID_CONTENT', 'memory id must be a non-empty string')
+    }
+    const id = MemoryId(input.id)
+    if (input.action === 'accept') {
+      return this.store.acceptProposal(id)
+    }
+    if (input.action === 'reject') {
+      return this.store.rejectProposal(id)
+    }
+    throw new OperationError(
+      'MEMORY_INVALID_QUERY',
+      `unknown review action '${String(input.action)}'`,
+    )
+  }
+
+  /** Aggregate unique normalized workspaces from stored memories and episodes. */
+  listWorkspaces(): WorkspaceSummary[] {
+    const map = new Map<string, WorkspaceSummary>()
+    const upsert = (rawKey: string, root: string, countDelta: number, updatedAt: string): void => {
+      const key = normalizeWorkspaceKey(rawKey || root)
+      if (key === '') return
+      const existing = map.get(key)
+      if (existing === undefined) {
+        map.set(key, { key, root: root || key, memoryCount: countDelta, updatedAt })
+        return
+      }
+      existing.memoryCount += countDelta
+      if (updatedAt.localeCompare(existing.updatedAt) > 0) {
+        existing.updatedAt = updatedAt
+        if (root !== '') existing.root = root
+      }
+    }
+
+    for (const [, record] of this.domain.table('memories').entries()) {
+      if (record.scope.kind !== 'workspace') continue
+      upsert(record.scope.key, record.scope.root, 1, record.updatedAt)
+    }
+    for (const [, episode] of this.domain.table('episodes').entries()) {
+      upsert(
+        episode.workspaceKey,
+        episode.workspaceRoot,
+        0,
+        episode.processedAt ?? episode.createdAt,
+      )
+    }
+    return [...map.values()].sort(
+      (left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt) || left.key.localeCompare(right.key),
+    )
   }
 
   /** List audit entries newest-first, optionally filtered by memory, dream or workspace scope. */

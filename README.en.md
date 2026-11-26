@@ -310,18 +310,19 @@ Minimal runnable config example:
 
 ## Architecture
 
-memloom uses a dual-host layered architecture in one repository, sharing a host-agnostic core (`src/core/`) across both the DSH bundle and the Antigravity (AGY) native plugin:
+memloom uses a multi-host layered architecture in one repository, sharing a host-agnostic core (`src/core/`) across the DSH bundle, the Antigravity (AGY) native plugin, and the standalone Memloom Desktop application:
 
 - **Host (DSH)**: a single `MemoryService` registers the `memory` service and owns storage, BM25 retrieval, episode capture, dreaming, existing-memory organization, `agent/pre-step` index injection, the six model tools and the `/memory` command.
 - **Client (DSH)**: registers the Settings → Memory page and icon, and shows a small memory-usage note in the assistant action row beside token usage; the memory tools use DSH's native tool-call rows with no custom cards. It reads and writes through `ctx.remote.memory.*`, uses zh/en copy and only theme tokens for styling.
 - **AGY native plugin (`src/agy/`)**: reuses the shared core with cross-process file-locked JSON persistence (`${PLUGIN_DATA}/memory.json`), 20 tiered MCP tools, unified Hooks (`PreInvocation` / `Stop` / `PreToolUse`), and bundled Skills built into a self-contained `dist/agy-plugin/` directory.
+- **Desktop app (`src/desktop/` + `desktop/`)**: reuses the shared core, `src/agy/` file-locked storage, and `src/client/` UI components to provide dual-format persistence, DSH process concurrency write-guarding, pre-write backups, all-clients aggregate search, and cross-client migration inside a hardened Electron shell, packaged via the isolated `desktop/` workspace into a Windows `win-x64` NSIS installer `.exe`.
 - **Storage**: DSH persists through a `storageDomain` JSON domain (default `$DSH_HOME/storages/memory.json`) and AGY defaults to `${PLUGIN_DATA}/memory.json`; both share the same six-table schema (memories, episodes, dreams, audit, operation log and session cursors) and compatible export/import JSON format (legacy `dsh-memory` exports remain importable).
 - **Consistency and recovery**: there are no cross-table transactions; multi-table writes go through the `operations` state machine and recover from the operation matrix after a crash, and a single corrupted row does not block recovery of the remaining operations.
 - **Index injection**: a first baseline, then, when refresh is enabled, only `add` / `replace` / `remove` / `reset` deltas, without waking the agent.
 - **Error contract**: Host business errors map to stable `memory/*` remote failure codes, with details preserving the original `OperationError` code.
 - **Compatibility**: `engines.dsh` declares the compatible DSH version range, and `prepack` builds before packing.
 
-See [`docs/architecture.md`](docs/architecture.md), [`docs/agy.md`](docs/agy.md), [`docs/memory-model.md`](docs/memory-model.md), [`docs/dreaming.md`](docs/dreaming.md) and [`docs/security.md`](docs/security.md).
+See [`docs/architecture.md`](docs/architecture.md), [`docs/agy.md`](docs/agy.md), [`docs/desktop.md`](docs/desktop.md), [`docs/memory-model.md`](docs/memory-model.md), [`docs/dreaming.md`](docs/dreaming.md) and [`docs/security.md`](docs/security.md).
 
 ## Antigravity (AGY) support
 
@@ -333,6 +334,17 @@ Alongside the DSH bundle, this repository also builds a self-contained **Antigra
 - **Cross-host portability**: AGY isolates live storage under `${PLUGIN_DATA}/memory.json` by default (never sharing live disk files with DSH) and exchanges memories with DSH via compatible JSON export/import.
 
 See [`docs/agy.md`](docs/agy.md) (Chinese) for full setup, storage layout, tool matrix and known limitations.
+
+## Memloom Desktop (standalone desktop app)
+
+This repository also includes **Memloom Desktop**, a standalone Electron management client (also in 0.x development; currently verified as a **Windows `win-x64` NSIS installer `.exe`**, with macOS / Linux targets reserved in configuration and strictly isolated from the DSH `.tgz` bundle and AGY plugin outputs):
+
+- **Multi-client discovery & dual-format fidelity**: automatically discovers local DSH (default + profiles), AGY, and custom `memory.json` stores; losslessly round-trips both `dsh-unit` (preserving `unit` and `global` metadata) and `agy-flat` JSON envelopes while reusing `.memory.lock` for AGY writes;
+- **DSH concurrency write-guard & automatic backups**: detects running DSH processes (fail-closed on query errors), enters `readonly-dsh-running` (opening read-only with zero disk writes and no `recover()`), supports explicit risk-confirmed temporary unlock, checks pre-write disk SHA-256 against external edits, and keeps up to 20 rotated pre-write backups per DSH store;
+- **Aggregate read-only search & cross-client migration**: runs management-mode BM25 search across all enabled stores (isolating `missing` / `corrupted` / `unreadable` clients in `skippedClients`), and supports direct single/multi-select `merge` migration as well as a guided `merge`/`replace` wizard with workspace mapping and confirmation gates;
+- **Hardened Electron shell & local build**: enforces `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, and `webSecurity: true`, validates every IPC payload with `zod` and native-dialog authorized paths, and builds `dist/desktop-release/memloom-desktop-0.1.3-win-x64-setup.exe` via `pnpm run build:desktop`, `pnpm run pack:desktop:check`, and `pnpm --dir desktop install && pnpm --dir desktop run pack:win` (CI release signing uses SignPath Foundation: Free code signing provided by SignPath.io, certificate by SignPath Foundation; see [`docs/code-signing-policy.md`](docs/code-signing-policy.md)).
+
+See [`docs/desktop.md`](docs/desktop.md) (Chinese) for full build instructions, isolation boundaries and known limitations.
 
 ## FAQ
 
@@ -394,7 +406,8 @@ The repository is at **0.1.0 development (0.x)**. Implemented and test-covered c
 - the 4-tab Settings → Memory management page: header overview with index budget meter, keyword search and filter pills, centered create/detail/edit modals (tag chips, importance slider, inline unsaved confirmation, archived records hiding Archive), proposal diff/side-by-side comparison with `Save & accept` and sequential review, `Dream now` with detailed run status/cancel/undo, drag-and-drop import preview with workspace mapping, and grouped horizontal settings;
 - stable `memory/*` failure codes for the remote management API (conflict, not found, invalid content, forbidden, capacity, unavailable), which the client uses to localize messages and detect concurrent-edit conflicts;
 - `engines.dsh` declares the compatible DSH version range, `prepack` builds before packing, and CI validates the packed files;
-- Antigravity (AGY) native plugin adapter: shared host-agnostic core, cross-process file-locked JSON persistence, 20 tiered MCP tools, `PreInvocation`/`Stop`/`PreToolUse` Hooks, two-stage organization Skills, and `pnpm build:agy` / `pnpm pack:agy:check` bundle verification (see [`docs/agy.md`](docs/agy.md)).
+- Antigravity (AGY) native plugin adapter: shared host-agnostic core, cross-process file-locked JSON persistence, 20 tiered MCP tools, `PreInvocation`/`Stop`/`PreToolUse` Hooks, two-stage organization Skills, and `pnpm build:agy` / `pnpm pack:agy:check` bundle verification (see [`docs/agy.md`](docs/agy.md));
+- Memloom Desktop standalone app: dual-format `dsh-unit`/`agy-flat` storage with pre-write backups, DSH process concurrency write-guard, all-clients aggregate BM25 search, cross-client migration, hardened Electron shell, and isolated Windows `win-x64` NSIS installer `.exe` packaging via `pnpm build:desktop` / `pnpm pack:desktop:check` and `desktop/` (see [`docs/desktop.md`](docs/desktop.md)).
 
 The Settings → Memory management page, the review UI, and the in-conversation memory-usage summary (the memory tools use DSH's native tool-call rows) are all delivered. 0.1.0 remains a **0.x development version** with `autoDream=false`, `refreshIndexOnChange=false` and `autoCaptureEpisodes=true`; see [Install](#install) and [Quick start](#quick-start) above.
 

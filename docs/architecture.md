@@ -1,22 +1,25 @@
 # 架构
 
-memloom（原 `dsh-memory`）采用同仓共享内核的双宿主分层架构：由零宿主依赖的 `src/core/` 提供统一记忆引擎，分别由 `src/host/` + `src/client/` 构成 DSH bundle，并由 `src/agy/` 构成 Antigravity（AGY）原生插件。本文描述已实现并验证的内核分层、DSH Host/Client 分层、AGY 适配层、存储 schema、operations 状态机与索引注入协议。
+memloom（原 `dsh-memory`）采用同仓共享内核的多宿主分层架构：由零宿主依赖的 `src/core/` 提供统一记忆引擎，分别由 `src/host/` + `src/client/` 构成 DSH bundle，由 `src/agy/` 构成 Antigravity（AGY）原生插件，并由 `src/desktop/` + `desktop/` 构成独立桌面客户端 Memloom Desktop。本文描述已实现并验证的内核分层、DSH Host/Client 分层、AGY 与 Desktop 适配层、存储 schema、operations 状态机与索引注入协议。
 
-## 双宿主分层架构（Core / DSH / AGY）
+## 多宿主分层架构（Core / DSH / AGY / Desktop）
 
 ```text
 src/
-├── shared/   # 共享数据模型、zod schema 与基础类型（无宿主运行时绑定）
-├── core/     # 宿主无关共享记忆内核（零 @deepseek-ai/* 依赖）
-├── host/     # DSH Host 适配层（Cordis MemoryService、storageDomain、DSH 工具/命令/@Remote）
-├── client/   # DSH React 管理面板（Settings → Memory）
-└── agy/      # Antigravity（AGY）原生插件适配层（文件锁 JSON 存储、Stdio MCP Server、Hooks、Assets）
+├── shared/    # 共享数据模型、zod schema 与基础类型（无宿主运行时绑定）
+├── core/      # 宿主无关共享记忆内核（零 @deepseek-ai/* 依赖）
+├── host/      # DSH Host 适配层（Cordis MemoryService、storageDomain、DSH 工具/命令/@Remote）
+├── client/    # DSH React 管理面板（Settings → Memory；部分通用组件由 Desktop 复用）
+├── agy/       # Antigravity（AGY）原生插件适配层（文件锁 JSON 存储、Stdio MCP Server、Hooks、Assets）
+└── desktop/   # Memloom Desktop 独立桌面端适配层（双格式存储、平台抽象、写保护、多端服务、Electron 壳）
+desktop/       # 隔离的 Electron 与 electron-builder 打包工程（不进入 DSH bundle）
 ```
 
-- **共享内核（`src/core/`）**：沉淀抽象存储契约（`storage-contract.ts`）、共享配置默认值与校验（`config.ts`）、`MemoryStore`、`OperationRunner` 状态机、本地 BM25 检索、纯索引组合与折叠协议（`indexing.ts` / `index-protocol.ts`）、脱敏与容量控制、审计、导入导出、提案去重、工作日志规则，以及宿主无关的 `MemoryEngine` 门面（含两阶段 Dreaming / Organize 状态机）。
+- **共享内核（`src/core/`）**：沉淀抽象存储契约（`storage-contract.ts`）、共享配置默认值与校验（`config.ts`）、`MemoryStore`、`OperationRunner` 状态机、本地 BM25 检索（含全状态管理态索引 `ManagementSearchIndex`）、纯索引组合与折叠协议（`indexing.ts` / `index-protocol.ts`）、脱敏与容量控制、审计、导入导出、提案去重、工作日志规则，以及宿主无关的 `MemoryEngine` 门面（含只读打开 `openReadOnly()`、管理面 CRUD 与两阶段 Dreaming / Organize 状态机）。
 - **DSH 适配层（`src/host/` + `src/client/`）**：复用 `src/core/` 与 DSH `storageDomain`、会话事件、模型运行时和管理页集成，对外导出接口与 `pnpm pack` DSH bundle 清单保持向后兼容。
 - **AGY 适配层（`src/agy/`）**：复用 `src/core/`，以跨进程文件锁 JSON 存储（`${PLUGIN_DATA}/memory.json` + `.memory.lock` + 原子写入 + 读前变更重载）、零外部依赖 Stdio MCP Server（20 个分级工具）、统一 Hook CLI（`PreInvocation` / `Stop` / `PreToolUse`）与内置 Rules/Skills 构建为自包含目录 `dist/agy-plugin/`。详见 [`docs/agy.md`](agy.md)。
-- **隔离边界**：ESLint 导入规则禁止 `src/shared/`、`src/core/` 与 `src/agy/` 引入 `@deepseek-ai/*`；`pnpm pack:check` 与 `pnpm pack:agy:check` 分别校验 DSH `.tgz` bundle 与 AGY `dist/agy-plugin/` 产物边界，避免相互混入。
+- **Desktop 适配层（`src/desktop/` + `desktop/`）**：复用 `src/core/`、`src/agy/` 存储/锁与 `src/client/` UI 组件，提供 `dsh-unit` / `agy-flat` 双格式保真封装、DSH 进程并发写保护状态机（`WriteGuard`）与写前快照备份（`DshFileDomain`）、多客户端注册表与只读聚合检索、跨库直接迁移，以及基于 `contextIsolation: true` + `sandbox: true` 的 Electron Main/Preload/Renderer 壳；通过 `scripts/build-desktop.mjs` 与隔离打包目录 `desktop/` 构建为 Windows 便携 `.exe`。详见 [`docs/desktop.md`](desktop.md)。
+- **隔离边界**：ESLint 导入规则禁止 `src/shared/`、`src/core/`、`src/agy/` 与 `src/desktop/` 引入 `@deepseek-ai/*`；`tsconfig.build.json` 排除 `src/desktop/**`；`pnpm pack:check`、`pnpm pack:agy:check` 与 `pnpm pack:desktop:check` 分别校验 DSH `.tgz` bundle、AGY `dist/agy-plugin/` 与 Desktop `dist/desktop-app/` 产物边界，避免相互混入。
 
 ## Host / Client 分层（DSH）
 

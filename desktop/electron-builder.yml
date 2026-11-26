@@ -1,0 +1,43 @@
+appId: io.github.jiamingwangcn.memloom.desktop
+productName: Memloom Desktop
+copyright: Copyright (c) 2026 Memloom Contributors (MIT)
+asar: true
+directories:
+  app: ../dist/desktop-app
+  output: ../dist/desktop-release
+files:
+  - '**/*'
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: ../dist/desktop-app/assets/icon.ico
+nsis:
+  script: ./resources/installer.nsi
+  installerLanguages:
+    - zh_CN
+    - en_US
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Memloom Desktop
+  installerIcon: ../dist/desktop-app/assets/icon.ico
+  uninstallerIcon: ../dist/desktop-app/assets/icon.ico
+  installerHeaderIcon: ../dist/desktop-app/assets/icon.ico
+  deleteAppDataOnUninstall: false
+  artifactName: memloom-desktop-${version}-win-${arch}-setup.exe
+
+# Future cross-platform targets (reserved; Windows win-x64 NSIS installer is verified in 0.x):
+# mac:
+#   target:
+#     - dmg
+#     - zip
+#   category: public.app-category.developer-tools
+# linux:
+#   target:
+#     - AppImage
+#     - tar.gz
+#   category: Development

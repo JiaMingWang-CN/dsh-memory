@@ -23,7 +23,13 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/shared/**/*.ts', 'src/core/**/*.ts', 'src/agy/**/*.ts'],
+    files: [
+      'src/shared/**/*.ts',
+      'src/core/**/*.ts',
+      'src/agy/**/*.ts',
+      'src/desktop/**/*.ts',
+      'src/desktop/**/*.tsx',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',

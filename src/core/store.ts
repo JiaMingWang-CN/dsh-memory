@@ -324,6 +324,14 @@ export class MemoryStore {
     })
   }
 
+  /**
+   * Open the store for read-only access without running startup recovery or
+   * producing any domain write I/O.
+   */
+  openReadOnly(): void {
+    this.ready = true
+  }
+
   /** Stop accepting new writes; in-flight work remains on the queue for {@link flush}. */
   stop(): void {
     this.stopped = true

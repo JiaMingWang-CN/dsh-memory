@@ -13,19 +13,30 @@ import { foldIndexSources, planIndexRefresh } from '../../src/core/index-protoco
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 
-function listTsFiles(dir: string): string[] {
+function listFilesByExt(dir: string, extensions: readonly string[]): string[] {
   const out: string[] = []
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name)
-    if (entry.isDirectory()) out.push(...listTsFiles(full))
-    else if (entry.name.endsWith('.ts')) out.push(full)
+    if (entry.isDirectory()) out.push(...listFilesByExt(full, extensions))
+    else if (extensions.some((ext) => entry.name.endsWith(ext))) out.push(full)
   }
   return out
 }
 
 describe('core isolation and contract parity', () => {
   it('forbids @deepseek-ai imports inside src/shared and src/core', () => {
-    const files = [...listTsFiles(join(root, 'src/shared')), ...listTsFiles(join(root, 'src/core'))]
+    const files = [
+      ...listFilesByExt(join(root, 'src/shared'), ['.ts']),
+      ...listFilesByExt(join(root, 'src/core'), ['.ts']),
+    ]
+    expect(files.length).toBeGreaterThan(10)
+    for (const file of files) {
+      expect(readFileSync(file, 'utf8'), file).not.toMatch(/@deepseek-ai\//)
+    }
+  })
+
+  it('forbids @deepseek-ai imports inside src/desktop', () => {
+    const files = listFilesByExt(join(root, 'src/desktop'), ['.ts', '.tsx'])
     expect(files.length).toBeGreaterThan(10)
     for (const file of files) {
       expect(readFileSync(file, 'utf8'), file).not.toMatch(/@deepseek-ai\//)

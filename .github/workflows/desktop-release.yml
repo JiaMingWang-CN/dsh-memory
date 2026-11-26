@@ -1,0 +1,129 @@
+name: Desktop Release (SignPath)
+
+on:
+  workflow_dispatch:
+    inputs:
+      signing_policy:
+        description: SignPath signing policy slug
+        required: false
+        default: release-signing
+        type: string
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build-and-sign:
+    name: Build & Sign Windows Installer (x64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: pnpm
+
+      - name: Verify SignPath secrets
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:SIGNPATH_API_TOKEN) -or [string]::IsNullOrWhiteSpace($env:SIGNPATH_ORGANIZATION_ID)) {
+            Write-Error "Missing SignPath configuration: configure repository secrets SIGNPATH_API_TOKEN and SIGNPATH_ORGANIZATION_ID (see docs/desktop.md and docs/code-signing-policy.md)."
+            exit 1
+          }
+
+      - name: Install root dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and verify desktop payload
+        run: pnpm run build:desktop && pnpm run pack:desktop:check
+
+      - name: Install isolated desktop packager dependencies
+        run: pnpm --dir desktop install --frozen-lockfile
+
+      - name: Build unpacked Windows application
+        run: pnpm --dir desktop run pack:win:dir
+
+      - name: Upload unsigned main executable
+        id: upload-unsigned-exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: memloom-desktop-unsigned-exe
+          path: dist/desktop-release/win-unpacked/Memloom Desktop.exe
+          if-no-files-found: error
+
+      - name: Sign main executable via SignPath
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'memloom' }}
+          signing-policy-slug: ${{ inputs.signing_policy || vars.SIGNPATH_SIGNING_POLICY || 'release-signing' }}
+          github-artifact-id: ${{ steps.upload-unsigned-exe.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist/signed-exe
+
+      - name: Replace unpacked executable with signed binary
+        shell: pwsh
+        run: |
+          $signedExe = Get-ChildItem -Path "dist/signed-exe" -Filter "Memloom Desktop.exe" -Recurse | Select-Object -First 1
+          if (-not $signedExe) {
+            Write-Error "Signed Memloom Desktop.exe was not found in dist/signed-exe"
+            exit 1
+          }
+          Copy-Item -Path $signedExe.FullName -Destination "dist/desktop-release/win-unpacked/Memloom Desktop.exe" -Force
+
+      - name: Build NSIS installer from signed unpacked directory
+        run: pnpm --dir desktop run pack:win:from-dir
+
+      - name: Upload unsigned NSIS installer
+        id: upload-unsigned-installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: memloom-desktop-unsigned-installer
+          path: dist/desktop-release/memloom-desktop-*-win-x64-setup.exe
+          if-no-files-found: error
+
+      - name: Sign NSIS installer via SignPath
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'memloom' }}
+          signing-policy-slug: ${{ inputs.signing_policy || vars.SIGNPATH_SIGNING_POLICY || 'release-signing' }}
+          github-artifact-id: ${{ steps.upload-unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist/signed-installer
+
+      - name: Upload signed installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: memloom-desktop-signed-installer
+          path: dist/signed-installer/*.exe
+          if-no-files-found: error
+
+      - name: Attach signed installer to GitHub Release
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $files = Get-ChildItem -Path "dist/signed-installer" -Filter "*.exe" -Recurse | ForEach-Object { $_.FullName }
+          if (-not $files) {
+            Write-Error "No signed installer found to upload to release."
+            exit 1
+          }
+          gh release upload "${{ github.event.release.tag_name }}" @files --clobber
