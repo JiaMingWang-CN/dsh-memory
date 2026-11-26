@@ -8,7 +8,7 @@
 
 ### The next session should not start from zero.
 
-**Local-first long-term experience memory for coding agents (DSH & Antigravity), formerly `dsh-memory`.**
+**Local-first long-term experience memory for coding agents (Antigravity & DSH): shared memory core, native plugins, and standalone desktop app — formerly `dsh-memory`.**
 
 Remember the projects you worked on, the pitfalls you hit, the rules you settled on, and your preferences.<br>
 Recall them when needed; stay quiet when not.
@@ -16,14 +16,14 @@ Recall them when needed; stay quiet when not.
 [Overview](#overview) · [Use cases](#use-cases) · [How it works](#how-it-works) · [Management](#management) · [Privacy and security](#privacy-and-security) · [Install](#install) · [Configuration](#configuration) · [Architecture](#architecture) · [FAQ](#faq) · [Release notes](#release-notes)
 
 [![Status](https://img.shields.io/badge/status-0.2.0--dev-blue)](#development-progress)
-[![Distribution](https://img.shields.io/badge/distribution-GitHub%20Plugin-black)](#install)
+[![Distribution](https://img.shields.io/badge/distribution-GitHub%20Releases-black)](#install)
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![Local first](https://img.shields.io/badge/data-local--first-brightgreen)](#privacy-and-security)
 
 </div>
 
 > [!NOTE]
-> **Currently at `0.1.0` development (0.x), distributed exclusively as a GitHub plugin via GitHub Releases — not published to npm.**
+> **Currently at `0.2.0` development (0.x), distributed exclusively via GitHub Releases (Antigravity native plugin, DSH bundle, and Memloom Desktop app) — not published to npm.**
 >
 > This document tracks the implemented capabilities in this repository. Before a stable release, interfaces, configuration and behavior may still change. See [`CHANGELOG.md`](CHANGELOG.md) for detailed changes.
 
@@ -41,17 +41,17 @@ Recall them when needed; stay quiet when not.
 
 ## Overview
 
-Every new session can start from zero: re-learning the project, re-asking conventions, and sometimes repeating a mistake that was already corrected.
+Every new session can start from zero: re-learning the project, re-asking conventions, and sometimes repeating a mistake that was already corrected. Experience is also easily fragmented across different coding-agent tools.
 
-**memloom (formerly `dsh-memory`) wants experience to carry across sessions.**
+**memloom (formerly `dsh-memory`) wants experience to carry across sessions and hosts.**
 
-It is not another full chat transcript and it does not stuff all history into context. It is an experience-memory system designed around the lifecycle of coding agents (DSH and Antigravity):
+It is not another full chat transcript and it does not stuff all history into context. It is a multi-host experience-memory system built on a host-agnostic shared core (`src/core/`), supporting **Antigravity (AGY)**, **DSH (DeepSeek Harness)**, and **Memloom Desktop** on equal footing:
 
 - **Remember corrections**: a pitfall becomes a reusable lesson.
 - **Remember work**: know what was done, where it stopped, and what it produced.
 - **Remember projects**: turn scattered architecture conventions, commands and decisions into project knowledge.
 - **Remember you**: keep a small set of genuinely long-lived cross-project preferences.
-- **Leave control to you**: inspect sources, review proposals, edit content, forget or permanently delete.
+- **Leave control to you**: search across hosts, inspect sources, review proposals, migrate between AGY and DSH, edit, forget, or permanently delete.
 
 <div align="center">
 
@@ -79,9 +79,9 @@ Through worklogs, project knowledge and source sessions, memloom will help the a
 
 Conventions, common commands, key decisions and known pitfalls that recur across sessions can be consolidated by Dreaming into maintainable project wiki entries. Every piece of knowledge has a source, can be replaced when stale, and can be corrected when wrong.
 
-### Make preferences work across projects
+### Make preferences work across projects and hosts
 
-Long-lived preferences such as "reply in Chinese" or "never auto-commit" can be explicitly written as global memories; project-specific technical rules stay in their own workspaces and do not pollute each other.
+Long-lived preferences such as "reply in Chinese" or "never auto-commit" can be explicitly written as global memories; project-specific technical rules stay in their own workspaces and do not pollute each other, and can be moved losslessly between AGY and DSH via **Memloom Desktop**.
 
 ## Four kinds of memory
 
@@ -98,7 +98,7 @@ Not every turn deserves to become a memory. Small talk, repeated retrieval and t
 
 ### 1. Capture at the right moment, not the whole conversation
 
-memloom is designed to listen for signals worth preserving:
+memloom listens across hosts for signals worth preserving:
 
 - the user explicitly corrects a mistake;
 - a tool fails and a working approach is found for the same target;
@@ -112,16 +112,16 @@ A qualifying turn (file change, delivery, user correction or explicit completion
 
 ### 2. Dreaming: turn fragments into experience
 
-Dreaming is an offline memory-organization process: it reads redacted Episodes, combines them with existing memories, distills Lessons, Worklogs and Wikis, and handles duplicates and stale content.
+Dreaming is an offline memory-organization process: it reads redacted Episodes, combines them with existing memories, distills Lessons, Worklogs and Wikis, and handles duplicates and stale content (AGY runs via two-stage `prepare`/`commit` tools paired with built-in Skills; DSH runs via a background queue using the configured or session model).
 
-The first complete release plans to be **human-first** by default:
+The default strategy is **human-first**:
 
 - automatic capture on;
 - automatic Dreaming off by default, with manual runs available;
 - all Dreaming-generated knowledge and logs start as `pending`;
 - only acceptance, or acceptance after editing, moves them to searchable `active`;
 - explicit `memory_write` content takes effect directly;
-- Dreaming can follow the current session model or use a chosen model and reasoning effort.
+- in DSH, Dreaming can follow the current session model or use a chosen model and reasoning effort; in AGY, no external LLM API key is required.
 
 High confidence is not truth. The model does not bypass review because it feels certain.
 
@@ -129,7 +129,7 @@ Implemented reliability behavior for Dreaming:
 
 - **Startup recovery and cold-session reconciliation**: after a process restart, persisted `queued` dreams resume with their original dream id; a dream interrupted while running is marked failed, its claimed episodes return to the retryable queue, and duplicate proposals are not generated. When `autoDream` is enabled, startup also reconciles cold sessions from the last 7 days to capture missed session events; with `autoDream=false` it neither reads cold sessions nor calls a model for this purpose.
 - **Failure classification, backoff and pause**: authentication and quota errors pause automatic dreaming immediately; rate-limit, timeout and network errors back off for 60 seconds, then 180 seconds, and pause after three consecutive failures. Pause and backoff are process-local and reset on restart; manual dreams are never blocked, and a successful manual dream clears the pause.
-- **Health checks and evidence grading**: before each dream that calls the model, pending episodes, duplicate tool failures, pending proposals, duplicate titles and missing daily worklogs are computed locally and supplied to the model as hints. The model uses only facts supported by the episodes: content the user stated counts as evidence and cites the episode id; assistant claims without tool or user support are marked unverified or omitted; one memory covers one topic, and only what the environment cannot give back is recorded (lessons, approaches that worked, verified rules, pitfalls and plans in progress) — not code, file contents, current configuration values, git history or command output.
+- **Health checks and evidence grading**: before organizing, pending episodes, duplicate tool failures, pending proposals, duplicate titles and missing daily worklogs are computed locally and supplied to the model as hints. The model uses only facts supported by the episodes: content the user stated counts as evidence and cites the episode id; assistant claims without tool or user support are marked unverified or omitted; one memory covers one topic, and only what the environment cannot give back is recorded (lessons, approaches that worked, verified rules, pitfalls and plans in progress) — not code, file contents, current configuration values, git history or command output.
 
 ### 3. A new session carries only a small, relevant slice of experience
 
@@ -154,39 +154,47 @@ When details are needed, the agent drills down through search and read: **index 
 
 In the optional in-session refresh mode, adds, edits, archives and expirations are synchronized through deltas or a new baseline; historical messages are never rewritten, and invalidated memories are clearly marked as no longer dependable.
 
-Refresh is merged only before a later real model request and never wakes the agent just because memory changed. After restart, resume or compaction, index state is rebuilt from durable messages in the session rather than a volatile in-memory cache.
+Refresh is merged only before a later real model request and never wakes the agent just because memory changed. After restart, resume or compaction, index state is rebuilt from durable session state rather than a volatile in-memory cache.
 
 ## Management
 
-### Settings → Memory
+`0.2.0` provides three complementary management surfaces covering cross-host desktop orchestration, in-host UI, and conversational workflows:
 
-The management page uses a **unified header + four focused tabs** (`Memories`, `Review`, `Import & Export`, `Settings`) and provides the following (0.1.0 development version):
+### 1. Memloom Desktop (standalone cross-host workbench)
 
-- **Header overview and navigation**: switch workspaces, click active/pending/archived counters to jump directly, monitor the current workspace's index budget meter, and access fixed `New memory`, `Dream now` and `Refresh` actions;
-- **Memories (search and filter)**: server-side keyword search across title, body and tags, segmented type/status filter pills, inline user tags and conditional paging;
-- **Centered modals for create, detail and edit**: pinned footers, tag chips, synchronized importance slider, one-click body/source copying, and inline unsaved-change confirmation; archived records show only Restore and hide Archive;
-- **Review and dreaming**: top status card showing the latest run's model, processed episodes and output counts with cancel/undo actions; proposal modal with **line-level diff / side-by-side / proposed-only** views, one-step `Save & accept`, and previous/next sequential review;
-- **Import and export**: separated Export and drag-and-drop Import cards with parsed file summary preview (memories, episodes, workspaces, exported timestamp), per-workspace mapping and structured import reports;
-- **Grouped settings**: four horizontal setting groups (`Automatic dreaming`, `Index & injection`, `Retention`, `Privacy & security`) with second-based idle wait and interval inputs, an opt-in `Auto-accept proposals` switch (off by default, keeps `derived` ownership and remains undoable by run), live KB budget conversion, unsaved-change indicator and discard action.
+A dedicated Electron application for **Antigravity (AGY)** and **DSH** on equal footing (featuring the `--ml-*` floating-island paper-and-ink design system, zero native form controls, light/dark/system themes, and zh/en locales; see [`docs/desktop.md`](docs/desktop.md)):
 
-Permanent deletion, full purge and full rebuild remain available only through the Host management API, require explicit confirmation parameters, and are not exposed in the 0.1.0 page.
+- **Memories**: federated BM25 search across all enabled hosts plus single-host master-detail CRUD, draft-protected editor modals with `desktop/external-change` conflict recovery, Markdown inspection, and floating batch bars;
+- **Review Inbox**: aggregates `pending` proposals across hosts with `supersedes` version comparison and `A` / `E` / `R` shortcuts;
+- **Cross-host Migration**: Loom Weft Bridge connecting AGY ⇄ DSH for single/multi-select `merge` or a 3-step `replace` wizard with workspace mapping and non-skippable confirmation gates;
+- **Dreams & Audit**: inspect `DreamRun` history with per-run undo and the immutable `AuditRecord` diff timeline;
+- **Host Config & WriteGuard**: edit all 23 AGY configuration fields with backup/rebuild/purge confirmation modals, manage DSH runtime concurrency read-only protection (`WriteGuard`) with SHA-256 pre-write checks and 20 rotated backups, and jump anywhere via `Ctrl/⌘K`.
 
-By default only the current workspace and global preferences are shown. Other projects' memories appear only after explicitly switching to "all accessible workspaces".
+### 2. DSH Settings → Memory (built-in 4-tab management page)
 
-In conversation, the memory tools keep DSH's native tool-call rows (matching `memory_read`), and a small note beside the token usage and time displays only non-zero cumulative counts of memories injected, written and searched in this session.
+Inside DSH, provides a **unified header + four focused tabs** (`Memories`, `Review`, `Import & Export`, `Settings`):
+
+- **Header overview & actions**: switch workspaces, jump via active/pending/archived counts, inspect the workspace index-budget meter, and access fixed `New memory`, `Dream now` and `Refresh` actions;
+- **Memories, review & import/export**: server-side keyword search, segmented filter pills, centered create/detail/edit modals, line-level diff / side-by-side proposal review with `Save & accept` and dream undo, drag-and-drop import preview with workspace mapping, and grouped horizontal settings (permanent deletion, full purge and full rebuild stay behind confirmed Host APIs);
+- **In-conversation indicator**: memory tools use DSH's native tool-call rows, and a small note beside token usage shows non-zero cumulative counts of memories injected, written and searched in the current session.
+
+### 3. Antigravity (AGY) built-in Skills & MCP management tools
+
+- **Conversational workflows**: ships bundled `memory`, `memory-dream`, and `memory-review` Skills to search, run two-stage Dream/Organize consolidation, and review pending proposals interactively;
+- **Confirmation gate**: sensitive tools (`scope: 'all'`, cross-workspace writes, export/import, undoDream, rebuild/purge) are gated by `PreToolUse` `force_ask` host confirmation (see [`docs/agy.md`](docs/agy.md)).
 
 ## Privacy and security
 
 **Memory should belong to you, not become an invisible black box.**
 
-- **Local first**: memory data is persisted locally under `$DSH_HOME` by default; there is no cloud account and no default cross-device sync. If an external model service performs Dreaming, the content sent depends on that model service.
-- **Redact before saving**: common secrets, tokens, passwords and inline `.env` values are redacted; the design does not save the original first and clean it later. An explicit `memory_write` that contains a private key, a common cloud API key, a GitHub/Slack token or another strong secret shape is refused with a hint to record where the credential is configured; capture, dream and import paths still replace and save under the redaction rules. `redactSecrets=false` only disables redaction for explicit writes, dreams and imports; capture and worklog text are always redacted.
-- **Workspace isolation**: project memories are filtered by normalized workspace identity, and the global layer allows user preferences only. A replacement import requires a mapping for every workspace in the file; if one is missing, the whole replacement is rejected.
+- **Local first**: memory data stays completely local on disk (AGY defaults to `${PLUGIN_DATA}/memory.json`, DSH defaults to `$DSH_HOME/storages/memory.json`); there is no cloud account and no default cross-device sync. If an external model service performs Dreaming, the content sent depends on that model service.
+- **Redact before saving**: common secrets, tokens, passwords and inline `.env` values are redacted before persistence. An explicit `memory_write` containing a private key, common cloud API key, GitHub/Slack token or another strong secret shape is refused with a hint pointing to credential configuration; capture, dream and import paths still replace and save under redaction rules. `redactSecrets=false` only disables redaction for explicit writes, dreams and imports; capture and worklog text are always redacted.
+- **Workspace isolation**: project memories are filtered by normalized workspace identity (including AGY `PreToolUse` host nonce verification, MCP `roots/list`, and strict global-only degradation), and the global layer allows user preferences only. Replacement import requires a mapping for every workspace in the file.
 - **Untrusted content**: memory bodies and source references are background knowledge, never system instructions; persistence and injection also include safety escaping.
-- **No full conversation copies**: the DSH session log remains the source of session facts; the memory store keeps distilled knowledge and necessary references.
+- **No full conversation copies**: host session logs (DSH session logs and AGY `transcript.jsonl`) remain the source of session facts; memory stores keep only distilled knowledge and necessary references.
 - **Bounded capacity**: hard limits reject new records with an alert instead of silently dropping data. When `active` records overflow, only unreviewed derived records are archived automatically; user-owned and pinned records are protected.
 - **User ownership**: memories created, edited, imported, accepted or restored by the user are protected from derived-cache rebuild cleanup.
-- **Dangerous operations need confirmation**: permanent deletion, full purge, full rebuild, replacement import, scope expansion or disabling safety protections still require explicit user confirmation; export files contain personal memories, and the management page reminds you to store them safely.
+- **Dangerous operations need confirmation**: permanent deletion, full purge, full rebuild, replacement import, scope expansion or disabling safety protections require explicit confirmation across Memloom Desktop modals, AGY `force_ask` gates, or confirmed Host APIs.
 
 ## Traceable, recoverable, undoable
 
@@ -195,7 +203,7 @@ Long-term memory must remain trustworthy under failure, not just writable.
 memloom stores structured records, Markdown bodies and a local retrieval index, coordinating multi-step writes through an operation log:
 
 - every business change keeps structured before/after snapshots and the actor;
-- business revision numbers prevent overwriting later user edits;
+- business revision numbers (`contentRevision`) prevent overwriting later user edits;
 - interrupted operations recover according to their persisted state after a process crash;
 - accepting a replacement proposal never leaves old and new versions active simultaneously;
 - Dreaming runs can be undone; entries edited by the user afterwards are skipped and reported;
@@ -205,20 +213,21 @@ memloom stores structured records, Markdown bodies and a local retrieval index, 
 
 ## Tools and commands
 
-### Agent tools
+### Core model tools (shared across AGY & DSH)
 
 | Tool | Intended use |
 | --- | --- |
-| `memory_search` | Search summaries by keyword, type and scope |
+| `memory_search` | Search summaries by keyword, type and scope (omit `query` to list top active summaries) |
 | `memory_read` | Read the full body and sources of a recallable memory, recording actual use |
-| `memory_write` | Explicitly create or update a memory; takes effect directly, and the tool description states when to write and when not to |
+| `memory_write` | Explicitly create or update a memory; takes effect directly, with "when to write / not write" rules |
 | `memory_forget` | Soft forget; models cannot delete permanently |
-| `memory_dream` | Manually start a dream run over the episode queue |
+| `memory_dream` | Manually start a dream run (DSH) or inspect pending dream queue |
 | `memory_organize` | Manually consolidate existing active memories into merge/replacement proposals |
 
-### User commands
+### Host-specific surfaces
 
-The plugin provides `/memory status`, `/memory search`, `/memory dream`, `/memory organize`, `/memory forget` and `/memory export` for status, retrieval, episode queue organization, existing-memory organization, forgetting and export summaries. Full JSON export is done in Settings → Memory.
+- **Antigravity (AGY)**: zero-dependency Stdio MCP server exposing **12 regular tools + 8 sensitive management tools** (including `memory_dream_prepare` / `memory_dream_commit`, `memory_organize_prepare` / `memory_organize_commit`, review, and undo), paired with `PreInvocation`, `Stop`, and `PreToolUse` Hooks plus `memory`, `memory-dream`, and `memory-review` Skills (see [`docs/agy.md`](docs/agy.md)).
+- **DSH**: `/memory status`, `/memory search`, `/memory dream`, `/memory organize`, `/memory forget`, and `/memory export` commands (`export` returns a summary; full JSON export lives in Settings → Memory or Memloom Desktop).
 
 ## Defaults
 
@@ -235,47 +244,56 @@ The long-term direction is to add shadow runs, limited autonomy and ordinary una
 
 ## Install
 
-> memloom is **distributed exclusively as a GitHub plugin (via this GitHub repository and GitHub Releases) and is not published to npm**. `0.1.0` remains a 0.x development version.
+> memloom is **distributed exclusively via this GitHub repository and GitHub Releases (not published to npm)**. `0.2.0` remains a 0.x development release.
 
-**Requirements**
+**Common requirement**: Node.js `>=24.9.0` (`pnpm` is only needed when building from source). Download prebuilt artifacts from [GitHub Releases v0.2.0](https://github.com/JiaMingWang-CN/memloom/releases/tag/v0.2.0) or build each target independently:
 
-- A locally installed DSH `0.2.2-rc.5` (the `engines.dsh` field in `package.json` declares the compatible range `^0.2.2-rc.5`), or Antigravity (AGY) native plugin support
-- Node.js `>=24.9.0`
-- pnpm (only required when building from source)
+### Option A: Antigravity (AGY) native plugin
 
-**Option 1: Install from a GitHub Release (recommended)**
+- **From Release (recommended)**: download [`memloom-agy-plugin-0.2.0.zip`](https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.0/memloom-agy-plugin-0.2.0.zip), extract to `~/.gemini/config/plugins/memloom`, and reference it in `plugins.json` (zero runtime `node_modules` dependencies; requires only local Node.js).
+- **From source**:
+  ```bash
+  git clone https://github.com/JiaMingWang-CN/memloom.git
+  cd memloom && pnpm install
+  pnpm build:agy && pnpm pack:agy:check   # builds & validates dist/agy-plugin/
+  ```
 
-Once a GitHub Release is published, install its prebuilt `.tgz` bundle asset directly via the DSH CLI without building locally:
+### Option B: DSH (DeepSeek Harness) bundle
 
-```bash
-dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.0/memloom-0.2.0.tgz
-```
+Requires locally installed DSH `0.2.2-rc.5` (`engines.dsh` declares `^0.2.2-rc.5`):
 
-You can also download `memloom-0.2.0.tgz` from GitHub Releases and install it from the DSH Plugins page.
+- **From Release (recommended)**:
+  ```bash
+  dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.0/memloom-0.2.0.tgz
+  ```
+  You can also download `memloom-0.2.0.tgz` and install it from the DSH Plugins page, then restart DSH.
+- **From source**:
+  ```bash
+  pnpm build          # produces dist/host and dist/client.js
+  dsh plugin --profile desktop add link:./
+  # or run `pnpm pack` to produce memloom-0.2.0.tgz
+  ```
+  See [`examples/cordis.patch.yml`](examples/cordis.patch.yml) for a minimal patch config, and `dsh plugin --profile desktop remove memloom` to uninstall.
 
-**Option 2: Build from GitHub source and install locally**
+### Option C: Memloom Desktop (standalone app)
 
-```bash
-git clone https://github.com/JiaMingWang-CN/memloom.git
-cd memloom
-pnpm install
-pnpm build          # produces dist/host and dist/client.js
+- **Windows `win-x64` installer**: download and run [`memloom-desktop-0.2.0-win-x64-setup.exe`](https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.0/memloom-desktop-0.2.0-win-x64-setup.exe) to discover and manage both local AGY and DSH stores side by side.
+- **Local browser-app mode / build from source**:
+  ```bash
+  pnpm run start:desktop   # launches via signed local Node.js + Edge app window (shares desktop-state.json)
+  # or build Electron payload and Windows NSIS installer:
+  pnpm run build:desktop && pnpm run pack:desktop:check
+  pnpm --dir desktop install && pnpm --dir desktop run pack:win
+  ```
 
-# Approach A: local link install (recommended for development; rebuild + restart DSH to reload)
-dsh plugin --profile desktop add link:./
-
-# Approach B: pack into a local bundle tarball
-pnpm pack           # produces memloom-0.2.0.tgz
-```
-
-Installing or enabling changes your profile; restart DSH afterwards and Memory will appear under Settings with its icon. See [`examples/cordis.patch.yml`](examples/cordis.patch.yml) for a minimal patch config. To remove the plugin, run `dsh plugin --profile desktop remove memloom` (your memories remain safely stored in `$DSH_HOME/storages/memory.json`).
+See [`docs/agy.md`](docs/agy.md) and [`docs/desktop.md`](docs/desktop.md) for full details.
 
 ## Quick start
 
-1. **Write a memory**: in a new session, ask the agent to remember something (it calls `memory_write`), or create one in Settings → Memory. Explicit writes take effect directly.
+1. **Write a memory**: in a new AGY or DSH session, ask the agent to remember something (it calls `memory_write`), or create one in **Memloom Desktop** / Settings → Memory. Explicit writes take effect directly.
 2. **Recall in a new session**: memloom injects a small memory index before the first request of a new session; the agent can also call `memory_search` for summaries and `memory_read` for the full body and sources.
-3. **Organize and review**: run `/memory dream`, or click `Dream now` in Settings → Memory. Results first enter "pending review" and become searchable long-term memories only after you accept or edit-before-accept.
-4. **Forget**: use `memory_forget` or the management page for a soft forget; the memory stops being recalled and can be restored later.
+3. **Organize and review**: use the `memory-dream` / `memory-review` Skills in AGY, `/memory dream` or `Dream now` in DSH, or the cross-host **Review Inbox** in **Memloom Desktop**; generated records start `pending` and become searchable only after acceptance or edit-before-accept.
+4. **Forget & migrate**: use `memory_forget` to soft-forget (restorable later), or transfer memories between AGY and DSH via **Memloom Desktop**.
 
 A typical loop:
 
@@ -289,7 +307,7 @@ A typical loop:
 
 ## Configuration
 
-Defaults match `src/host/config.ts` field by field; see [`docs/configuration.md`](docs/configuration.md) for every field. Key 0.1.0 defaults:
+Canonical defaults live in [`src/core/config.ts`](src/core/config.ts); see [`docs/configuration.md`](docs/configuration.md) for every field. Key `0.2.0` defaults:
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -300,7 +318,7 @@ Defaults match `src/host/config.ts` field by field; see [`docs/configuration.md`
 | `redactSecrets` | `true` | Redact secrets before persistence. |
 | `injectForSubagents` | `false` | Do not repeat fixed context for every subtask by default. |
 
-Minimal runnable config example:
+In AGY, edit `${PLUGIN_DATA}/config.json` or use the **Host Config** workbench in **Memloom Desktop**; in DSH, override via your profile patch YAML:
 
 ```yaml
 - insert:
@@ -314,111 +332,74 @@ Minimal runnable config example:
 
 ## Architecture
 
-memloom uses a multi-host layered architecture in one repository, sharing a host-agnostic core (`src/core/`) across the DSH bundle, the Antigravity (AGY) native plugin, and the standalone Memloom Desktop application:
+memloom uses a multi-host layered architecture in one repository, sharing a host-agnostic core (`src/core/` + `src/shared/`) across the AGY native plugin, the DSH bundle, and Memloom Desktop:
 
-- **Host (DSH)**: a single `MemoryService` registers the `memory` service and owns storage, BM25 retrieval, episode capture, dreaming, existing-memory organization, `agent/pre-step` index injection, the six model tools and the `/memory` command.
-- **Client (DSH)**: registers the Settings → Memory page and icon, and shows a small memory-usage note in the assistant action row beside token usage; the memory tools use DSH's native tool-call rows with no custom cards. It reads and writes through `ctx.remote.memory.*`, uses zh/en copy and only theme tokens for styling.
-- **AGY native plugin (`src/agy/`)**: reuses the shared core with cross-process file-locked JSON persistence (`${PLUGIN_DATA}/memory.json`), 20 tiered MCP tools, unified Hooks (`PreInvocation` / `Stop` / `PreToolUse`), and bundled Skills built into a self-contained `dist/agy-plugin/` directory.
-- **Desktop app (`src/desktop/` + `desktop/`)**: reuses the shared core and `src/agy/` file-locked storage with a dedicated desktop design system (`--ml-*` dual-theme floating-island workbench, custom precision controls, and official DSH / AGY host badges), dual-format persistence, DSH process concurrency write-guarding, pre-write backups, all-clients aggregate search, and cross-client migration inside a hardened Electron shell, packaged via the isolated `desktop/` workspace into a Windows `win-x64` NSIS installer `.exe`.
-- **Storage**: DSH persists through a `storageDomain` JSON domain (default `$DSH_HOME/storages/memory.json`) and AGY defaults to `${PLUGIN_DATA}/memory.json`; both share the same six-table schema (memories, episodes, dreams, audit, operation log and session cursors) and compatible export/import JSON format (legacy `dsh-memory` exports remain importable).
-- **Consistency and recovery**: there are no cross-table transactions; multi-table writes go through the `operations` state machine and recover from the operation matrix after a crash, and a single corrupted row does not block recovery of the remaining operations.
-- **Index injection**: a first baseline, then, when refresh is enabled, only `add` / `replace` / `remove` / `reset` deltas, without waking the agent.
-- **Error contract**: Host business errors map to stable `memory/*` remote failure codes, with details preserving the original `OperationError` code.
-- **Compatibility**: `engines.dsh` declares the compatible DSH version range, and `prepack` builds before packing.
+- **Shared core (`src/core/` + `src/shared/`)**: owns the six-table schema (memories, episodes, dreams, audit, operation log, session cursors), BM25 search, operation-log crash recovery, capacity and redaction policies, export/import, and two-stage Dream/Organize execution.
+- **AGY native plugin (`src/agy/`)**: pairs the shared core with cross-process `.memory.lock` JSON persistence (`${PLUGIN_DATA}/memory.json`), 20 tiered MCP tools, `PreInvocation` / `Stop` / `PreToolUse` Hooks, and bundled Skills in a self-contained `dist/agy-plugin/`.
+- **DSH plugin (`src/host/` + `src/client/`)**: registers the `memory` service via a single `MemoryService` (`storageDomain`, default `$DSH_HOME/storages/memory.json`), six model tools, `/memory` commands, and the Settings → Memory UI (`ctx.remote.memory.*`).
+- **Memloom Desktop (`src/desktop/` + `desktop/`)**: features an independent `--ml-*` floating-island UI with official DSH/AGY host icons, lossless dual-envelope serialization (`dsh-unit` & `agy-flat`), DSH runtime `WriteGuard` concurrency protection, automatic pre-write backups, federated search, and cross-host migration.
+- **Consistency & compatibility**: multi-table mutations coordinate via the `operations` state machine and `contentRevision` optimistic concurrency; legacy `dsh-memory` export JSON remains importable.
 
 See [`docs/architecture.md`](docs/architecture.md), [`docs/agy.md`](docs/agy.md), [`docs/desktop.md`](docs/desktop.md), [`docs/memory-model.md`](docs/memory-model.md), [`docs/dreaming.md`](docs/dreaming.md) and [`docs/security.md`](docs/security.md).
 
-## Antigravity (AGY) support
-
-Alongside the DSH bundle, this repository also builds a self-contained **Antigravity (AGY) native plugin** (also in 0.x development, kept separate from the DSH `.tgz` package):
-
-- **Self-contained build**: run `pnpm build:agy` and `pnpm pack:agy:check` to build and validate `dist/agy-plugin/` with zero runtime `node_modules` dependencies (requires only local Node.js `>=24.9.0`), then copy it to `~/.gemini/config/plugins/memloom` or reference it from `plugins.json`;
-- **Tiered MCP tools and confirmation gate**: exposes 12 regular tools and 8 sensitive management tools over a Stdio MCP server; sensitive tools as well as cross-workspace, `scope: 'all'` and file-writing export calls are gated by `PreToolUse` `force_ask` confirmation;
-- **Hooks and two-stage organization**: `PreInvocation` handles first-turn baseline injection with fast-skip on subsequent turns, `Stop` incrementally captures whitelisted fragments from `transcript.jsonl`, and `prepare` / `commit` tools pair with bundled Skills (`memory`, `memory-dream`, `memory-review`) without requiring an external LLM API key;
-- **Cross-host portability**: AGY isolates live storage under `${PLUGIN_DATA}/memory.json` by default (never sharing live disk files with DSH) and exchanges memories with DSH via compatible JSON export/import.
-
-See [`docs/agy.md`](docs/agy.md) (Chinese) for full setup, storage layout, tool matrix and known limitations.
-
-## Memloom Desktop (standalone desktop app)
-
-This repository also includes **Memloom Desktop**, a standalone Electron management client (also in 0.x development; currently verified as a **Windows `win-x64` NSIS installer `.exe`**, with macOS / Linux targets reserved in configuration and strictly isolated from the DSH `.tgz` bundle and AGY plugin outputs):
-
-- **Multi-client discovery & dual-format fidelity**: automatically discovers local DSH (default + profiles), AGY, and custom `memory.json` stores; losslessly round-trips both `dsh-unit` (preserving `unit` and `global` metadata) and `agy-flat` JSON envelopes while reusing `.memory.lock` for AGY writes;
-- **DSH concurrency write-guard & automatic backups**: detects running DSH processes (fail-closed on query errors), enters `readonly-dsh-running` (opening read-only with zero disk writes and no `recover()`), supports explicit risk-confirmed temporary unlock, checks pre-write disk SHA-256 against external edits, and keeps up to 20 rotated pre-write backups per DSH store;
-- **Aggregate read-only search & cross-client migration**: runs management-mode BM25 search across all enabled stores (isolating `missing` / `corrupted` / `unreadable` clients in `skippedClients`), and supports direct single/multi-select `merge` migration as well as a guided `merge`/`replace` wizard with workspace mapping and confirmation gates;
-- **Hardened Electron shell & local build**: enforces `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, and `webSecurity: true`, validates every IPC payload with `zod` and native-dialog authorized paths, and builds `dist/desktop-release/memloom-desktop-0.2.0-win-x64-setup.exe` via `pnpm run build:desktop`, `pnpm run pack:desktop:check`, and `pnpm --dir desktop install && pnpm --dir desktop run pack:win`.
-
-See [`docs/desktop.md`](docs/desktop.md) (Chinese) for full build instructions, isolation boundaries and known limitations.
-
-## FAQ
-
-**Can I rely on memloom for long-term daily use now?**
-The repository is at 0.1.0 development (0.x) and has not reached a stable release. Features work, but interfaces, configuration and behavior may still change.
-
-**Will it organize my memories automatically?**
-Not by default. `autoDream=false`, so you run `/memory dream` (episode queue) or `/memory organize` (existing active memories), or click `Dream now`. Even with automatic organization enabled, outputs enter review first.
-
-**Does "remember this" write immediately?**
-Yes. When the model did not call `memory_write` in that turn, an explicit "remember" or "from now on" request writes an `active` memory directly (a preference for stable-preference wording, a lesson otherwise); automatic dream/organize outputs still go through review.
-
-**Do organized memories take effect directly?**
-No. Every dream-generated `lesson` / `wiki` / `worklog(daily)` starts as `pending` and becomes searchable only after you accept or edit-before-accept in Settings → Memory.
-
-**Does it support semantic or vector search?**
-No. Retrieval uses local BM25; there is no vector search and no external embedding service.
-
-**Does memory sync across devices?**
-No. Data stays locally under `$DSH_HOME`; there is no cloud account or cross-device sync.
-
-**Can different projects pollute each other?**
-No. Memories are isolated by normalized `workspaceKey`; by default only the current workspace and global preferences are shown, and other workspaces appear only after explicitly switching to "all accessible workspaces".
-
-**How do I back up or migrate memories?**
-Export full JSON from the export area in Settings → Memory, then merge or replace it through the import area after mapping each workspace. `/memory export` only returns an export summary and writes no file. Across machines, choose a local target for every source workspace; unmapped entries are skipped, and replacement mode requires all of them to be mapped.
-
-**Does uninstalling the plugin delete my memories?**
-Disabling/uninstalling stops injection and capture while historical messages remain; memory data stays in `$DSH_HOME` and can be cleaned manually.
-
 ## Explicit non-goals
 
-The first complete release does not aim at:
+In `0.x`, memloom does not aim at:
 
 - external embedding services or vector databases;
 - cloud accounts and cross-device sync;
 - team multi-user permission systems;
-- replacing DSH's historical session-text search;
-- changing the DSH session format or adding private session event types;
+- replacing host (AGY / DSH) historical session-text search;
+- changing host session formats or adding private session event types;
 - model-weight training or fine-tuning;
 - enabling automatic knowledge activation without human review by default.
 
 ## Development progress
 
-The repository is at **0.1.0 development (0.x)**. Implemented and test-covered capabilities include:
+The repository is at **`0.2.0` development (0.x)**. Implemented and test-covered capabilities include:
 
-- memory domain storage, CRUD, scope isolation and version control;
-- operation log, audit, capacity control, import/export and crash recovery;
-- local BM25 retrieval and management-page keyword search;
-- the six explicit tools `memory_write`, `memory_search`, `memory_read`, `memory_forget`, `memory_dream` and `memory_organize`;
-- new-session memory index injection (first baseline by default, optional delta refresh);
-- whitelisted Episode capture, conditional `worklog(turn)` and manual/automatic Dreaming (all outputs `pending`);
-- spoken "remember / from now on" requests write an `active` memory directly (preference or lesson) and dedupe against a same-turn `memory_write`;
-- full-library consolidation of existing active memories (`memory_organize` / `/memory organize`), where proposals must `supersedes` the older memory;
-- dream queue startup recovery and cold-session startup reconciliation, failure classification/backoff/process-local pause, health checks and evidence grading;
-- worklog title and body budgets, strong-secret refusal on explicit writes, and the recent turn worklog index fallback (design D1, v2.4);
-- `proposalKey` dedupe, duplicate-proposal linking and per-dream-run undo (triggerable from the management page);
-- the `/memory status | search | dream | organize | forget | export` command (`export` returns a summary);
-- the 4-tab Settings → Memory management page: header overview with index budget meter, keyword search and filter pills, centered create/detail/edit modals (tag chips, importance slider, inline unsaved confirmation, archived records hiding Archive), proposal diff/side-by-side comparison with `Save & accept` and sequential review, `Dream now` with detailed run status/cancel/undo, drag-and-drop import preview with workspace mapping, and grouped horizontal settings;
-- stable `memory/*` failure codes for the remote management API (conflict, not found, invalid content, forbidden, capacity, unavailable), which the client uses to localize messages and detect concurrent-edit conflicts;
-- `engines.dsh` declares the compatible DSH version range, `prepack` builds before packing, and CI validates the packed files;
-- Antigravity (AGY) native plugin adapter: shared host-agnostic core, cross-process file-locked JSON persistence, 20 tiered MCP tools, `PreInvocation`/`Stop`/`PreToolUse` Hooks, two-stage organization Skills, and `pnpm build:agy` / `pnpm pack:agy:check` bundle verification (see [`docs/agy.md`](docs/agy.md));
-- Memloom Desktop standalone app: dual-format `dsh-unit`/`agy-flat` storage with pre-write backups, DSH process concurrency write-guard, all-clients aggregate BM25 search, cross-client migration, hardened Electron shell, and isolated Windows `win-x64` NSIS installer `.exe` packaging via `pnpm build:desktop` / `pnpm pack:desktop:check` and `desktop/` (see [`docs/desktop.md`](docs/desktop.md)).
+- host-agnostic shared memory core (`src/core/`): domain storage, CRUD, scope isolation, version control, operation log, audit, capacity control, import/export and crash recovery;
+- local BM25 retrieval, new-session index injection (baseline and optional delta refresh), whitelisted Episode capture, conditional `worklog(turn)`, spoken "remember" direct writes, and Dreaming / Organize consolidation;
+- dream queue startup recovery and cold-session startup reconciliation, failure classification/backoff/process-local pause, health checks, evidence grading, worklog budgets, strong-secret refusal, and per-run undo;
+- **Antigravity (AGY) native plugin**: cross-process file-locked JSON persistence, 20 tiered MCP tools, `PreInvocation`/`Stop`/`PreToolUse` Hooks, two-stage organization Skills, and `pnpm build:agy` / `pnpm pack:agy:check` bundle verification ([`docs/agy.md`](docs/agy.md));
+- **DSH bundle plugin**: six structured-output tools, `/memory` commands, 4-tab Settings → Memory management page, session-memory usage note, and `engines.dsh` compatibility range;
+- **Memloom Desktop (`0.2.0` full UI redesign)**: `--ml-*` floating-island workbench with zero native controls, official DSH & AGY vector logos, five core workflows (`Memories`, `Review`, `Migrate`, `Dreams & Audit`, `Host Config`), DSH `WriteGuard`, 20 rotated backups, and Windows `win-x64` NSIS installer packaging ([`docs/desktop.md`](docs/desktop.md)).
 
-The Settings → Memory management page, the review UI, and the in-conversation memory-usage summary (the memory tools use DSH's native tool-call rows) are all delivered. 0.1.0 remains a **0.x development version** with `autoDream=false`, `refreshIndexOnChange=false` and `autoCaptureEpisodes=true`; see [Install](#install) and [Quick start](#quick-start) above.
+The default policy keeps `autoDream=false`, `refreshIndexOnChange=false` and `autoCaptureEpisodes=true`; see [Install](#install) and [Quick start](#quick-start) above.
 
 ## Release notes
 
-- **Distribution channel**: memloom is distributed exclusively as a **GitHub plugin** via [GitHub Releases](https://github.com/JiaMingWang-CN/memloom/releases) (prebuilt `.tgz` bundle asset plus repository source), with **no npm package publication**.
+- **Distribution channel**: memloom is distributed exclusively via [GitHub Releases](https://github.com/JiaMingWang-CN/memloom/releases) with **`memloom-<version>.tgz`** (DSH bundle), **`memloom-agy-plugin-<version>.zip`** (Antigravity plugin), and **`memloom-desktop-<version>-win-x64-setup.exe`** (Windows desktop installer) plus repository source — **no npm package publication**.
 - **Changelog**: see [`CHANGELOG.md`](CHANGELOG.md) for detailed changes.
+
+## FAQ
+
+**Can I rely on memloom for long-term daily use now?**
+The repository is at `0.2.0` development (0.x) and has not reached a stable release. Features work and are covered by automated tests, but interfaces, configuration and behavior may still change.
+
+**Will it organize my memories automatically?**
+Not by default. `autoDream=false`, so you trigger organization manually (via the `memory-dream` Skill in AGY, or `/memory dream` / `Dream now` in DSH); even when automatic organization is enabled, outputs enter `pending` review first.
+
+**Does "remember this" write immediately?**
+Yes. When the model did not call `memory_write` in that turn, an explicit "remember" or "from now on" request writes an `active` memory directly (a preference for stable-preference wording, a lesson otherwise); automatic dream/organize outputs still go through review.
+
+**Do organized memories take effect directly?**
+No. Every dream-generated `lesson` / `wiki` / `worklog(daily)` starts as `pending` and becomes searchable only after you accept or edit-before-accept in Memloom Desktop, the AGY `memory-review` Skill, or DSH Settings → Memory.
+
+**Does it support semantic or vector search?**
+No. Retrieval uses local BM25; there is no vector search and no external embedding service.
+
+**Does memory sync across devices?**
+No. Data stays locally in each host's storage path (AGY `${PLUGIN_DATA}/memory.json`, DSH `$DSH_HOME/storages/memory.json`); there is no cloud account or cross-device sync.
+
+**Can different projects or hosts pollute each other?**
+No. Memories are isolated by normalized `workspaceKey`, and AGY and DSH keep separate disk stores by default; inside Memloom Desktop they can be viewed together while remaining clearly labeled by host and workspace.
+
+**How do I back up or migrate memories?**
+The easiest way is the **Cross-host Migration** workbench in **Memloom Desktop**, which supports AGY ⇄ DSH `merge` and workspace-mapped `replace` migrations; you can also export full JSON and map workspaces on import. `/memory export` only returns a summary and writes no file.
+
+**Does uninstalling the plugin delete my memories?**
+Disabling/uninstalling the AGY or DSH plugin stops injection and capture while historical sessions remain; memory data stays in its local directory and can be cleaned manually.
 
 ## License
 
@@ -430,6 +411,6 @@ This project uses the [MIT license](LICENSE). Sponsor brand and marks remain the
 
 **Let experience remain, so every new session can move forward.**
 
-memloom · Local-first long-term memory · 0.1.0-dev
+memloom · Local-first long-term memory · 0.2.0-dev
 
 </div>
