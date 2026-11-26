@@ -65,15 +65,7 @@ dist/desktop-release/memloom-desktop-0.1.3-win-x64-setup.exe
 > pnpm run start:desktop
 > ```
 >
-> 对外公开发布已签名的 Windows 安装程序请使用下文的 SignPath Foundation 自动化签名发布流水线。
-
-### SignPath Foundation 免费开源代码签名（GitHub Actions）
-
-本仓库已在 [`.github/workflows/desktop-release.yml`](../.github/workflows/desktop-release.yml) 集成 **SignPath Foundation** 两阶段签名流程（先对 `Memloom Desktop.exe` 主程序签名，再封装为 NSIS 安装程序并对 `memloom-desktop-<version>-win-x64-setup.exe` 签名）。审批通过后在 GitHub 仓库配置以下条目即可触发自动签名与 Release 附件上传：
-
-- **Repository Secrets**：`SIGNPATH_API_TOKEN`、`SIGNPATH_ORGANIZATION_ID`
-- **Repository Variables（可选，若与默认不一致）**：`SIGNPATH_PROJECT_SLUG`（默认 `memloom`）、`SIGNPATH_SIGNING_POLICY`（默认 `release-signing`）
-- **签名政策与致谢**：Free code signing provided by SignPath.io, certificate by SignPath Foundation. 详见 [`docs/code-signing-policy.md`](code-signing-policy.md)。
+> 对外分发独立 `.exe` 时需在 `electron-builder` 打包流程接入受信任的商业代码签名证书。
 
 `dist/desktop-app/` 产物结构：
 

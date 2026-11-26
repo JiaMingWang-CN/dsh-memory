@@ -204,18 +204,5 @@ describe('desktop packaging and isolation checks', () => {
     expect(nsiScript).toContain('WriteUninstaller')
     expect(nsiScript).toContain('Nsis7z::Extract')
     expect(desktopPkg.scripts?.['pack:win']).toContain('--win nsis')
-    expect(desktopPkg.scripts?.['pack:win:dir']).toContain('--dir')
-    expect(desktopPkg.scripts?.['pack:win:from-dir']).toContain('--prepackaged')
-  })
-
-  it('provides SignPath Foundation CI release workflow and code signing policy acknowledgement', () => {
-    const workflow = readFileSync(join(root, '.github/workflows/desktop-release.yml'), 'utf8')
-    const policy = readFileSync(join(root, 'docs/code-signing-policy.md'), 'utf8')
-    expect(workflow).toContain('signpath/github-action-submit-signing-request@v3')
-    expect(workflow).toContain('pack:win:dir')
-    expect(workflow).toContain('pack:win:from-dir')
-    expect(policy).toContain(
-      'Free code signing provided by SignPath.io, certificate by SignPath Foundation.',
-    )
   })
 })

@@ -353,7 +353,7 @@ memloom 采用同仓共享内核的多宿主分层架构，核心记忆引擎（
 - **多客户端发现与双格式保真**：自动发现本机 DSH（默认与 profiles）、AGY 及自定义 `memory.json` 库；无损识别并往返序列化 `dsh-unit`（完整保留 `unit` 与 `global` 元数据）与 `agy-flat` 两种外层 JSON 格式，AGY 写入复用跨进程 `.memory.lock`；
 - **DSH 并发写保护与自动备份**：自动检测运行中的 DSH 进程（查询异常按 fail-closed 保护），运行期间将 DSH 库锁定为只读保护态（通过只读打开零写盘且不触发 `recover()`），支持显式风险确认后临时解锁；写入 DSH 前执行磁盘 SHA-256 外部变更检测，并按单次逻辑写批自动留存最多 20 份写前快照备份；
 - **全端聚合检索与跨库迁移**：支持跨全部已启用客户端执行只读管理态 BM25 聚合检索（自动隔离 `missing` / `corrupted` / `unreadable` 库并列出跳过原因），支持单条/多选直接 `merge` 迁移与带工作区映射及确认门禁的 `replace` 迁移向导；
-- **安全模型与本地构建**：窗口强制启用 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true` 与 `webSecurity: true`，所有 IPC 经 `zod` 校验并受原生对话框授权路径约束；运行 `pnpm run build:desktop`、`pnpm run pack:desktop:check` 与 `pnpm --dir desktop install && pnpm --dir desktop run pack:win` 可构建 `dist/desktop-release/memloom-desktop-0.1.3-win-x64-setup.exe`（CI 通过 SignPath Foundation 签发开源代码签名，Free code signing provided by SignPath.io, certificate by SignPath Foundation，详见 [`docs/code-signing-policy.md`](docs/code-signing-policy.md)）。
+- **安全模型与本地构建**：窗口强制启用 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true` 与 `webSecurity: true`，所有 IPC 经 `zod` 校验并受原生对话框授权路径约束；运行 `pnpm run build:desktop`、`pnpm run pack:desktop:check` 与 `pnpm --dir desktop install && pnpm --dir desktop run pack:win` 可构建 `dist/desktop-release/memloom-desktop-0.1.3-win-x64-setup.exe`。
 
 完整构建说明、隔离边界与已知限制见 [`docs/desktop.md`](docs/desktop.md)。
 
