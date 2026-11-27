@@ -5,10 +5,10 @@ Dreaming 是 memloom 的离线记忆整理引擎，输入是 `episodes` 队列�
 ## 触发方式
 
 - **手动**：`/memory dream` 命令或 `memory_dream` 工具，立即入队并返回 dream id；可处理当前工作区中 `status` 为 `new`、`failed-retryable` 或 `skipped` 的 episode，`since` 可选，且只按 episode 创建时间过滤（`createdAt >= since`）。
-- **自动（代码存在，默认关闭）**：只有当用户显式设置 `autoDream = true` 时才启用。`turn/end` 后 `dreamIdleDelayMs`（默认 30 秒）防抖，期间有新 `turn/start` 则取消并重新计时；每个工作区额外受 `autoDreamMinIntervalMs`（默认 5 分钟）限制；队列全局并发 1。
+- **自动（代码存在，默认关闭）**：只有当用户显式设置 `autoDream = true` 时才启用。在 DSH 中，`turn/end` 后 `dreamIdleDelayMs`（默认 30 秒）防抖，期间有新 `turn/start` 则取消并重新计时；每个工作区额外受 `autoDreamMinIntervalMs`（默认 5 分钟）限制；队列全局并发 1。在 AGY 中，`Stop` 捕获到新片段后标记待整理状态，并在满足 `autoDreamMinIntervalMs` 后于下次 `PreInvocation` 注入提醒，由主代理按 `dreamSubagentModel`（默认 `flash`）派生后台子代理执行两阶段整理。
 - **冷会话回填（随 autoDream 开启）**：`sessionCursors` 按 `sessionId` 记录 `lastProcessedSeq`，只扫描最近 `dreamLookbackDays`（默认 7 天）内、属于本工作区的会话，从游标之后读取以避免重复提炼，每次最多 `dreamMaxSessionsPerRun`（默认 10）个会话。
 
-无论手动还是自动，0.1.0 的所有梦产物都不会自动置为 `active`。
+无论手动还是自动，Dreaming 生成的提案默认先进入 `pending`，等待人工审阅（除非用户显式开启 `autoAcceptProposals`）。
 
 ## 整理已有记忆（organize）
 
@@ -68,8 +68,12 @@ Dream 失败会先归入 `fatal` / `transient` / `other` 三类，再决定重�
 - 助手没有工具结果或用户陈述支持的断言标为 `unverified`，或在正文中省略。
 - 每条输出必须带至少一个 `sourceEpisodeIds`，引用实际提供的 episode，不得缩短 episode id。
 
-### 记录原则
+### 记录与噪声过滤原则
 
+- **捕获期过滤**：自动捕获阶段会跳过常见瞬时/通用工具失败（如 `UNKNOWN`、`UNKNOWN_TOOL`、`FS_NOT_FOUND`、`FS_EDIT_NOT_FOUND`、`SEARCH_FAILED`、`WEB_PROVIDER_ERROR`、`TIMEOUT` / `RATE_LIMIT` 等），以及未包含用户纠正的中止/取消轮次（`interrupted` / `cancelled` / `aborted`），避免低价值噪声进入 `episodes` 队列。
+- **宁缺毋滥与空输出收敛**：当批次片段仅包含常规执行、一次性状态快照、未验证猜测或与现有记录重复的信息时，模型应直接返回空数组 `{"memories":[],"wikiUpdates":[]}`；空输出与本次未被任何提案引用的已认领片段会标记为 `skipped`（不再退回 `failed-retryable` 循环重跑）。
+- **尊重 `worklogCapture: "off"`**：当关闭工作日志捕获时，Dream 系统提示词、输出 schema 与提交校验均会禁止输出 `worklog` 类型。
+- **纳入已有 `pending` 去重上下文**：Assemble `## Related memories` 时同时纳入当前作用域的 `active` 与 `pending` 提案（标注 `|pending`），避免对未审阅队列中的同类主题重复提案。
 - **一条一主题**：一条记忆只讲一个主题，混合主题时拆开。
 - **记录持久规则**：记录长期有效的规则，而不是一次性事件。
 - **只记环境给不回来的东西**：教训、做通的路子、验证过的规则、坑与进行中的计划值得记录；代码、文件内容、当前配置值、git 历史与命令输出不记录。

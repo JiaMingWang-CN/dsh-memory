@@ -59,6 +59,22 @@ function isClientUnhealthy(client: DesktopClientInfo): boolean {
   return !client.enabled || client.health === 'corrupted' || client.health === 'unreadable'
 }
 
+function pluginStateTone(state: NonNullable<DesktopClientInfo['pluginStatus']>['state']): {
+  color: string
+  labelKey: string
+} {
+  switch (state) {
+    case 'enabled':
+      return { color: 'var(--ml-success)', labelKey: 'desktop.plugin.enabled' }
+    case 'disabled':
+      return { color: 'var(--ml-warn)', labelKey: 'desktop.plugin.disabled' }
+    case 'not-installed':
+      return { color: 'var(--ml-text-muted)', labelKey: 'desktop.plugin.notInstalled' }
+    default:
+      return { color: 'var(--ml-text-muted)', labelKey: 'desktop.plugin.unknown' }
+  }
+}
+
 export function DesktopApp(props?: DesktopAppProps): React.ReactElement
 export function DesktopApp(props: DesktopAppProps): React.ReactElement
 export function DesktopApp(props: DesktopAppProps = {}): React.ReactElement {
@@ -670,6 +686,13 @@ export function DesktopApp(props: DesktopAppProps = {}): React.ReactElement {
             clients.map((client) => {
               const selected = route === 'memories' && activeHostId === client.id
               const count = hostCounts[client.id]
+              const pluginStatus = client.pluginStatus
+              const pluginTone =
+                pluginStatus !== undefined ? pluginStateTone(pluginStatus.state) : undefined
+              const pluginTitle =
+                pluginStatus !== undefined && pluginTone !== undefined
+                  ? `${t(pluginTone.labelKey)}${pluginStatus.version !== undefined ? ` v${pluginStatus.version}` : ''}${pluginStatus.detail !== undefined ? ` — ${pluginStatus.detail}` : ''}`
+                  : undefined
               return h(
                 'button',
                 {
@@ -691,6 +714,31 @@ export function DesktopApp(props: DesktopAppProps = {}): React.ReactElement {
                 h(
                   'span',
                   { className: 'ml-nav-pill-right' },
+                  pluginStatus !== undefined && pluginTone !== undefined
+                    ? h('span', {
+                        className: 'ml-host-dot',
+                        'data-plugin-state': pluginStatus.state,
+                        style: { background: pluginTone.color },
+                        title: pluginTitle,
+                        'aria-label': pluginTitle,
+                      })
+                    : null,
+                  pluginStatus !== undefined &&
+                    pluginTone !== undefined &&
+                    pluginStatus.state !== 'enabled'
+                    ? h(
+                        'span',
+                        {
+                          style: {
+                            fontSize: '11px',
+                            color: pluginTone.color,
+                            lineHeight: 1,
+                          },
+                          title: pluginTitle,
+                        },
+                        t(pluginTone.labelKey),
+                      )
+                    : null,
                   isClientUnhealthy(client)
                     ? h(
                         'span',

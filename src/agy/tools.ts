@@ -214,6 +214,11 @@ const memoryDreamPrepareSchema = z
     maxEpisodes: z.number().int().min(1).optional().describe('Maximum episodes to claim.'),
     since: z.string().min(1).optional().describe('Only claim episodes at or after this ISO time.'),
     trigger: z.enum(['auto', 'manual', 'rebuild']).optional().describe('Dream trigger label.'),
+    model: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Optional model or subagent tier label recorded on the DreamRun.'),
   })
   .strict()
 
@@ -254,6 +259,11 @@ const memoryOrganizePrepareSchema = z
       .max(60)
       .optional()
       .describe('Maximum active memories to include (1-60).'),
+    model: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Optional model or subagent tier label recorded on the DreamRun.'),
   })
   .strict()
 
@@ -422,6 +432,7 @@ const memoryConfigSchema = z
     autoAcceptProposals: z.boolean().optional(),
     dreamIdleDelayMs: naturalInt().optional(),
     autoDreamMinIntervalMs: naturalInt().optional(),
+    dreamSubagentModel: z.enum(['flash_lite', 'flash', 'pro', 'inherit']).optional(),
     dreamMaxEpisodes: naturalInt().optional(),
     dreamLookbackDays: naturalInt().optional(),
     dreamProcessingTimeoutMs: naturalInt().optional(),
@@ -971,20 +982,25 @@ export function createAgyTools(deps: CreateAgyToolsDeps): readonly AgyToolDefini
     {
       name: 'memory_dream_prepare',
       description:
-        'Stage 1 of two-stage dreaming: claim unprocessed episodes as processing, create a running DreamRun, and return prompts and output schema for consolidation.',
+        'Stage 1 of two-stage dreaming: claim unprocessed episodes as processing, create a running DreamRun, and return prompts, output schema, and recommendedSubagentModel for consolidation.',
       inputSchema: toJsonSchema(memoryDreamPrepareSchema),
       sensitive: false,
       async execute(rawArgs, ctx) {
         const args = parseArgs(memoryDreamPrepareSchema, rawArgs, 'MEMORY_INVALID_QUERY')
         const scope = resolveDreamMemoryScope(args.scope, ctx)
-        return await runWrite(() =>
-          engine.prepareDream({
+        return await runWrite(async () => {
+          const prepared = await engine.prepareDream({
             scope,
             ...(args.maxEpisodes === undefined ? {} : { maxEpisodes: args.maxEpisodes }),
             ...(args.since === undefined ? {} : { since: args.since }),
             ...(args.trigger === undefined ? {} : { trigger: args.trigger }),
-          }),
-        )
+            ...(args.model === undefined ? {} : { model: args.model }),
+          })
+          return {
+            ...prepared,
+            recommendedSubagentModel: engine.getConfig().dreamSubagentModel,
+          }
+        })
       },
     },
 
@@ -1010,18 +1026,23 @@ export function createAgyTools(deps: CreateAgyToolsDeps): readonly AgyToolDefini
     {
       name: 'memory_organize_prepare',
       description:
-        'Stage 1 of two-stage full-store organization: select up to 60 active memories in the current scope, create a running organize DreamRun, and return consolidation prompts and schema.',
+        'Stage 1 of two-stage full-store organization: select up to 60 active memories in the current scope, create a running organize DreamRun, and return consolidation prompts, schema, and recommendedSubagentModel.',
       inputSchema: toJsonSchema(memoryOrganizePrepareSchema),
       sensitive: false,
       async execute(rawArgs, ctx) {
         const args = parseArgs(memoryOrganizePrepareSchema, rawArgs, 'MEMORY_INVALID_QUERY')
         const scope = resolveDreamMemoryScope(args.scope, ctx)
-        return await runWrite(() =>
-          engine.prepareOrganize({
+        return await runWrite(async () => {
+          const prepared = await engine.prepareOrganize({
             scope,
             ...(args.maxRecords === undefined ? {} : { maxRecords: args.maxRecords }),
-          }),
-        )
+            ...(args.model === undefined ? {} : { model: args.model }),
+          })
+          return {
+            ...prepared,
+            recommendedSubagentModel: engine.getConfig().dreamSubagentModel,
+          }
+        })
       },
     },
 

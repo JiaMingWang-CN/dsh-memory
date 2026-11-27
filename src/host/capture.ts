@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ToolExecution, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import type { MemoryConfig } from './config.ts'
+import { isTransientToolFailure } from '../core/capture-filter.ts'
 import { redactSecrets } from './redact.ts'
 import type { MemoryStore } from './store.ts'
 import type { EpisodeKind, EpisodeRecord, MemoryType } from '../shared/types.ts'
@@ -554,12 +555,19 @@ export class MemoryCapture {
       error?: { code?: string; reason?: string }
     },
   ): void {
-    const code = input.error?.code ?? 'UNKNOWN'
+    const code =
+      input.error?.code ??
+      (input.error?.reason !== undefined && input.error.reason.trim() !== ''
+        ? 'TOOL_ERROR'
+        : 'UNKNOWN')
     const errorText =
       sanitize(
         `${input.name}: ${code}${input.error?.reason === undefined ? '' : ` ${input.error.reason}`}`,
         MAX_CAPTURE_TOOL_ERROR_BYTES,
       ) ?? `${input.name}: ${code}`
+    if (isTransientToolFailure(code, errorText)) {
+      return
+    }
     state.failures.push({
       name: input.name,
       targetHash: input.targetHash,
@@ -686,8 +694,10 @@ export class MemoryCapture {
     this.resetTurn(state)
     if (input.workspaceKey === '') return
     this.enqueue(async () => {
+      const interruptedTurn = outcome === 'interrupted'
       const hasContent =
         !pureMemoryTurn &&
+        (!interruptedTurn || input.correction) &&
         (input.prompt !== undefined ||
           input.assistantFinal !== undefined ||
           input.files.length > 0 ||

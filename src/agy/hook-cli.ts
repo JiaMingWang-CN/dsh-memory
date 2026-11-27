@@ -408,6 +408,9 @@ function buildSensitiveReason(toolName: string, args: Record<string, unknown>): 
       if (args.injectForSubagents === true) {
         risks.push('开启子代理记忆注入 injectForSubagents')
       }
+      if (typeof args.dreamSubagentModel === 'string') {
+        risks.push(`设置整理子代理模型档位 dreamSubagentModel=${args.dreamSubagentModel}`)
+      }
       if (keys.some((k) => k.startsWith('max'))) {
         risks.push('调整存储容量上限')
       }
@@ -438,6 +441,18 @@ function buildOverwrite(
   }
 }
 
+function buildAutoDreamReminder(pendingEpisodesCount: number, modelTier: string): string {
+  return [
+    '<system-reminder>',
+    `[Memloom autoDream] 当前工作区有 ${pendingEpisodesCount} 条待整理的会话片段（episodes）。`,
+    `请在不打断或阻塞用户当前任务的前提下，调用 invoke_subagent 派生后台子代理（Model 设为 "${modelTier}"，建议 TypeName="self" 或启用记忆 MCP 工具的后台代理）执行 memory-dream 两阶段整理：`,
+    '1. 调用 memory_dream_prepare 认领待整理片段并获取提示词；',
+    '2. 按高门槛证据规则提炼长期知识（常规操作/瞬时报错/重复提案直接输出空数组 memories: []）；',
+    '3. 调用 memory_dream_commit 提交提案（或传 memories: [] 将片段标为 skipped）。',
+    '</system-reminder>',
+  ].join('\n')
+}
+
 async function handlePreInvocation(
   payload: Record<string, unknown>,
   env: NodeJS.ProcessEnv,
@@ -447,7 +462,8 @@ async function handlePreInvocation(
     const configStore = new AgyConfigStore(paths.configPath)
     const config = await configStore.load()
     if (config.enabled === false) return {}
-    if (isSubagentPayload(payload, env) && config.injectForSubagents !== true) return {}
+    const isSubagent = isSubagentPayload(payload, env)
+    if (isSubagent && config.injectForSubagents !== true) return {}
 
     const conversationId = extractConversationId(payload)
     const workspaceRoot = extractWorkspaceRoot(payload)
@@ -466,11 +482,16 @@ async function handlePreInvocation(
       existingState !== undefined
         ? foldIndexSources(existingState.indexSources, scopeKey, expectedBaselineId)
         : undefined
+    const needsAutoDreamCheck =
+      config.autoDream === true &&
+      existingState?.pendingAutoDreamCheck === true &&
+      !isSubagent &&
+      workspaceKey !== null
 
     // FAST-SKIP PATH (Review Focus #5): when a baseline for the same scopeKey &
-    // baselineId is already recorded and refreshIndexOnChange is false, return {}
-    // immediately WITHOUT opening or reading memory.json.
-    if (folded !== undefined && config.refreshIndexOnChange !== true) {
+    // baselineId is already recorded, refreshIndexOnChange is false, and no
+    // autoDream check is pending, return {} immediately WITHOUT opening memory.json.
+    if (folded !== undefined && config.refreshIndexOnChange !== true && !needsAutoDreamCheck) {
       if (conversationId !== undefined && existingState !== undefined) {
         if (existingState.workspaceRoot !== workspaceRoot) {
           await sessionStore.write({
@@ -493,6 +514,55 @@ async function handlePreInvocation(
       ...(lockTimeoutMs === undefined ? {} : { lockTimeoutMs }),
     })
     const engine = new MemoryEngine({ domain, config, now: () => now })
+
+    let autoDreamReminderText: string | undefined
+    let nextPendingAutoDreamCheck = existingState?.pendingAutoDreamCheck
+    let nextLastAutoDreamPromptAt = existingState?.lastAutoDreamPromptAt
+
+    if (needsAutoDreamCheck && workspaceKey !== null) {
+      const nowMs = now.getTime()
+      const sinceIso = new Date(nowMs - config.dreamLookbackDays * 86_400_000).toISOString()
+      const minIntervalMs = config.autoDreamMinIntervalMs
+      const lastPromptMs =
+        existingState?.lastAutoDreamPromptAt !== undefined
+          ? Date.parse(existingState.lastAutoDreamPromptAt)
+          : NaN
+      const promptCooldownActive =
+        Number.isFinite(lastPromptMs) && nowMs - lastPromptMs < minIntervalMs
+
+      const dreams = [...domain.table('dreams').entries()].map(([, run]) => run)
+      const hasActiveRunningDream = dreams.some(
+        (run) =>
+          run.scopeKey === workspaceKey &&
+          run.status === 'running' &&
+          nowMs - Date.parse(run.startedAt) < config.dreamProcessingTimeoutMs,
+      )
+      const latestRunMs = dreams
+        .filter((run) => run.scopeKey === workspaceKey && run.trigger !== 'organize')
+        .reduce((max, run) => {
+          const ts = Date.parse(run.finishedAt ?? run.startedAt)
+          return Number.isFinite(ts) ? Math.max(max, ts) : max
+        }, 0)
+      const dreamCooldownActive = latestRunMs > 0 && nowMs - latestRunMs < minIntervalMs
+
+      const pendingEpisodesCount = [...domain.table('episodes').entries()].filter(([, ep]) => {
+        if (ep.workspaceKey !== workspaceKey) return false
+        if (ep.status !== 'new' && ep.status !== 'failed-retryable') return false
+        return ep.createdAt >= sinceIso
+      }).length
+
+      if (pendingEpisodesCount === 0) {
+        nextPendingAutoDreamCheck = false
+      } else if (!hasActiveRunningDream && !promptCooldownActive && !dreamCooldownActive) {
+        autoDreamReminderText = buildAutoDreamReminder(
+          pendingEpisodesCount,
+          config.dreamSubagentModel,
+        )
+        nextPendingAutoDreamCheck = false
+        nextLastAutoDreamPromptAt = now.toISOString()
+      }
+    }
+
     const readOnlyIndexService: MemoryIndexSourceService = {
       activeInScope: (targetWorkspaceKey) => engine.activeInScope(targetWorkspaceKey),
       search: (request) => engine.search(request),
@@ -515,17 +585,6 @@ async function handlePreInvocation(
       },
     }
 
-    const rawUserInput = typeof payload.lastUserInput === 'string' ? payload.lastUserInput : ''
-    const queryText = rawUserInput.length > 0 ? extractUserRequestText(rawUserInput) : ''
-
-    const snapshot = composeMemoryIndex({
-      service: readOnlyIndexService,
-      workspaceKey,
-      queryText,
-      indexMaxBytes: config.indexMaxBytes,
-      now: () => now,
-    })
-
     const saveState = async (indexSources: MemoryIndexSource[]): Promise<void> => {
       if (conversationId === undefined) return
       await sessionStore.write({
@@ -537,9 +596,43 @@ async function handlePreInvocation(
         ...(existingState?.previousAssistantText === undefined
           ? {}
           : { previousAssistantText: existingState.previousAssistantText }),
+        ...(nextPendingAutoDreamCheck !== undefined
+          ? { pendingAutoDreamCheck: nextPendingAutoDreamCheck }
+          : {}),
+        ...(nextLastAutoDreamPromptAt !== undefined
+          ? { lastAutoDreamPromptAt: nextLastAutoDreamPromptAt }
+          : {}),
         updatedAt: now.toISOString(),
       })
     }
+
+    const buildInjectResponse = (primaryText?: string): Record<string, unknown> => {
+      const steps: { systemMessage: { systemMessage: string } }[] = []
+      if (primaryText !== undefined && primaryText.length > 0) {
+        steps.push({ systemMessage: { systemMessage: primaryText } })
+      }
+      if (autoDreamReminderText !== undefined && autoDreamReminderText.length > 0) {
+        steps.push({ systemMessage: { systemMessage: autoDreamReminderText } })
+      }
+      return steps.length === 0 ? {} : { injectSteps: steps }
+    }
+
+    // Fast branch when index does not need refresh and we only ran the autoDream check
+    if (folded !== undefined && config.refreshIndexOnChange !== true) {
+      await saveState(existingState!.indexSources)
+      return buildInjectResponse()
+    }
+
+    const rawUserInput = typeof payload.lastUserInput === 'string' ? payload.lastUserInput : ''
+    const queryText = rawUserInput.length > 0 ? extractUserRequestText(rawUserInput) : ''
+
+    const snapshot = composeMemoryIndex({
+      service: readOnlyIndexService,
+      workspaceKey,
+      queryText,
+      indexMaxBytes: config.indexMaxBytes,
+      now: () => now,
+    })
 
     // Case 1: First baseline injection for this conversation
     if (existingState === undefined || existingState.indexSources.length === 0) {
@@ -560,12 +653,10 @@ async function handlePreInvocation(
       }
       await saveState([baselineSource])
       if (snapshot.entries.length === 0) {
-        return {}
+        return buildInjectResponse()
       }
       const renderedText = renderBaseline(snapshot, config.indexMaxBytes)
-      return {
-        injectSteps: [{ systemMessage: { systemMessage: renderedText } }],
-      }
+      return buildInjectResponse(renderedText)
     }
 
     // Case 2: Scope or baseline identity changed -> full reset
@@ -595,11 +686,9 @@ async function handlePreInvocation(
       }
       await saveState([resetSource])
       if (snapshot.entries.length === 0 && invalidations.length === 0) {
-        return {}
+        return buildInjectResponse()
       }
-      return {
-        injectSteps: [{ systemMessage: { systemMessage: renderedText } }],
-      }
+      return buildInjectResponse(renderedText)
     }
 
     // Case 3: refreshIndexOnChange === true -> plan delta or reset
@@ -620,15 +709,13 @@ async function handlePreInvocation(
       (!plan.urgent && plan.withinInterval)
     ) {
       await saveState(existingState.indexSources)
-      return {}
+      return buildInjectResponse()
     }
 
     const nextSources =
       plan.mode === 'reset' ? [plan.source] : [...existingState.indexSources, plan.source]
     await saveState(nextSources)
-    return {
-      injectSteps: [{ systemMessage: { systemMessage: plan.renderedText } }],
-    }
+    return buildInjectResponse(plan.renderedText)
   } catch (error) {
     await logHookError(paths.logPath, 'PreInvocation', error)
     return {}
@@ -773,8 +860,9 @@ async function handleStop(
     const error = typeof payload.error === 'string' ? payload.error : undefined
     const subagent = isSubagentPayload(payload, env)
 
+    let captureEpisodesCreated = 0
     await domain.withWriteLock(async () => {
-      await captureAgyTranscript({
+      const report = await captureAgyTranscript({
         transcriptPath,
         conversationId,
         workspaceRoot,
@@ -786,7 +874,26 @@ async function handleStop(
         sessionStore,
         config,
       })
+      captureEpisodesCreated = report.episodesCreated
     })
+    if (config.autoDream === true && !subagent && captureEpisodesCreated > 0) {
+      const existingState = await sessionStore.read(conversationId)
+      await sessionStore.write({
+        conversationId,
+        workspaceRoot,
+        scopeKey: normalizeWorkspaceKey(workspaceRoot),
+        indexSources: existingState?.indexSources ?? [],
+        captureTurn: existingState?.captureTurn ?? 0,
+        ...(existingState?.previousAssistantText === undefined
+          ? {}
+          : { previousAssistantText: existingState.previousAssistantText }),
+        pendingAutoDreamCheck: true,
+        ...(existingState?.lastAutoDreamPromptAt === undefined
+          ? {}
+          : { lastAutoDreamPromptAt: existingState.lastAutoDreamPromptAt }),
+        updatedAt: new Date().toISOString(),
+      })
+    }
     return {}
   } catch (error) {
     await logHookError(paths.logPath, 'Stop', error)

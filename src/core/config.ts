@@ -9,6 +9,9 @@
 import { z } from 'zod'
 import { OperationError } from './operations.ts'
 
+/** Preferred AGY subagent model tier for background/manual Dream & Organize runs. */
+export type DreamSubagentModel = 'flash_lite' | 'flash' | 'pro' | 'inherit'
+
 /** Memory plugin configuration (all fields optional as a patch). */
 export interface MemoryConfig {
   enabled?: boolean
@@ -22,6 +25,7 @@ export interface MemoryConfig {
   dreamProvider?: string
   dreamModel?: string
   dreamReasoningEffort?: string
+  dreamSubagentModel?: DreamSubagentModel
   dreamMaxEpisodes?: number
   dreamMaxSessionsPerRun?: number
   dreamMaxTokens?: number
@@ -67,6 +71,7 @@ export const MEMORY_CONFIG_DEFAULTS: Required<
   dreamIdleDelayMs: 30_000,
   autoDreamMinIntervalMs: 300_000,
   dreamModelMode: 'follow-session',
+  dreamSubagentModel: 'flash',
   dreamMaxEpisodes: 40,
   dreamMaxSessionsPerRun: 10,
   dreamMaxTokens: 4096,
@@ -94,7 +99,7 @@ export const MEMORY_CONFIG_DEFAULTS: Required<
   searchLimit: 20,
 }
 
-/** The 23 runtime configuration keys editable from AGY `memory_config`. */
+/** The 24 runtime configuration keys editable from AGY `memory_config`. */
 export const AGY_EDITABLE_CONFIG_FIELDS: readonly (keyof MemoryConfig)[] = [
   'enabled',
   'indexMaxBytes',
@@ -103,6 +108,7 @@ export const AGY_EDITABLE_CONFIG_FIELDS: readonly (keyof MemoryConfig)[] = [
   'autoAcceptProposals',
   'dreamIdleDelayMs',
   'autoDreamMinIntervalMs',
+  'dreamSubagentModel',
   'dreamMaxEpisodes',
   'dreamLookbackDays',
   'dreamProcessingTimeoutMs',
@@ -136,6 +142,7 @@ const patchSchema = z
     dreamProvider: z.string().optional(),
     dreamModel: z.string().optional(),
     dreamReasoningEffort: z.string().optional(),
+    dreamSubagentModel: z.enum(['flash_lite', 'flash', 'pro', 'inherit']).optional(),
     dreamMaxEpisodes: natural().optional(),
     dreamMaxSessionsPerRun: natural().optional(),
     dreamMaxTokens: natural().optional(),

@@ -3,15 +3,15 @@
 `memloom`（原 `dsh-memory`）在共享记忆内核（`src/core/`）与既有管理界面组件（`src/client/`）的基础上，在 `src/desktop/` 与隔离打包工程 `desktop/` 提供 **Memloom Desktop**——面向本地长期记忆库的可视化桌面管理客户端，支持同机管理 DSH、Antigravity（AGY）与自定义目录记忆库。
 
 > [!NOTE]
-> **开发状态说明**：`memloom` 当前仍处于 **0.x 开发版本**（`0.2.1`），尚未发布稳定版。当前桌面端仅完成 Windows `win-x64` 安装程序（NSIS `.exe`）构建与验证，macOS / Linux 目标仅在配置中预留扩展段。
+> **开发状态说明**：`memloom` 当前仍处于 **0.x 开发版本**（`0.2.2`），尚未发布稳定版。当前桌面端仅完成 Windows `win-x64` 安装程序（NSIS `.exe`）构建与验证，macOS / Linux 目标仅在配置中预留扩展段。
 
 ---
 
 ## 核心能力（已实现）
 
-- **双宿主自动发现与状态隔离**：
+- **双宿主自动发现与插件/存储双态探测**：
   - 自动发现本机 DSH 默认库（`$DSH_HOME/storages/memory.json` 或 `~/.dsh/storages/memory.json`）、DSH 各 profile 库（`profiles/*/storages/memory.json`）及 AGY 默认/环境变量库（`MEMLOOM_STORE_PATH`、`MEMLOOM_DATA_DIR`、`PLUGIN_DATA` 或 `~/.gemini/config/plugin-data/memloom/memory.json`），同时兼容检测遗留旧路径并提供一键接入。
-  - 在桌面 UI 层以 DSH 与 Antigravity（AGY）为等权的一等宿主（新建库仅限尚未初始化的 AGY 库，DSH 库保持由宿主初始化）。
+  - 只读探测 DSH profile（`package.json`、`node_modules`、`cordis.patch.yml`）与 AGY 插件目录（`~/.gemini/config/plugins/`、`plugins.json`、`config.json` 与运行时 `config.json`）的安装状态、版本号与启用/禁用状态，并在左侧宿主导航与「宿主配置」顶部卡片直观看板呈现；在桌面 UI 层以 DSH 与 Antigravity（AGY）为等权的一等宿主（新建库仅限尚未初始化的 AGY 库，DSH 库保持由宿主初始化）。
 - **双外层存储格式保真与损坏保护**：
   - 自动识别并无损往返序列化 DSH `dsh-unit`（`{ unit, global, tables }`，完整保留 `unit` 与 `global` 元数据）与 AGY `agy-flat` 两种封装格式。
   - 写入 DSH 库前执行磁盘 SHA-256 外部变更检测（若被外部修改则立即中止并返回 `desktop/external-change`），并在每次逻辑写批前于同目录 `backups/memory-desktop-before-write-*.json` 创建自动快照备份（最多保留 20 份同类桌面自动备份）。
@@ -23,7 +23,7 @@
   - 跨全部已启用客户端执行管理态 BM25 聚合检索与工作区列表聚合；单个客户端处于 `missing` / `corrupted` / `unreadable` 状态时自动隔离并记录在 `skippedClients` 中，不影响其余健康库检索。
 - **双层浮岛工作台与五大核心视图**：
   - 采用双层浮岛工作台布局：**左侧静谧导航轨**顶部展示 Memloom 官方横向 Logo（随浅/深色自动切换），包含「全部记忆」「待审阅提案」「跨端迁移」三大主工作台入口、等权呈现的 DSH / AGY「已连接宿主」列表与「整理与审计」「宿主配置」维护入口，底部提供 `Ctrl+K` 命令面板、中/英文切换与浅/深色主题分段开关；**右侧圆角悬浮主画布**承载独立可滚动的工作区内容与自定义精工组件（零原生 `<select>` / 原生 checkbox / 原生 range）。
-  - 五大典型视图覆盖：**全部记忆**（跨端聚合与单宿主主从双栏管理、Markdown 排版检视、悬浮批量操作条、草稿保护编辑弹窗）、**待审阅提案**（跨端待审阅队列、`supersedes` 双栏版本对比与 `A` / `E` / `R` 快捷键）、**跨端迁移**（DSH ⇄ AGY 经纬桥接器与 3 步安全向导，含 `Replace` 禁止跳过及风险确认门禁）、**整理与审计**（`DreamRun` 历史按批撤销与不可变 `AuditRecord` Diff 时间线）与**宿主配置**（AGY 23 项可编辑参数含刻度字节滑块与备份重建，DSH 并发写保护状态机与只读 Profile 卡片）。
+  - 五大典型视图覆盖：**全部记忆**（跨端聚合与单宿主主从双栏管理、Markdown 排版检视、悬浮批量操作条、草稿保护编辑弹窗）、**待审阅提案**（跨端待审阅队列、`supersedes` 双栏版本对比与 `A` / `E` / `R` 快捷键）、**跨端迁移**（DSH ⇄ AGY 经纬桥接器与 3 步安全向导，含 `Replace` 禁止跳过及风险确认门禁）、**整理与审计**（`DreamRun` 历史按批撤销与不可变 `AuditRecord` Diff 时间线）与**宿主配置**（AGY 24 项可编辑参数含 `dreamSubagentModel` 档位选择、刻度字节滑块与备份重建，DSH 并发写保护状态机、宿主插件状态徽章与只读 Profile 卡片）。
 - **安全基线、生产窗口与外观**：
   - Electron 窗口启用 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`、`webSecurity: true`，移除顶部原生菜单栏及默认 DevTools 调试入口（仅在显式设置 `MEMLOOM_DESKTOP_DEVTOOLS=1` 时开放调试快捷键）；所有 IPC 通道经 `zod` 校验，文件路径操作严格受原生对话框授权登记簿约束。
   - 内置亮色 / 暗色 / 跟随系统主题与中文 / 英文界面切换，桌面自身状态持久化在 Electron `userData` 目录下的 `desktop-state.json`，不污染任何 `memory.json`。
@@ -54,7 +54,7 @@ pnpm --dir desktop run pack:win
 打包完成后将在 `dist/desktop-release/` 下生成向导式 Windows 安装程序（支持自定义安装路径、创建桌面与开始菜单快捷方式，卸载时保留 `%APPDATA%/memloom-desktop/` 用户数据）：
 
 ```text
-dist/desktop-release/memloom-desktop-0.2.1-win-x64-setup.exe
+dist/desktop-release/memloom-desktop-0.2.2-win-x64-setup.exe
 ```
 
 > [!TIP]

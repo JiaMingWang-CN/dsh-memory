@@ -33,6 +33,9 @@ const fields = {
   dreamProvider: z.string(),
   dreamModel: z.string(),
   dreamReasoningEffort: z.string(),
+  dreamSubagentModel: z
+    .union([z.const('flash_lite'), z.const('flash'), z.const('pro'), z.const('inherit')])
+    .default(MEMORY_CONFIG_DEFAULTS.dreamSubagentModel),
   dreamMaxEpisodes: z.natural().default(MEMORY_CONFIG_DEFAULTS.dreamMaxEpisodes),
   dreamMaxSessionsPerRun: z.natural().default(MEMORY_CONFIG_DEFAULTS.dreamMaxSessionsPerRun),
   dreamMaxTokens: z.natural().default(MEMORY_CONFIG_DEFAULTS.dreamMaxTokens),

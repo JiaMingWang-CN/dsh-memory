@@ -88,7 +88,7 @@ describe('local desktop server (signed runtime bridge)', () => {
       assetsDir: env.assetsDir,
       service: env.service,
       dialog: env.dialog,
-      appInfo: { version: '0.2.1', platform: 'win32' },
+      appInfo: { version: '0.2.2', platform: 'win32' },
     })
 
     try {

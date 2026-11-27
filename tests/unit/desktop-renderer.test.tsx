@@ -147,6 +147,14 @@ function createFakeBridge(options?: {
       lastCheckedAt: '2026-11-25T12:00:00.000Z',
       writable: false,
       configEditable: false,
+      pluginStatus: {
+        state: 'enabled',
+        installed: true,
+        enabled: true,
+        version: '0.2.1',
+        pluginName: 'dsh-memory',
+        installPath: 'C:/fake/dsh/profile/node_modules/dsh-memory',
+      },
     },
     {
       id: 'agy-default',
@@ -162,6 +170,12 @@ function createFakeBridge(options?: {
       lastCheckedAt: '2026-11-25T12:00:00.000Z',
       writable: true,
       configEditable: true,
+      pluginStatus: {
+        state: 'not-installed',
+        installed: false,
+        enabled: false,
+        detail: 'Plugin is not installed under ~/.gemini/config/plugins.',
+      },
     },
     {
       id: 'custom-broken',
@@ -489,7 +503,7 @@ function createFakeBridge(options?: {
       saveExportJson: () => ok('C:/fake/export.json'),
     },
     app: {
-      getInfo: () => ok({ version: '0.2.1', platform: 'win32', systemTheme: 'light' }),
+      getInfo: () => ok({ version: '0.2.2', platform: 'win32', systemTheme: 'light' }),
       getPreferences: () => ok(prefs),
       updatePreferences: (patch) => {
         spies.updatePreferences(patch)
@@ -705,32 +719,41 @@ describe('Desktop renderer core interactions', () => {
     expect(screen.getAllByText(/新增 2，跳过 0，替换 1/).length).toBeGreaterThanOrEqual(1)
   })
 
-  it('renders 23-field AGY config with detented slider + safety confirm and read-only card for DSH', async () => {
+  it('renders 24-field AGY config with subagent model selector, plugin status, detented slider + safety confirm, and read-only card for DSH', async () => {
     const { bridge, spies } = createFakeBridge()
     render(h(DesktopApp, { bridge }))
 
     await screen.findByText('DSH Lesson')
     const nav = screen.getByRole('navigation')
+    // Sidebar displays AGY not-installed status label and DSH enabled tooltip
+    expect(within(nav).getByText('未安装')).toBeTruthy()
     fireEvent.click(within(nav).getByText('宿主配置'))
 
-    // Default focuses AGY: shows 23 fields, detented slider, no DSH model selection fields
+    // Default focuses AGY: shows 24 fields, plugin status badge, subagent model selector, detented slider, no DSH model selection fields
     await screen.findByText('启用记忆插件')
+    expect(screen.getAllByText('未安装').length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText('dream 模型模式')).toBeNull()
     expect(screen.getByRole('slider', { name: '索引大小上限（字节）' })).toBeTruthy()
     expect(screen.getByLabelText('默认检索返回上限')).toBeTruthy()
+    expect(screen.getByRole('group', { name: '整理子代理模型档位' })).toBeTruthy()
 
-    // Disabling redactSecrets requires confirmation before calling updateConfig
+    // Select Flash Lite subagent model and disable redactSecrets -> requires confirmation before calling updateConfig
+    fireEvent.click(screen.getByRole('button', { name: 'Flash Lite' }))
     fireEvent.click(screen.getByRole('switch', { name: '秘密脱敏' }))
     fireEvent.click(await screen.findByRole('button', { name: '保存' }))
     expect(spies.updateConfig).not.toHaveBeenCalled()
     expect(screen.getByText('安全与自动化风险确认')).toBeTruthy()
     fireEvent.click(screen.getByText('确认'))
     await waitFor(() => expect(spies.updateConfig).toHaveBeenCalledTimes(1))
-    expect(spies.updateConfig.mock.calls[0]?.[0]).toMatchObject({ redactSecrets: false })
+    expect(spies.updateConfig.mock.calls[0]?.[0]).toMatchObject({
+      redactSecrets: false,
+      dreamSubagentModel: 'flash_lite',
+    })
 
-    // Switch to DSH tab -> shows read-only profile card and WriteGuard controls
+    // Switch to DSH tab -> shows enabled plugin status badge, read-only profile card, and WriteGuard controls
     fireEvent.click(screen.getByRole('tab', { name: 'DSH 默认' }))
     await screen.findByText('DSH 配置由 DSH Profile 管理')
+    expect(screen.getByText('已启用 v0.2.1')).toBeTruthy()
     expect(screen.getByText('DSH 并发写保护状态机')).toBeTruthy()
   })
 

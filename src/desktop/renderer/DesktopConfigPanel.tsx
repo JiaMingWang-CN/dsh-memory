@@ -1,7 +1,7 @@
 /**
  * Host Configuration & Safety Guard workbench:
- * - AGY hosts expose all 23 `AGY_EDITABLE_CONFIG_FIELDS` with detented byte slider,
- *   precision steppers, safety risk confirmation, floating unsaved bar, and backup/rebuild tools.
+ * - AGY hosts expose all 24 `AGY_EDITABLE_CONFIG_FIELDS` with detented byte slider,
+ *   precision steppers, subagent model selector, safety risk confirmation, floating unsaved bar, and backup/rebuild tools.
  * - DSH hosts expose interactive WriteGuard state machine, snapshot policy, and read-only profile card.
  * @module memloom/desktop/renderer/DesktopConfigPanel
  */
@@ -10,6 +10,7 @@ import { formatMessage, t } from '../../client/locales.ts'
 import {
   AGY_EDITABLE_CONFIG_FIELDS,
   MEMORY_CONFIG_DEFAULTS,
+  type DreamSubagentModel,
   type MemoryConfig,
   type ResolvedMemoryConfig,
 } from '../../core/config.ts'
@@ -55,6 +56,7 @@ interface AgyConfigDraft {
   autoAcceptProposals: boolean
   dreamIdleDelaySec: number
   autoDreamMinIntervalSec: number
+  dreamSubagentModel: DreamSubagentModel
   dreamMaxEpisodes: number
   dreamLookbackDays: number
   dreamProcessingTimeoutMs: number
@@ -83,6 +85,7 @@ function draftFromResolved(config?: ResolvedMemoryConfig): AgyConfigDraft {
     autoAcceptProposals: c.autoAcceptProposals,
     dreamIdleDelaySec: Math.max(0, Math.round(c.dreamIdleDelayMs / MS_PER_SECOND)),
     autoDreamMinIntervalSec: Math.max(0, Math.round(c.autoDreamMinIntervalMs / MS_PER_SECOND)),
+    dreamSubagentModel: c.dreamSubagentModel,
     dreamMaxEpisodes: c.dreamMaxEpisodes,
     dreamLookbackDays: c.dreamLookbackDays,
     dreamProcessingTimeoutMs: c.dreamProcessingTimeoutMs,
@@ -231,6 +234,7 @@ export function DesktopConfigPanel(props: DesktopConfigPanelProps): React.ReactE
         autoAcceptProposals: draft.autoAcceptProposals,
         dreamIdleDelayMs: draft.dreamIdleDelaySec * MS_PER_SECOND,
         autoDreamMinIntervalMs: draft.autoDreamMinIntervalSec * MS_PER_SECOND,
+        dreamSubagentModel: draft.dreamSubagentModel,
         dreamMaxEpisodes: draft.dreamMaxEpisodes,
         dreamLookbackDays: draft.dreamLookbackDays,
         dreamProcessingTimeoutMs: draft.dreamProcessingTimeoutMs,
@@ -257,6 +261,9 @@ export function DesktopConfigPanel(props: DesktopConfigPanelProps): React.ReactE
       const next = unwrapIpc(await bridge.memory.updateConfig({ clientId: activeClient.id, patch }))
       setConfigResult(next)
       setDraft(draftFromResolved(next.config))
+      if (patch.enabled !== undefined && patch.enabled !== baseline.enabled) {
+        await props.onDataChanged()
+      }
       props.onNotify(t('config.saved'), 'success')
     } catch (err) {
       props.onNotify(`${t('config.saveFailed')} ${desktopErrorText(err)}`, 'danger')
@@ -434,35 +441,119 @@ export function DesktopConfigPanel(props: DesktopConfigPanelProps): React.ReactE
                     },
                     activeClient.storePath,
                   ),
+                  activeClient.pluginStatus !== undefined
+                    ? h(
+                        'div',
+                        {
+                          style: {
+                            fontSize: '12px',
+                            color: 'var(--ml-text-muted)',
+                            marginTop: '6px',
+                            lineHeight: 1.5,
+                            wordBreak: 'break-all',
+                          },
+                        },
+                        activeClient.pluginStatus.installPath !== undefined
+                          ? `${t('desktop.plugin.installPathLabel')}: ${activeClient.pluginStatus.installPath}`
+                          : activeClient.pluginStatus.state === 'not-installed'
+                            ? activeClient.kind === 'dsh'
+                              ? t('desktop.plugin.notInstalledHintDsh')
+                              : t('desktop.plugin.notInstalledHintAgy')
+                            : (activeClient.pluginStatus.detail ?? ''),
+                        activeClient.pluginStatus.state === 'disabled' &&
+                          activeClient.pluginStatus.installPath !== undefined &&
+                          activeClient.pluginStatus.detail !== undefined
+                          ? ` (${activeClient.pluginStatus.detail})`
+                          : null,
+                      )
+                    : null,
                 ),
                 h(
-                  'span',
+                  'div',
                   {
                     style: {
-                      padding: '4px 10px',
-                      borderRadius: '7px',
-                      fontSize: '12px',
-                      fontWeight: 500,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      flexWrap: 'wrap',
+                      justifyContent: 'flex-end',
                       flex: 'none',
-                      background:
-                        activeClient.kind === 'agy'
-                          ? 'var(--ml-agy-soft)'
-                          : activeClient.kind === 'dsh'
-                            ? 'var(--ml-dsh-soft)'
-                            : 'var(--ml-copper-soft)',
-                      color:
-                        activeClient.kind === 'agy'
-                          ? 'var(--ml-agy)'
-                          : activeClient.kind === 'dsh'
-                            ? 'var(--ml-dsh)'
-                            : 'var(--ml-copper)',
                     },
                   },
-                  activeClient.kind === 'dsh'
-                    ? t('desktop.config.dshStoreMeta')
-                    : activeClient.kind === 'agy'
-                      ? t('desktop.config.agyStoreMeta')
-                      : activeClient.kind,
+                  activeClient.pluginStatus !== undefined
+                    ? h(
+                        'span',
+                        {
+                          'data-plugin-state': activeClient.pluginStatus.state,
+                          style: {
+                            padding: '4px 10px',
+                            borderRadius: '7px',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background:
+                              activeClient.pluginStatus.state === 'enabled'
+                                ? 'var(--ml-success-soft)'
+                                : activeClient.pluginStatus.state === 'disabled'
+                                  ? 'var(--ml-warn-soft)'
+                                  : 'var(--ml-recessed)',
+                            color:
+                              activeClient.pluginStatus.state === 'enabled'
+                                ? 'var(--ml-success)'
+                                : activeClient.pluginStatus.state === 'disabled'
+                                  ? 'var(--ml-warn)'
+                                  : 'var(--ml-text-muted)',
+                          },
+                        },
+                        h('span', {
+                          className: 'ml-host-dot',
+                          style: {
+                            background:
+                              activeClient.pluginStatus.state === 'enabled'
+                                ? 'var(--ml-success)'
+                                : activeClient.pluginStatus.state === 'disabled'
+                                  ? 'var(--ml-warn)'
+                                  : 'var(--ml-text-muted)',
+                          },
+                        }),
+                        activeClient.pluginStatus.state === 'enabled'
+                          ? `${t('desktop.plugin.enabled')}${activeClient.pluginStatus.version !== undefined ? ` v${activeClient.pluginStatus.version}` : ''}`
+                          : activeClient.pluginStatus.state === 'disabled'
+                            ? `${t('desktop.plugin.disabled')}${activeClient.pluginStatus.version !== undefined ? ` v${activeClient.pluginStatus.version}` : ''}`
+                            : t('desktop.plugin.notInstalled'),
+                      )
+                    : null,
+                  h(
+                    'span',
+                    {
+                      style: {
+                        padding: '4px 10px',
+                        borderRadius: '7px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        flex: 'none',
+                        background:
+                          activeClient.kind === 'agy'
+                            ? 'var(--ml-agy-soft)'
+                            : activeClient.kind === 'dsh'
+                              ? 'var(--ml-dsh-soft)'
+                              : 'var(--ml-copper-soft)',
+                        color:
+                          activeClient.kind === 'agy'
+                            ? 'var(--ml-agy)'
+                            : activeClient.kind === 'dsh'
+                              ? 'var(--ml-dsh)'
+                              : 'var(--ml-copper)',
+                      },
+                    },
+                    activeClient.kind === 'dsh'
+                      ? t('desktop.config.dshStoreMeta')
+                      : activeClient.kind === 'agy'
+                        ? t('desktop.config.agyStoreMeta')
+                        : activeClient.kind,
+                  ),
                 ),
               ),
 
@@ -766,6 +857,28 @@ export function DesktopConfigPanel(props: DesktopConfigPanelProps): React.ReactE
                           checked: draft.autoAcceptProposals,
                           disabled: saving,
                           onChange: (v) => updateDraft({ autoAcceptProposals: v }),
+                        }),
+                      ),
+                      h(
+                        'div',
+                        { style: { borderTop: '1px solid var(--ml-border)' } },
+                        h(SettingRow, {
+                          label: t('desktop.config.dreamSubagentModel'),
+                          hint: t('desktop.config.dreamSubagentModelHint'),
+                          control: h(SegmentedControl<DreamSubagentModel>, {
+                            label: t('desktop.config.dreamSubagentModel'),
+                            value: draft.dreamSubagentModel,
+                            onChange: (v) => updateDraft({ dreamSubagentModel: v }),
+                            items: [
+                              {
+                                id: 'flash_lite',
+                                label: t('desktop.config.subagentModel.flash_lite'),
+                              },
+                              { id: 'flash', label: t('desktop.config.subagentModel.flash') },
+                              { id: 'pro', label: t('desktop.config.subagentModel.pro') },
+                              { id: 'inherit', label: t('desktop.config.subagentModel.inherit') },
+                            ],
+                          }),
                         }),
                       ),
                       h(

@@ -686,6 +686,9 @@ export class MultiClientService {
 
     const cached = this.engines.get(clientId)
     const effective = cached !== undefined ? cached.engine.updateConfig(saved) : saved
+    if (cleanPatch.enabled !== undefined) {
+      await this.registry.refreshDiscovery()
+    }
 
     return {
       editable: true,

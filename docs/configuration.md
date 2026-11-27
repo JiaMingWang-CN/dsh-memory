@@ -19,6 +19,7 @@ memloom 的全部可调项都在 `src/host/config.ts` 的 `Config` schema 中定
 | `dreamProvider` | —（未设置） | `fixed` 模式使用的 provider；为空则退回默认模型。 |
 | `dreamModel` | —（未设置） | `fixed` 模式使用的 model；为空则退回默认模型。 |
 | `dreamReasoningEffort` | —（未设置） | 可选，覆盖思考强度。 |
+| `dreamSubagentModel` | `flash` | AGY 两阶段整理与原生 `autoDream` 派生后台子代理时建议使用的 Model 档位（`flash_lite` / `flash` / `pro` / `inherit`）。 |
 | `dreamMaxEpisodes` | `40` | 单次 dream 最多处理的 episode 数。 |
 | `dreamMaxSessionsPerRun` | `10` | 冷会话回填单次最多处理的会话数。 |
 | `dreamMaxTokens` | `4096` | 单次 dream 输出的 token 上限。 |
@@ -29,7 +30,7 @@ memloom 的全部可调项都在 `src/host/config.ts` 的 `Config` schema 中定
 | `refreshMinIntervalMs` | `60000` | 非紧急索引增量的最小间隔（毫秒）。 |
 | `refreshMaxBytes` | `2048` | 单条索引增量的字节预算。 |
 | `refreshResetBytes` | `8192` | 同一基线周期累计增量达到后改用完整 reset 的字节阈值。 |
-| `worklogCapture` | `significant` | worklog 捕获策略：`significant` 只在有文件变更、交付、用户纠正或明确完成结果时生成 `worklog(turn)`（子代理不生成）；`off` 完全停止。 |
+| `worklogCapture` | `significant` | worklog 捕获策略：`significant` 只在有文件变更、交付、用户纠正或明确完成结果时生成 `worklog(turn)`（子代理不生成）；`off` 同时停止 `worklog(turn)` 捕获与 Dream 阶段产出 `worklog` 提案。 |
 | `worklogRetentionDays` | `90` | `worklog(turn)` 保留天数，到期转 `archived`。 |
 | `episodeRetentionDays` | `30` | 已处理 episode 保留天数，之后物理删除。 |
 | `maxActiveMemories` | `5000` | `active` 条目上限；溢出时只自动归档未审阅的 `derived` 记录，用户拥有或 pinned 的记录受保护，容量不足时拒绝新增。 |
@@ -52,6 +53,7 @@ memloom 的全部可调项都在 `src/host/config.ts` 的 `Config` schema 中定
 - `autoCaptureEpisodes` 默认 `true`：自动捕获 episode，但普通片段不直接成为可检索知识。
 - `indexMaxBytes` 默认 `4096`：控制首次记忆索引的大小。
 
-以上默认值与 `src/host/config.ts` 保持一致；改动源码默认值时，必须同步更新本文与 README。
+以上默认值与 `src/host/config.ts`、`src/core/config.ts` 保持一致；改动源码默认值时，必须同步更新本文与 README。
 
-本版本没有新增配置字段。dream 队列启动恢复使用已持久化的队列数据；失败分类、退避与自动 dream 暂停的状态只保存在进程内，不提供配置项，进程重启后重置，`autoDream` 等既有默认值保持不变。
+- `dreamSubagentModel` 默认 `flash`：控制 AGY 端 `memory-dream` 与原生 `autoDream` 派生后台子代理的模型档位（可选 `flash_lite` / `flash` / `pro` / `inherit`）。
+- 失败分类、退避与自动 dream 暂停状态只保存在 DSH 进程内，进程重启后重置。

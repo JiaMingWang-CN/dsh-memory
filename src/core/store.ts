@@ -1281,6 +1281,13 @@ export class MemoryStore {
       .filter((record) => record.status === 'active')
   }
 
+  /** All currently pending records. */
+  pendingRecords(): MemoryRecord[] {
+    return [...this.memories.entries()]
+      .map(([, record]) => record)
+      .filter((record) => record.status === 'pending')
+  }
+
   /** Enforce the queued-episode capacity gate from the capture pipeline. */
   checkEpisodeCapacity(): void {
     this.capacity?.checkEpisodeQueue?.(this.counts())
@@ -1690,6 +1697,24 @@ export class MemoryStore {
         await this.episodes.put(id, {
           ...current,
           status: 'processed',
+          dreamId,
+          processedAt: nowIso,
+        })
+      }
+    })
+  }
+
+  /** Mark claimed episodes `skipped` when a completed dream produced no proposal citing them. */
+  async markEpisodesSkipped(ids: readonly EpisodeId[], dreamId: string): Promise<void> {
+    return this.serialize(async () => {
+      this.assertReady()
+      const nowIso = this.nowIso()
+      for (const id of ids) {
+        const current = this.episodes.get(id)
+        if (current === undefined) continue
+        await this.episodes.put(id, {
+          ...current,
+          status: 'skipped',
           dreamId,
           processedAt: nowIso,
         })

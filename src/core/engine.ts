@@ -33,12 +33,13 @@ import {
 } from './config.ts'
 import { checkDreamHealth } from './dream-health.ts'
 import {
-  DREAM_SYSTEM_PROMPT,
   ORGANIZE_RECORD_LIMIT,
   ORGANIZE_SYSTEM_PROMPT,
   RELATED_MEMORY_LIMIT,
   buildDreamPrompt,
+  buildDreamSystemPrompt,
   buildOrganizePrompt,
+  mergeRelatedMemories,
 } from './dream-prompt.ts'
 import {
   exportMemories,
@@ -98,22 +99,23 @@ const STRONG_SECRET_WRITE_MESSAGE =
 
 const MEMORY_TYPES: ReadonlySet<MemoryType> = new Set(['lesson', 'worklog', 'wiki', 'preference'])
 
-const DREAM_OUTPUT_SCHEMA = z.toJSONSchema(
-  z.object({
-    memories: z.array(
-      z.object({
-        type: memoryTypeSchema,
-        title: z.string().min(1),
-        body: z.string().min(1),
-        confidence: z.number().min(0).max(1),
-        importance: z.number().min(0).max(1),
-        sourceEpisodeIds: z.array(z.string().min(1)).min(1),
-        tags: z.array(z.string()).optional(),
-        supersedes: z.array(z.string().min(1)).optional(),
-      }),
-    ),
-  }),
-) as Record<string, unknown>
+const buildDreamOutputSchema = (allowWorklog: boolean): Record<string, unknown> =>
+  z.toJSONSchema(
+    z.object({
+      memories: z.array(
+        z.object({
+          type: allowWorklog ? memoryTypeSchema : z.enum(['lesson', 'wiki', 'preference']),
+          title: z.string().min(1),
+          body: z.string().min(1),
+          confidence: z.number().min(0).max(1),
+          importance: z.number().min(0).max(1),
+          sourceEpisodeIds: z.array(z.string().min(1)).min(1),
+          tags: z.array(z.string()).optional(),
+          supersedes: z.array(z.string().min(1)).optional(),
+        }),
+      ),
+    }),
+  ) as Record<string, unknown>
 
 const ORGANIZE_OUTPUT_SCHEMA = z.toJSONSchema(
   z.object({
@@ -179,11 +181,13 @@ export interface PrepareDreamInput {
   maxEpisodes?: number
   since?: string
   trigger?: Exclude<DreamTrigger, 'organize'>
+  model?: string
 }
 
 export interface PrepareOrganizeInput {
   scope: MemoryScope
   maxRecords?: number
+  model?: string
 }
 
 export interface MemoryWriteInput {
@@ -1346,7 +1350,7 @@ export class MemoryEngine {
       status: 'running',
       startedAt,
       provider: 'agy',
-      model: 'agent',
+      model: input.model?.trim() || `subagent:${this.resolvedConfig.dreamSubagentModel}`,
       episodes: 0,
       committed: 0,
       pending: 0,
@@ -1372,13 +1376,14 @@ export class MemoryEngine {
       health: checkDreamHealth(this.store, input.scope),
     })
 
+    const allowWorklog = this.resolvedConfig.worklogCapture !== 'off'
     return {
       dreamId,
       scope: input.scope,
       episodeIds: claimed.map((episode) => episode.id),
-      systemPrompt: DREAM_SYSTEM_PROMPT,
+      systemPrompt: buildDreamSystemPrompt({ allowWorklog }),
       userPrompt,
-      outputSchema: DREAM_OUTPUT_SCHEMA,
+      outputSchema: buildDreamOutputSchema(allowWorklog),
     }
   }
 
@@ -1455,11 +1460,7 @@ export class MemoryEngine {
         .filter((episode) => !persisted.usedEpisodeIds.has(episode.id))
         .map((episode) => episode.id)
       if (unusedIds.length > 0) {
-        await this.store.releaseEpisodes(
-          unusedIds,
-          dream.id,
-          'proposal did not reference this episode',
-        )
+        await this.store.markEpisodesSkipped(unusedIds, dream.id)
       }
 
       const finished: DreamRun = {
@@ -1483,7 +1484,7 @@ export class MemoryEngine {
         createdIds: persisted.createdIds,
         skippedDuplicates: persisted.skippedDuplicates,
         processedEpisodes: usedIds.length,
-        skippedEpisodes: 0,
+        skippedEpisodes: unusedIds.length,
       }
     } catch (error) {
       await this.runner.markFailed(operation, error)
@@ -1542,7 +1543,7 @@ export class MemoryEngine {
       status: 'running',
       startedAt: this.nowIso(),
       provider: 'agy',
-      model: 'agent',
+      model: input.model?.trim() || `subagent:${this.resolvedConfig.dreamSubagentModel}`,
       episodes: 0,
       committed: 0,
       pending: 0,
@@ -1720,6 +1721,12 @@ export class MemoryEngine {
     const type = entry.type
     if (typeof type !== 'string' || !MEMORY_TYPES.has(type as MemoryType)) {
       throw new OperationError('MEMORY_INVALID_CONTENT', 'proposal entry has an invalid type')
+    }
+    if (!isOrganize && this.resolvedConfig.worklogCapture === 'off' && type === 'worklog') {
+      throw new OperationError(
+        'MEMORY_INVALID_CONTENT',
+        'worklog proposals are disabled when worklogCapture is off',
+      )
     }
     if (scope.kind === 'global' && type !== 'preference') {
       throw new OperationError('MEMORY_FORBIDDEN_SCOPE', 'only preference memories may be global')
@@ -2064,6 +2071,7 @@ export class MemoryEngine {
       .trim()
 
     const workspaceKey = scope.kind === 'workspace' ? scope.key : null
+    const active: MemoryRecord[] = []
     if (query !== '') {
       const hits = this.search({
         query,
@@ -2071,26 +2079,30 @@ export class MemoryEngine {
         scope: scope.kind === 'global' ? 'global' : 'auto',
         limit: RELATED_MEMORY_LIMIT,
       }).results
-      const records: MemoryRecord[] = []
       for (const hit of hits) {
         const record = this.store.get(MemoryId(hit.id))
         if (record !== undefined && isRecordVisible(record, workspaceKey)) {
-          records.push({ ...record, title: this.redactText(record.title) })
+          active.push(record)
         }
-        if (records.length >= RELATED_MEMORY_LIMIT) break
       }
-      return records
+    } else {
+      for (const record of this.store.activeRecords()) {
+        if (isRecordVisible(record, workspaceKey)) {
+          active.push(record)
+        }
+      }
     }
 
-    return this.store
-      .activeRecords()
-      .filter((record) => {
-        if (record.scope.kind === 'global') return record.type === 'preference'
-        if (scope.kind === 'global') return false
-        return record.scope.key === scope.key
-      })
-      .slice(0, RELATED_MEMORY_LIMIT)
-      .map((record) => ({ ...record, title: this.redactText(record.title) }))
+    const pending = this.store
+      .pendingRecords()
+      .filter((record) => isRecordVisible(record, workspaceKey))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    return mergeRelatedMemories(
+      active,
+      pending,
+      (title) => this.redactText(title),
+      RELATED_MEMORY_LIMIT,
+    )
   }
 
   private redactEpisode(episode: EpisodeRecord): EpisodeRecord {

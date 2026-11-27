@@ -860,4 +860,145 @@ describe('handleHookEvent — Stop & CLI', () => {
       expect(res.decision, serverName).toBe('force_ask')
     }
   })
+
+  it('triggers AGY native autoDream reminder on PreInvocation after Stop captures episodes and respects cooldown', async () => {
+    const dataDir = makeTempDir()
+    const env = { PLUGIN_DATA: dataDir }
+    const paths = resolveAgyDataPaths(env)
+
+    const configStore = new AgyConfigStore(paths.configPath)
+    await configStore.savePatch({
+      autoDream: true,
+      dreamSubagentModel: 'flash_lite',
+      autoDreamMinIntervalMs: 3_600_000,
+    })
+
+    // First PreInvocation establishes baseline with zero episodes
+    await handleHookEvent(
+      {
+        hookEventName: 'PreInvocation',
+        conversationId: 'conv-autodream',
+        workspacePaths: ['/ws/auto'],
+        lastUserInput: '<USER_REQUEST>Initial question</USER_REQUEST>',
+      },
+      env,
+    )
+
+    // Stop captures a turn episode and marks pendingAutoDreamCheck
+    const transcriptPath = join(dataDir, 'transcript-auto.jsonl')
+    writeFileSync(
+      transcriptPath,
+      [
+        JSON.stringify({
+          step_index: 0,
+          source: 'USER_EXPLICIT',
+          type: 'USER_INPUT',
+          status: 'DONE',
+          created_at: new Date().toISOString(),
+          content: '<USER_REQUEST>Build the project</USER_REQUEST>',
+        }),
+        JSON.stringify({
+          step_index: 1,
+          source: 'MODEL',
+          type: 'PLANNER_RESPONSE',
+          status: 'DONE',
+          created_at: new Date().toISOString(),
+          content: 'Ran pnpm build cleanly.',
+          tool_calls: [{ name: 'write_file', args: { Path: '/ws/auto/index.ts' } }],
+        }),
+        JSON.stringify({
+          step_index: 2,
+          source: 'SYSTEM',
+          type: 'GENERIC',
+          status: 'DONE',
+          created_at: new Date().toISOString(),
+          content: 'Wrote file',
+        }),
+      ].join('\n') + '\n',
+      'utf8',
+    )
+
+    await handleHookEvent(
+      {
+        hookEventName: 'Stop',
+        conversationId: 'conv-autodream',
+        workspacePaths: ['/ws/auto'],
+        transcriptPath,
+        terminationReason: 'NO_TOOL_CALL',
+      },
+      env,
+    )
+
+    // Next PreInvocation injects [Memloom autoDream] reminder with configured Model tier
+    const triggered = (await handleHookEvent(
+      {
+        hookEventName: 'PreInvocation',
+        conversationId: 'conv-autodream',
+        workspacePaths: ['/ws/auto'],
+        lastUserInput: '<USER_REQUEST>Next task</USER_REQUEST>',
+      },
+      env,
+    )) as { injectSteps?: { systemMessage?: { systemMessage?: string } }[] }
+
+    const reminder =
+      triggered.injectSteps?.map((s) => s.systemMessage?.systemMessage ?? '').join('\n') ?? ''
+    expect(reminder).toContain('[Memloom autoDream]')
+    expect(reminder).toContain('Model 设为 "flash_lite"')
+
+    // Subsequent PreInvocation without new Stop episodes fast-skips cleanly
+    const skipped = await handleHookEvent(
+      {
+        hookEventName: 'PreInvocation',
+        conversationId: 'conv-autodream',
+        workspacePaths: ['/ws/auto'],
+        lastUserInput: '<USER_REQUEST>Third turn</USER_REQUEST>',
+      },
+      env,
+    )
+    expect(skipped).toEqual({})
+
+    // Even if another Stop captures an episode immediately, cooldown prevents re-triggering
+    writeFileSync(
+      transcriptPath,
+      [
+        JSON.stringify({
+          step_index: 3,
+          source: 'USER_EXPLICIT',
+          type: 'USER_INPUT',
+          status: 'DONE',
+          created_at: new Date().toISOString(),
+          content: '<USER_REQUEST>Another edit</USER_REQUEST>',
+        }),
+        JSON.stringify({
+          step_index: 4,
+          source: 'MODEL',
+          type: 'PLANNER_RESPONSE',
+          status: 'DONE',
+          created_at: new Date().toISOString(),
+          content: 'Done.',
+        }),
+      ].join('\n') + '\n',
+      { encoding: 'utf8', flag: 'a' },
+    )
+    await handleHookEvent(
+      {
+        hookEventName: 'Stop',
+        conversationId: 'conv-autodream',
+        workspacePaths: ['/ws/auto'],
+        transcriptPath,
+        terminationReason: 'NO_TOOL_CALL',
+      },
+      env,
+    )
+    const cooledDown = await handleHookEvent(
+      {
+        hookEventName: 'PreInvocation',
+        conversationId: 'conv-autodream',
+        workspacePaths: ['/ws/auto'],
+        lastUserInput: '<USER_REQUEST>Fourth turn</USER_REQUEST>',
+      },
+      env,
+    )
+    expect(cooledDown).toEqual({})
+  })
 })

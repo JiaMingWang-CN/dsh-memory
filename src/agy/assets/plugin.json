@@ -1,7 +1,7 @@
 {
   "name": "memloom",
   "displayName": "Memloom",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "长期记忆插件：按作用域隔离的持久化记忆存储、BM25 检索、增量会话捕获、两阶段 Dreaming 整理与人工审阅门禁。",
   "logo": "assets/logo.svg",
   "suggestedPrompts": [

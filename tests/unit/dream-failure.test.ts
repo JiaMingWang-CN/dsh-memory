@@ -390,7 +390,6 @@ describe('dream manual recovery', () => {
   it('manual success clears', async () => {
     const { store, runner } = await openStore()
     const first = await addEpisode(store, 1)
-    await addEpisode(store, 2)
     let now = new Date('2026-01-01T00:00:00.000Z')
     const dreamer = new MemoryDreamer({
       store,
@@ -423,6 +422,7 @@ describe('dream manual recovery', () => {
 
     // A successful manual run resets the streak: the next transient failure
     // schedules the first-step backoff instead of pausing the dreamer.
+    await addEpisode(store, 2)
     now = new Date(now.getTime() + 1_000)
     await run('auto')
     expect(dreamer.dreamQueueState()).toEqual({

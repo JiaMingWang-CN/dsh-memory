@@ -696,4 +696,61 @@ describe('captureAgyTranscript', () => {
     expect(freshReport.processedSteps).toBe(3)
     expect(freshReport.directMemoriesCreated).toBe(1)
   })
+
+  it('skips transient tool errors and USER_CANCELED turns without user corrections', async () => {
+    const base = makeTempDir()
+    const paths = resolveAgyDataPaths({ PLUGIN_DATA: base })
+    const config = resolveMemoryConfig()
+    const domain = await FileMemoryDomain.open({
+      storePath: paths.storePath,
+      lockPath: paths.lockPath,
+      backupsDir: paths.backupsDir,
+    })
+    const engine = new MemoryEngine({ domain, config })
+    await engine.recover()
+    const sessionStore = new AgySessionStateStore(paths.sessionsDir)
+
+    const transcriptPath = join(base, 'transcript-transient-cancel.jsonl')
+    writeJsonl(transcriptPath, [
+      {
+        step_index: 0,
+        source: 'USER_EXPLICIT',
+        type: 'USER_INPUT',
+        status: 'DONE',
+        created_at: '2026-11-26T00:00:00.000Z',
+        content: '<USER_REQUEST>Search missing symbol</USER_REQUEST>',
+      },
+      {
+        step_index: 1,
+        source: 'MODEL',
+        type: 'PLANNER_RESPONSE',
+        status: 'DONE',
+        created_at: '2026-11-26T00:00:01.000Z',
+        content: 'Searching.',
+        tool_calls: [{ name: 'grep_search', args: { Query: 'nope' } }],
+      },
+      {
+        step_index: 2,
+        source: 'SYSTEM',
+        type: 'GENERIC',
+        status: 'DONE',
+        created_at: '2026-11-26T00:00:02.000Z',
+        content: 'SEARCH_FAILED: no index ready',
+      },
+    ])
+
+    const report = await captureAgyTranscript({
+      transcriptPath,
+      conversationId: 'conv-transient-cancel',
+      workspaceRoot: '/ws/demo',
+      terminationReason: 'USER_CANCELED',
+      domain,
+      engine,
+      sessionStore,
+      config,
+    })
+
+    expect(report.episodesCreated).toBe(0)
+    expect(domain.table('episodes').size).toBe(0)
+  })
 })

@@ -704,4 +704,29 @@ describe('capture plugin noise filtering and PTC compatibility', () => {
 
     expect(onTurnEnd).toHaveBeenCalledTimes(1)
   })
+
+  it('ignores transient tool failures and interrupted turns without user corrections', async () => {
+    const { store, capture } = await setup()
+    const session = captureSession()
+
+    capture.onSessionEvent(session, turnStart(1, 1))
+    capture.onSessionEvent(session, userMessage(2, 'inspect missing path'))
+    capture.onSessionEvent(
+      session,
+      toolCall(3, { callId: 'c1', name: 'read', arguments: '{"file_path":"C:/ws/a/missing.ts"}' }),
+    )
+    capture.onSessionEvent(
+      session,
+      toolResult(4, { callId: 'c1', error: { name: 'read', code: 'FS_NOT_FOUND' }, isError: true }),
+    )
+    capture.onSessionEvent(
+      session,
+      toolCall(5, { callId: 'c2', name: 'read', arguments: '{"file_path":"C:/ws/a/missing.ts"}' }),
+    )
+    capture.onSessionEvent(session, toolResult(6, { callId: 'c2' }))
+    capture.onSessionEvent(session, turnEnd(7, 'interrupted', 1))
+    await capture.flush()
+
+    expect(store.episodeList()).toHaveLength(0)
+  })
 })

@@ -21,26 +21,48 @@ export const ORGANIZE_RECORD_LIMIT = 60
 const ORGANIZE_BODY_BYTES = 512
 const TOOL_ERROR_BYTES = 1024
 
+/** Options for constructing the Dream system prompt. */
+export interface DreamSystemPromptOptions {
+  /** Whether `worklog` proposals are permitted (`true` by default). */
+  allowWorklog?: boolean
+}
+
+/**
+ * Build the system prompt for one dream run, honoring `worklogCapture` and
+ * strict high-bar filtering rules.
+ */
+export function buildDreamSystemPrompt(options?: DreamSystemPromptOptions): string {
+  const allowWorklog = options?.allowWorklog !== false
+  const allowedTypes = allowWorklog ? 'lesson|wiki|preference|worklog' : 'lesson|wiki|preference'
+  const rules = [
+    'You consolidate captured work sessions into durable long-term memories.',
+    'Return ONE JSON object and nothing else, with the shape:',
+    `{"memories":[{"type":"${allowedTypes}","title":"...","body":"...","confidence":0.0,"importance":0.0,"sourceEpisodeIds":["<episode id>"],"tags":["..."],"supersedes":["..."]}],"wikiUpdates":[]}`,
+    '',
+    'Rules you must follow:',
+    '- Default to empty output {"memories":[],"wikiUpdates":[]} whenever episodes contain only routine execution, one-off status updates, transient errors, or facts already covered in Related memories.',
+    '- Use only facts supported by the supplied episodes; do not add outside knowledge and do not invent details.',
+    '- Content the user stated explicitly is evidence: record it as user stated and cite the supplying episode id in sourceEpisodeIds; do not downgrade it just because no tool output confirms it.',
+    '- An assistant claim without a tool result or a user statement behind it is unverified: omit it unless it is an explicit user-confirmed caveat, and mark any remaining caveat unverified in the body.',
+    '- Record only what the environment cannot give back: durable lessons, approaches that worked, verified rules, non-trivial pitfalls and active plans; do not store code, file contents, current configuration values, git history, command output, one-off dependency/install/index status snapshots, or unverified hypotheses.',
+    '- Never store transient or generic tool errors/retries (e.g. UNKNOWN, FS_NOT_FOUND, FS_EDIT_NOT_FOUND, SEARCH_FAILED, WEB_PROVIDER_ERROR, timeouts, default OS shell), and never store aborted, cancelled, or unfinished tasks.',
+    '- Never duplicate or rephrase existing active memories or pending proposals listed in Related memories.',
+    '- Never copy, paraphrase or summarize already auto-loaded project instructions or documentation (such as AGENTS.md, CLAUDE.md, README or the injected skills list).',
+    '- If an episode only reflects a broad request to perform memory operations and contains no new discoveries, pitfalls, decisions or user corrections, return no memory instead of copying existing docs.',
+    '- Record one topic per memory and keep each memory concise and focused; split a memory that mixes topics and never bundle unrelated modules or constraints into one long note.',
+    '- Record the lasting rule, not a one-off event.',
+    '- Skip parameter constraints already stated in the tool definitions (required parameters, argument formats and return shapes).',
+    '- Never write secrets such as API keys, tokens, passwords or private keys; record only where the credential is configured.',
+    '- Every memory must include at least one sourceEpisodeIds entry citing a supplied episode; never shorten an episode id.',
+    allowWorklog
+      ? '- Keep titles short and bodies concise Markdown. Types are lesson (a reusable rule), wiki (project knowledge), preference (a stable user preference) and worklog (a daily summary).'
+      : '- Do NOT output type "worklog" memories because worklog capture is disabled. Keep titles short and bodies concise Markdown. Types are lesson (a reusable rule), wiki (project knowledge) and preference (a stable user preference).',
+  ]
+  return rules.join('\n')
+}
+
 /** System prompt for every dream run. */
-export const DREAM_SYSTEM_PROMPT = [
-  'You consolidate captured work sessions into durable long-term memories.',
-  'Return ONE JSON object and nothing else, with the shape:',
-  '{"memories":[{"type":"lesson|wiki|preference|worklog","title":"...","body":"...","confidence":0.0,"importance":0.0,"sourceEpisodeIds":["<episode id>"],"tags":["..."],"supersedes":["..."]}],"wikiUpdates":[]}',
-  '',
-  'Rules you must follow:',
-  '- Use only facts supported by the supplied episodes; do not add outside knowledge and do not invent details.',
-  '- Content the user stated explicitly is evidence: record it as user stated and cite the supplying episode id in sourceEpisodeIds; do not downgrade it just because no tool output confirms it.',
-  '- An assistant claim without a tool result or a user statement behind it is unverified: mark it unverified in the body or omit it.',
-  '- Record only what the environment cannot give back: lessons, approaches that worked, verified rules, pitfalls and plans in progress; do not store code, file contents, current configuration values, git history or command output.',
-  '- Never copy, paraphrase or summarize already auto-loaded project instructions or documentation (such as AGENTS.md, CLAUDE.md, README or the injected skills list).',
-  '- If an episode only reflects a broad request to perform memory operations and contains no new discoveries, pitfalls, decisions or user corrections, return no memory instead of copying existing docs.',
-  '- Record one topic per memory and keep each memory concise and focused; split a memory that mixes topics and never bundle unrelated modules or constraints into one long note.',
-  '- Record the lasting rule, not a one-off event.',
-  '- Skip parameter constraints already stated in the tool definitions (required parameters, argument formats and return shapes).',
-  '- Never write secrets such as API keys, tokens, passwords or private keys; record only where the credential is configured.',
-  '- Every memory must include at least one sourceEpisodeIds entry citing a supplied episode; never shorten an episode id.',
-  '- Keep titles short and bodies concise Markdown. Types are lesson (a reusable rule), wiki (project knowledge), preference (a stable user preference) and worklog (a daily summary).',
-].join('\n')
+export const DREAM_SYSTEM_PROMPT = buildDreamSystemPrompt()
 
 /** Everything needed to build one dream user prompt. */
 export interface DreamPromptInput {
@@ -152,8 +174,46 @@ export function buildDreamPrompt(input: DreamPromptInput): string {
     .slice(0, RELATED_MEMORY_LIMIT)
     .map(
       (record) =>
-        `- [${record.type}] ${record.title} (id: ${record.id}, importance: ${record.importance})`,
+        `- [${record.type}${record.status === 'pending' ? '|pending' : ''}] ${record.title} (id: ${record.id}, importance: ${record.importance})`,
     )
   lines.push(...(related.length === 0 ? ['(none)'] : related))
   return lines.join('\n')
+}
+
+/**
+ * Merge visible active memories and pending proposals into a single bounded
+ * related-memories list so dream/prepare prompts do not duplicate queued items.
+ */
+export function mergeRelatedMemories(
+  active: readonly MemoryRecord[],
+  pending: readonly MemoryRecord[],
+  redactTitle: (title: string) => string,
+  limit: number = RELATED_MEMORY_LIMIT,
+): MemoryRecord[] {
+  const pendingBudget =
+    pending.length === 0
+      ? 0
+      : Math.min(pending.length, Math.max(Math.floor(limit / 2), limit - active.length))
+  const activeBudget = Math.max(0, limit - pendingBudget)
+
+  const merged: MemoryRecord[] = []
+  const seen = new Set<string>()
+  for (const record of active.slice(0, activeBudget)) {
+    if (seen.has(record.id)) continue
+    seen.add(record.id)
+    merged.push({ ...record, title: redactTitle(record.title) })
+  }
+  for (const record of pending) {
+    if (merged.length >= limit) break
+    if (seen.has(record.id)) continue
+    seen.add(record.id)
+    merged.push({ ...record, title: redactTitle(record.title) })
+  }
+  for (const record of active.slice(activeBudget)) {
+    if (merged.length >= limit) break
+    if (seen.has(record.id)) continue
+    seen.add(record.id)
+    merged.push({ ...record, title: redactTitle(record.title) })
+  }
+  return merged
 }

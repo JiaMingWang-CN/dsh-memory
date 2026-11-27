@@ -20,7 +20,7 @@ import { createAgyTools } from './tools.ts'
 import { resolveCallContext } from './workspace-resolver.ts'
 
 const SERVER_NAME = 'memloom'
-const SERVER_VERSION = '0.2.1'
+const SERVER_VERSION = '0.2.2'
 const RETENTION_INTERVAL_MS = 6 * 60 * 60 * 1000
 const SESSION_RETENTION_DAYS = 30
 

@@ -1,6 +1,6 @@
 {
   "name": "memloom",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "Local-first long-term experience memory for coding agents (DSH & Antigravity): durable scoped storage, BM25 retrieval, dreaming & human review.",
   "type": "module",

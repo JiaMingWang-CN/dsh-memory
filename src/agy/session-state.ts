@@ -23,6 +23,8 @@ export interface AgySessionState {
   indexSources: MemoryIndexSource[]
   captureTurn: number
   previousAssistantText?: string
+  pendingAutoDreamCheck?: boolean
+  lastAutoDreamPromptAt?: string
   updatedAt: string
 }
 
@@ -66,6 +68,13 @@ function parseSessionState(raw: unknown): AgySessionState | undefined {
     ...(typeof obj.scopeKey === 'string' ? { scopeKey: obj.scopeKey } : {}),
     ...(typeof obj.previousAssistantText === 'string'
       ? { previousAssistantText: obj.previousAssistantText }
+      : {}),
+    ...(typeof obj.pendingAutoDreamCheck === 'boolean'
+      ? { pendingAutoDreamCheck: obj.pendingAutoDreamCheck }
+      : {}),
+    ...(typeof obj.lastAutoDreamPromptAt === 'string' &&
+    !Number.isNaN(Date.parse(obj.lastAutoDreamPromptAt))
+      ? { lastAutoDreamPromptAt: obj.lastAutoDreamPromptAt }
       : {}),
   }
 }
@@ -116,6 +125,12 @@ export class AgySessionStateStore {
       ...(state.scopeKey !== undefined ? { scopeKey: state.scopeKey } : {}),
       ...(state.previousAssistantText !== undefined
         ? { previousAssistantText: state.previousAssistantText }
+        : {}),
+      ...(state.pendingAutoDreamCheck !== undefined
+        ? { pendingAutoDreamCheck: state.pendingAutoDreamCheck }
+        : {}),
+      ...(state.lastAutoDreamPromptAt !== undefined
+        ? { lastAutoDreamPromptAt: state.lastAutoDreamPromptAt }
         : {}),
     }
     await writeFileAtomic(

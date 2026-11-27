@@ -15,8 +15,9 @@ import type { MemoryConfig } from './config.ts'
 import { checkDreamHealth } from './dream-health.ts'
 import {
   buildDreamPrompt,
+  buildDreamSystemPrompt,
   buildOrganizePrompt,
-  DREAM_SYSTEM_PROMPT,
+  mergeRelatedMemories,
   ORGANIZE_RECORD_LIMIT,
   ORGANIZE_SYSTEM_PROMPT,
   RELATED_MEMORY_LIMIT,
@@ -568,21 +569,20 @@ export class MemoryDreamer {
           failure = new Error('dream was cancelled')
           return
         }
-        await this.store.markEpisodesProcessed(
-          summary.usedEpisodeIds as EpisodeRecord['id'][],
-          dreamId,
-        )
-        this.clearOtherFailures(summary.usedEpisodeIds)
+        if (summary.usedEpisodeIds.length > 0) {
+          await this.store.markEpisodesProcessed(
+            summary.usedEpisodeIds as EpisodeRecord['id'][],
+            dreamId,
+          )
+          this.clearOtherFailures(summary.usedEpisodeIds)
+        }
         const used = new Set(summary.usedEpisodeIds)
         const unused = claimed
           .filter((episode) => !used.has(episode.id))
           .map((episode) => episode.id)
         if (unused.length > 0) {
-          await this.store.releaseEpisodes(
-            unused,
-            dreamId,
-            'proposal did not reference this episode',
-          )
+          await this.store.markEpisodesSkipped(unused, dreamId)
+          this.clearOtherFailures(unused)
         }
         if (this.isCancelled(dreamId, controller.signal)) {
           await this.releaseCancelled(dreamId, claimed)
@@ -1136,9 +1136,8 @@ export class MemoryDreamer {
   }
 
   /**
-   * Rank the active memories related to one batch. A batch with searchable text
-   * only sees its BM25 matches; a batch without text falls back to the visible
-   * active set so the model still has the duplicate-title context.
+   * Rank the active and pending memories related to one batch so the model avoids
+   * proposing duplicates of already queued or active knowledge.
    */
   private collectRelated(scope: MemoryScope, claimed: readonly EpisodeRecord[]): MemoryRecord[] {
     const query = claimed
@@ -1150,21 +1149,25 @@ export class MemoryDreamer {
       .join(' ')
       .slice(0, 800)
       .trim()
-    if (this.relatedSearch !== undefined && query !== '') {
-      return this.relatedSearch({
-        query,
-        workspaceKey: scope.kind === 'workspace' ? scope.key : null,
-        scope: scope.kind === 'global' ? 'global' : 'auto',
-        limit: RELATED_MEMORY_LIMIT,
-      })
-        .slice(0, RELATED_MEMORY_LIMIT)
-        .map((record) => ({ ...record, title: this.redactText(record.title) }))
-    }
-    return this.store
-      .activeRecords()
+    const active: MemoryRecord[] =
+      this.relatedSearch !== undefined && query !== ''
+        ? this.relatedSearch({
+            query,
+            workspaceKey: scope.kind === 'workspace' ? scope.key : null,
+            scope: scope.kind === 'global' ? 'global' : 'auto',
+            limit: RELATED_MEMORY_LIMIT,
+          })
+        : this.store.activeRecords().filter((record) => this.visibleInScope(record, scope))
+    const pending = this.store
+      .pendingRecords()
       .filter((record) => this.visibleInScope(record, scope))
-      .slice(0, RELATED_MEMORY_LIMIT)
-      .map((record) => ({ ...record, title: this.redactText(record.title) }))
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    return mergeRelatedMemories(
+      active,
+      pending,
+      (title) => this.redactText(title),
+      RELATED_MEMORY_LIMIT,
+    )
   }
 
   /** Build prompt and call the model, retrying once on invalid JSON. */
@@ -1189,7 +1192,7 @@ export class MemoryDreamer {
     const baseOptions: GenerateOptions = {
       provider: selection.provider,
       model: selection.model,
-      system: DREAM_SYSTEM_PROMPT,
+      system: buildDreamSystemPrompt({ allowWorklog: this.config.worklogCapture !== 'off' }),
       messages,
       maxTokens: this.config.dreamMaxTokens ?? 4096,
       signal,
@@ -1274,11 +1277,20 @@ export class MemoryDreamer {
       ...memoriesRaw.map((entry) => ({ entry, forced: undefined as MemoryType | undefined })),
       ...wikiRaw.map((entry) => ({ entry, forced: 'wiki' as MemoryType })),
     ]
-    if (raw.length === 0) throw new Error('model output contained no memories')
+    if (raw.length === 0) return { memories: [] }
+    const allowWorklog = this.config.worklogCapture !== 'off'
     const knownEpisodes = new Set(claimed.map((episode) => episode.id as string))
-    const memories = raw.map(({ entry, forced }) =>
-      this.normalizeEntry(entry, forced, scope, knownEpisodes),
-    )
+    const memories = raw
+      .filter(({ entry, forced }) => {
+        if (allowWorklog) return true
+        const candidateType =
+          forced ??
+          (entry !== null && typeof entry === 'object'
+            ? (entry as Record<string, unknown>).type
+            : undefined)
+        return candidateType !== 'worklog'
+      })
+      .map(({ entry, forced }) => this.normalizeEntry(entry, forced, scope, knownEpisodes))
     return { memories }
   }
 

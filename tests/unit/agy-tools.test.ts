@@ -355,23 +355,45 @@ describe('agy tiered MCP memory tools', () => {
     const ctx = makeWorkspaceCtx('C:\\Workspaces\\ConfigTest')
 
     const updated = (await getTool('memory_config').execute(
-      { indexMaxBytes: 2048, redactSecrets: true, searchLimit: 10 },
+      {
+        indexMaxBytes: 2048,
+        redactSecrets: true,
+        searchLimit: 10,
+        dreamSubagentModel: 'flash_lite',
+      },
       ctx,
-    )) as { config: { indexMaxBytes: number; redactSecrets: boolean; searchLimit: number } }
+    )) as {
+      config: {
+        indexMaxBytes: number
+        redactSecrets: boolean
+        searchLimit: number
+        dreamSubagentModel: string
+      }
+    }
 
     expect(updated.config.indexMaxBytes).toBe(2048)
     expect(updated.config.redactSecrets).toBe(true)
     expect(updated.config.searchLimit).toBe(10)
+    expect(updated.config.dreamSubagentModel).toBe('flash_lite')
 
     const status = (await getTool('memory_status').execute({}, ctx)) as {
-      config: { indexMaxBytes: number; searchLimit: number }
+      config: { indexMaxBytes: number; searchLimit: number; dreamSubagentModel: string }
     }
     expect(status.config.indexMaxBytes).toBe(2048)
     expect(status.config.searchLimit).toBe(10)
+    expect(status.config.dreamSubagentModel).toBe('flash_lite')
 
     const persisted = JSON.parse(await fs.readFile(configPath, 'utf8')) as Record<string, unknown>
     expect(persisted.indexMaxBytes).toBe(2048)
     expect(persisted.searchLimit).toBe(10)
+    expect(persisted.dreamSubagentModel).toBe('flash_lite')
+
+    // memory_dream_prepare returns recommendedSubagentModel and records model on DreamRun
+    const prep = (await getTool('memory_dream_prepare').execute({}, ctx)) as {
+      dreamId: string
+      recommendedSubagentModel: string
+    }
+    expect(prep.recommendedSubagentModel).toBe('flash_lite')
 
     // Reject DSH-only fields
     for (const field of [

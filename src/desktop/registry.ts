@@ -8,7 +8,7 @@ import path from 'node:path'
 import { z } from 'zod'
 import { readFileWithRetry, writeFileAtomic } from '../agy/storage.ts'
 import { OperationError } from '../core/operations.ts'
-import type { DiscoveredStore, PlatformAdapter } from './platform/types.ts'
+import type { DiscoveredStore, HostPluginStatus, PlatformAdapter } from './platform/types.ts'
 import { parseStoreEnvelope, type StoreEnvelopeFormat } from './storage/envelope.ts'
 
 export const DESKTOP_STATE_VERSION = 1
@@ -43,6 +43,7 @@ export interface RegisteredClient {
   readonly healthDetail?: string
   readonly lastCheckedAt: string
   readonly profileName?: string
+  readonly pluginStatus?: HostPluginStatus
 }
 
 export interface AddCustomClientInput {
@@ -80,6 +81,16 @@ const preferencesPatchSchema = z
   })
   .strict()
 
+const hostPluginStatusSchema = z.object({
+  state: z.enum(['enabled', 'disabled', 'not-installed', 'unknown']),
+  installed: z.boolean(),
+  enabled: z.boolean().nullable(),
+  version: z.string().min(1).optional(),
+  pluginName: z.string().min(1).optional(),
+  installPath: z.string().min(1).optional(),
+  detail: z.string().optional(),
+})
+
 const registeredClientSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -94,6 +105,7 @@ const registeredClientSchema = z.object({
   healthDetail: z.string().optional(),
   lastCheckedAt: z.string().min(1),
   profileName: z.string().min(1).optional(),
+  pluginStatus: hostPluginStatusSchema.optional(),
 })
 
 const persistedStateSchema = z.object({
@@ -126,6 +138,26 @@ function clonePreferences(prefs: DesktopPreferences): DesktopPreferences {
   }
 }
 
+function clonePluginStatus(status: {
+  readonly state: HostPluginStatus['state']
+  readonly installed: boolean
+  readonly enabled: boolean | null
+  readonly version?: string | undefined
+  readonly pluginName?: string | undefined
+  readonly installPath?: string | undefined
+  readonly detail?: string | undefined
+}): HostPluginStatus {
+  return {
+    state: status.state,
+    installed: status.installed,
+    enabled: status.enabled,
+    ...(status.version !== undefined ? { version: status.version } : {}),
+    ...(status.pluginName !== undefined ? { pluginName: status.pluginName } : {}),
+    ...(status.installPath !== undefined ? { installPath: status.installPath } : {}),
+    ...(status.detail !== undefined ? { detail: status.detail } : {}),
+  }
+}
+
 function cloneClient(client: RegisteredClient): RegisteredClient {
   return {
     id: client.id,
@@ -141,6 +173,9 @@ function cloneClient(client: RegisteredClient): RegisteredClient {
     ...(client.healthDetail !== undefined ? { healthDetail: client.healthDetail } : {}),
     lastCheckedAt: client.lastCheckedAt,
     ...(client.profileName !== undefined ? { profileName: client.profileName } : {}),
+    ...(client.pluginStatus !== undefined
+      ? { pluginStatus: clonePluginStatus(client.pluginStatus) }
+      : {}),
   }
 }
 
@@ -167,6 +202,9 @@ function fromParsedClient(parsed: z.infer<typeof registeredClientSchema>): Regis
     ...(parsed.healthDetail !== undefined ? { healthDetail: parsed.healthDetail } : {}),
     lastCheckedAt: parsed.lastCheckedAt,
     ...(parsed.profileName !== undefined ? { profileName: parsed.profileName } : {}),
+    ...(parsed.pluginStatus !== undefined
+      ? { pluginStatus: clonePluginStatus(parsed.pluginStatus) }
+      : {}),
   }
 }
 
@@ -348,6 +386,9 @@ export class ClientRegistry {
           ...(probe.healthDetail !== undefined ? { healthDetail: probe.healthDetail } : {}),
           lastCheckedAt: probe.lastCheckedAt,
           ...(store.profileName !== undefined ? { profileName: store.profileName } : {}),
+          ...(store.pluginStatus !== undefined
+            ? { pluginStatus: clonePluginStatus(store.pluginStatus) }
+            : {}),
         })
       }
 

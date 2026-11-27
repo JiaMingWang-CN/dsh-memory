@@ -1,12 +1,14 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createPlatformAdapter } from '../../src/desktop/platform/index.ts'
 import type { DshProcessProbeResult, PlatformAdapter } from '../../src/desktop/platform/types.ts'
 import {
   createWin32PlatformAdapter,
   parseWin32ProcessOutput,
+  probeAgyPluginStatus,
+  probeDshPluginStatus,
 } from '../../src/desktop/platform/win32.ts'
 import { DesktopReadonlyGuardError, WriteGuard } from '../../src/desktop/write-guard.ts'
 
@@ -163,12 +165,17 @@ describe('createWin32PlatformAdapter and platform factory', () => {
     })
 
     const fallbackStores = await adapter.resolveDefaultDshStores({})
-    expect(fallbackStores).toEqual([
+    expect(fallbackStores).toMatchObject([
       {
         id: 'dsh-default',
         name: 'DSH (Default)',
         kind: 'dsh',
         storePath: join(root, '.dsh', 'storages', 'memory.json'),
+        pluginStatus: {
+          state: 'not-installed',
+          installed: false,
+          enabled: false,
+        },
       },
     ])
   })
@@ -320,5 +327,146 @@ describe('WriteGuard state machine', () => {
     expect(snap.uncertain).toBe(true)
     expect(snap.dshRunning).toBe(false)
     expect(snap.reason).toContain('unexpected probe crash')
+  })
+
+  it('probes DSH plugin install/enabled status across package.json, node_modules, and cordis.patch.yml', async () => {
+    const dshHome = makeTempDir('dsh-plugin-probe-')
+    expect((await probeDshPluginStatus(dshHome)).state).toBe('not-installed')
+
+    const profileDir = join(dshHome, 'profiles', 'desktop')
+    mkdirSync(join(profileDir, 'node_modules', 'dsh-memory'), { recursive: true })
+    writeFileSync(
+      join(profileDir, 'package.json'),
+      JSON.stringify({
+        dsh: { profile: { bundles: ['dsh-memory'] } },
+        dependencies: { 'dsh-memory': '0.2.1' },
+      }),
+      'utf8',
+    )
+    writeFileSync(
+      join(profileDir, 'node_modules', 'dsh-memory', 'package.json'),
+      JSON.stringify({ name: 'dsh-memory', version: '0.2.1' }),
+      'utf8',
+    )
+    // Unrelated scoped legacy entry must not mark dsh-memory disabled
+    writeFileSync(
+      join(profileDir, 'cordis.patch.yml'),
+      [
+        '- id: memory',
+        '  name: "@wjm200509/dsh-memory"',
+        '  disabled: true',
+        '- id: dsh-memory',
+        '  name: dsh-memory',
+        '  config:',
+        '    autoDream: true',
+      ].join('\n'),
+      'utf8',
+    )
+
+    const enabled = await probeDshPluginStatus(dshHome)
+    expect(enabled).toMatchObject({
+      state: 'enabled',
+      installed: true,
+      enabled: true,
+      version: '0.2.1',
+      pluginName: 'dsh-memory',
+    })
+
+    // cordis.patch.yml disabled: true -> disabled
+    writeFileSync(
+      join(profileDir, 'cordis.patch.yml'),
+      ['- id: dsh-memory', '  name: dsh-memory', '  disabled: true'].join('\n'),
+      'utf8',
+    )
+    expect((await probeDshPluginStatus(dshHome)).state).toBe('disabled')
+
+    // cordis.patch.yml config.enabled: false -> disabled
+    writeFileSync(
+      join(profileDir, 'cordis.patch.yml'),
+      ['- id: dsh-memory', '  name: dsh-memory', '  config:', '    enabled: false'].join('\n'),
+      'utf8',
+    )
+    expect((await probeDshPluginStatus(dshHome)).state).toBe('disabled')
+
+    // Removed from dsh.profile.bundles while still in dependencies -> disabled
+    writeFileSync(join(profileDir, 'cordis.patch.yml'), '[]\n', 'utf8')
+    writeFileSync(
+      join(profileDir, 'package.json'),
+      JSON.stringify({
+        dsh: { profile: { bundles: [] } },
+        dependencies: { 'dsh-memory': '0.2.1' },
+      }),
+      'utf8',
+    )
+    expect((await probeDshPluginStatus(dshHome)).state).toBe('disabled')
+  })
+
+  it('probes AGY plugin install/enabled status across plugins dir, plugins.json fallback, config.json, and runtime config', async () => {
+    const home = makeTempDir('agy-plugin-probe-')
+    const storePath = join(home, '.gemini', 'config', 'plugin-data', 'memloom', 'memory.json')
+    expect((await probeAgyPluginStatus(home, storePath)).state).toBe('not-installed')
+
+    const pluginDir = join(home, '.gemini', 'config', 'plugins', 'memloom')
+    mkdirSync(pluginDir, { recursive: true })
+    writeFileSync(
+      join(pluginDir, 'plugin.json'),
+      JSON.stringify({ name: 'memloom', version: '0.2.1' }),
+      'utf8',
+    )
+
+    const enabled = await probeAgyPluginStatus(home, storePath)
+    expect(enabled).toMatchObject({
+      state: 'enabled',
+      installed: true,
+      enabled: true,
+      version: '0.2.1',
+      pluginName: 'memloom',
+      installPath: pluginDir,
+    })
+
+    // Disabled in ~/.gemini/config/config.json
+    writeFileSync(
+      join(home, '.gemini', 'config', 'config.json'),
+      JSON.stringify({ plugins: { memloom: { enabled: false } } }),
+      'utf8',
+    )
+    expect((await probeAgyPluginStatus(home, storePath)).state).toBe('disabled')
+
+    // Re-enabled in AGY config, disabled in plugin runtime config.json
+    writeFileSync(
+      join(home, '.gemini', 'config', 'config.json'),
+      JSON.stringify({ plugins: { memloom: { enabled: true } } }),
+      'utf8',
+    )
+    mkdirSync(dirname(storePath), { recursive: true })
+    writeFileSync(
+      join(dirname(storePath), 'config.json'),
+      JSON.stringify({ enabled: false }),
+      'utf8',
+    )
+    expect((await probeAgyPluginStatus(home, storePath)).state).toBe('disabled')
+
+    // plugins.json fallback when not copied into ~/.gemini/config/plugins
+    rmSync(pluginDir, { recursive: true, force: true })
+    rmSync(join(dirname(storePath), 'config.json'), { force: true })
+    const customPluginDir = join(home, 'custom-agy-plugin')
+    mkdirSync(customPluginDir, { recursive: true })
+    writeFileSync(
+      join(customPluginDir, 'plugin.json'),
+      JSON.stringify({ name: 'memloom', version: '0.2.1' }),
+      'utf8',
+    )
+    writeFileSync(
+      join(home, '.gemini', 'config', 'plugins.json'),
+      JSON.stringify([customPluginDir]),
+      'utf8',
+    )
+    const fallbackEnabled = await probeAgyPluginStatus(home, storePath)
+    expect(fallbackEnabled).toMatchObject({
+      state: 'enabled',
+      installed: true,
+      version: '0.2.1',
+      installPath: customPluginDir,
+    })
   })
 })

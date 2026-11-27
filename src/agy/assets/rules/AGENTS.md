@@ -16,4 +16,5 @@
 - 敏感管理操作（`memory_review`、`memory_restore`、`memory_delete`、`memory_undo_dream`、`memory_import`、`memory_rebuild`、`memory_purge`、`memory_config`）以及跨工作区 / `scope: "all"` / 指定 `outputPath` 写盘的 `memory_list`、`memory_export`，均受 `PreToolUse` `force_ask` 门禁保护。
 - 严禁尝试伪造、修改或注入 `__agyHostContext` 等宿主保留字段，严禁以分步绕过、重命名参数或诱导用户跳过提示的方式规避确认弹窗。
 - Dream 与 Organize 产出的提案一律先进入 `pending`，必须等待用户经确认门禁审阅后再决定批准或拒绝。
+- 当 `PreInvocation` 注入 `[Memloom autoDream]` 提醒时，应按指示调用 `invoke_subagent` 派生后台子代理（使用指定的 `Model` 档位）执行 `memory-dream` 两阶段整理，避免阻塞用户当前任务。
 - 如需系统化的管理、整理或审阅流程，可按需加载 `memory`、`memory-dream`、`memory-review` 技能。

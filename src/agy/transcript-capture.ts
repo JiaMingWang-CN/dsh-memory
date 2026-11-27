@@ -11,6 +11,7 @@
 import { createHash } from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import { CapacityPolicy } from '../core/capacity.ts'
+import { isTransientToolFailure } from '../core/capture-filter.ts'
 import type { ResolvedMemoryConfig } from '../core/config.ts'
 import type { MemoryEngine } from '../core/engine.ts'
 import { OperationRunner } from '../core/operations.ts'
@@ -653,8 +654,11 @@ export async function captureAgyTranscript(
       }
 
       let persistedRecord: EpisodeRecord | undefined
+      const cancelledOrAborted =
+        outcomeInfo.outcome === 'aborted' || outcomeInfo.outcome === 'cancelled'
       const hasContent =
         !pureMemoryTurn &&
+        (!cancelledOrAborted || turn.correction) &&
         (episodeInput.prompt !== undefined ||
           episodeInput.assistantFinal !== undefined ||
           episodeInput.files.length > 0 ||
@@ -854,24 +858,26 @@ export async function captureAgyTranscript(
           const toolError =
             sanitize(`${call.name}: ${errorDetail}`, MAX_CAPTURE_TOOL_ERROR_BYTES) ??
             `${call.name}: ${inspected.code}`
-          activeTurn.failures.push({
-            name: call.name,
-            targetHash: call.targetHash,
-            code: inspected.code,
-            seq: step.stepIndex,
-            consumed: false,
-          })
-          const failRecord = await input.engine.appendEpisode({
-            sessionId: input.conversationId,
-            workspaceKey,
-            workspaceRoot: input.workspaceRoot,
-            kind: 'tool-failure',
-            turn: activeTurn.turnNumber,
-            sourceSeqs: [step.stepIndex],
-            toolName: call.name,
-            toolError,
-          })
-          if (failRecord !== undefined) episodesCreated += 1
+          if (!isTransientToolFailure(inspected.code, toolError)) {
+            activeTurn.failures.push({
+              name: call.name,
+              targetHash: call.targetHash,
+              code: inspected.code,
+              seq: step.stepIndex,
+              consumed: false,
+            })
+            const failRecord = await input.engine.appendEpisode({
+              sessionId: input.conversationId,
+              workspaceKey,
+              workspaceRoot: input.workspaceRoot,
+              kind: 'tool-failure',
+              turn: activeTurn.turnNumber,
+              sourceSeqs: [step.stepIndex],
+              toolName: call.name,
+              toolError,
+            })
+            if (failRecord !== undefined) episodesCreated += 1
+          }
         } else {
           const matchedFailure = activeTurn.failures.find(
             (entry) =>
@@ -923,6 +929,12 @@ export async function captureAgyTranscript(
       indexSources: existingSession?.indexSources ?? [],
       captureTurn: currentTurnNumber,
       ...(previousAssistantText === undefined ? {} : { previousAssistantText }),
+      ...(existingSession?.pendingAutoDreamCheck === undefined
+        ? {}
+        : { pendingAutoDreamCheck: existingSession.pendingAutoDreamCheck }),
+      ...(existingSession?.lastAutoDreamPromptAt === undefined
+        ? {}
+        : { lastAutoDreamPromptAt: existingSession.lastAutoDreamPromptAt }),
     }
   })
 

@@ -473,3 +473,88 @@ describe('dream redaction', () => {
     expect(pending[0]?.body).toContain('hunter2')
   })
 })
+
+describe('dream quality tightening', () => {
+  it('completes empty dream output by marking claimed episodes skipped', async () => {
+    const { store, runner } = await openStore()
+    const ep1 = await addEpisode(store, 1)
+    const ep2 = await addEpisode(store, 2)
+    const llm = scriptedLlm([JSON.stringify({ memories: [], wikiUpdates: [] })])
+    const dreamer = new MemoryDreamer({ store, runner, config: resolveMemoryConfig({}), llm })
+
+    await dreamer.enqueue({
+      scopeKey: 'ws-a',
+      scopeKind: 'workspace',
+      scopeRoot: 'C:/ws/a',
+      trigger: 'auto',
+    })
+    await dreamer.flush()
+
+    expect(llm.calls).toHaveLength(1)
+    const run = store.dreamList()[0]
+    expect(run?.status).toBe('completed')
+    expect(run?.committed).toBe(0)
+    expect(store.getEpisode(ep1.id)?.status).toBe('skipped')
+    expect(store.getEpisode(ep2.id)?.status).toBe('skipped')
+  })
+
+  it('marks unreferenced episodes skipped, blocks worklog when worklogCapture is off, and includes pending proposals in related search', async () => {
+    const { store, runner } = await openStore()
+    const ep1 = await addEpisode(store, 1)
+    const ep2 = await addEpisode(store, 2)
+    await store.create({
+      type: 'lesson',
+      title: 'Existing pending rule',
+      body: 'Already queued for review.',
+      scope: { kind: 'workspace', key: 'ws-a', root: 'C:/ws/a' },
+      status: 'pending',
+    })
+
+    const llm = scriptedLlm([
+      JSON.stringify({
+        memories: [
+          {
+            type: 'worklog',
+            title: 'Should be filtered out',
+            body: 'No worklogs when off.',
+            confidence: 0.9,
+            importance: 0.4,
+            sourceEpisodeIds: [ep2.id],
+          },
+          {
+            type: 'lesson',
+            title: 'Real lesson',
+            body: 'Verified durable finding.',
+            confidence: 0.9,
+            importance: 0.8,
+            sourceEpisodeIds: [ep1.id],
+          },
+        ],
+        wikiUpdates: [],
+      }),
+    ])
+    const dreamer = new MemoryDreamer({
+      store,
+      runner,
+      config: resolveMemoryConfig({ worklogCapture: 'off' }),
+      llm,
+    })
+
+    await dreamer.enqueue({
+      scopeKey: 'ws-a',
+      scopeKind: 'workspace',
+      scopeRoot: 'C:/ws/a',
+      trigger: 'manual',
+    })
+    await dreamer.flush()
+
+    expect(llm.calls[0]?.system).toContain('Do NOT output type "worklog"')
+    expect(promptText(llm.calls[0])).toContain('[lesson|pending] Existing pending rule')
+
+    const pending = store.list({ workspaceKey: 'ws-a', status: 'pending' }).items
+    expect(pending.map((item) => item.title)).toContain('Real lesson')
+    expect(pending.map((item) => item.title)).not.toContain('Should be filtered out')
+    expect(store.getEpisode(ep1.id)?.status).toBe('processed')
+    expect(store.getEpisode(ep2.id)?.status).toBe('skipped')
+  })
+})

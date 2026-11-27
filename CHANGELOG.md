@@ -13,6 +13,17 @@ written only when that version is actually released.
 
 ### Added
 
+- Shared transient-noise capture filter (`src/core/capture-filter.ts`): filters out transient/generic tool errors (`UNKNOWN`, `UNKNOWN_TOOL`, `FS_NOT_FOUND`, `FS_EDIT_NOT_FOUND`, `SEARCH_FAILED`, `WEB_PROVIDER_ERROR`, timeouts, rate limits) and interrupted/cancelled turns without user corrections in both DSH capture and AGY `transcript.jsonl` capture.
+- Host plugin installation & enabled status probing in Memloom Desktop (`probeDshPluginStatus` and `probeAgyPluginStatus`), persisted on `RegisteredClient.pluginStatus` and displayed in the left host rail and Host Config header card.
+- AGY subagent model tier configuration (`dreamSubagentModel`, default `'flash'`, across `flash_lite` / `flash` / `pro` / `inherit`) editable via `memory_config` (24 fields) and Memloom Desktop's AGY Host Settings segmented control, returned as `recommendedSubagentModel` by `memory_dream_prepare` / `memory_organize_prepare`, and recorded on `DreamRun.model`.
+- AGY native Hook-driven `autoDream`: when `autoDream: true`, `Stop` flags `pendingAutoDreamCheck` after capturing episodes and `PreInvocation` injects a `[Memloom autoDream]` reminder to spawn a background subagent with the configured `dreamSubagentModel` once `autoDreamMinIntervalMs` elapses (preserving zero-read fast-skip otherwise).
+
+### Changed
+
+- Tightened Dream quality and deduplication across DSH and core engines: Dream runs now allow empty `{"memories":[],"wikiUpdates":[]}` outputs, mark unreferenced or empty-run episodes as `skipped` instead of `failed-retryable`, enforce `worklogCapture: 'off'` in Dream system prompts/schemas/validation, include existing `pending` proposals in `collectRelated` (`|pending`), and instruct models to skip transient errors, aborted tasks, one-off status snapshots, and unverified guesses.
+
+### Fixed
+
 - Installable DSH Host bundle with a single `MemoryService` and `memory` service registration.
 - Memory domain: six storage tables, zod record schemas and `contentDigest`.
 - `MemoryStore` CRUD, `contentRevision` optimistic concurrency, scope isolation and audit.

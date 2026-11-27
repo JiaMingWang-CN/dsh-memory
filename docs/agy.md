@@ -70,7 +70,7 @@ AGY 适配层按以下顺序解析数据存储路径（优先取第一个非空�
 | --- | --- |
 | `memory.json` | 主存储文件（`name: "memory"`、`version: 1`），包含与 DSH 一致的 6 张表：`memories`、`episodes`、`dreams`、`audit`、`operations`、`session_cursors`。 |
 | `.memory.lock` | 跨进程排他写锁（默认等待上限 5000ms，陈旧锁阈值 30 秒，持锁进程已退出或超过硬上限时安全接管），配合临时文件 `fsync` + 原子 `rename` 与读前变更检测，保障常驻 MCP Server 与短进程 Hooks 并发写安全与立即可见。 |
-| `config.json` | AGY 运行时配置（默认值与 [`docs/configuration.md`](configuration.md) 一致），经 `memory_config` 修改后即时热生效，无需重启 MCP Server。DSH 专有的模型选择字段（`dreamModelMode` / `dreamProvider` / `dreamModel` / `dreamReasoningEffort`）在 AGY 中不生效。 |
+| `config.json` | AGY 运行时配置（默认值与 [`docs/configuration.md`](configuration.md) 一致），经 `memory_config` 修改后即时热生效，无需重启 MCP Server。其中包含 AGY 适用的 `dreamSubagentModel`（默认 `flash`，可选 `flash_lite` / `flash` / `pro` / `inherit`）；DSH 专有的模型选择字段（`dreamModelMode` / `dreamProvider` / `dreamModel` / `dreamReasoningEffort`）在 AGY 中不生效。 |
 | `sessions/<conversationId>.json` | 可重建的会话缓存（索引折叠态、会话工作区锚点与跨 `Stop` 捕获状态）；超过 30 天未更新时随保留清理自动回收。 |
 | `backups/` | 存储表校验发现损坏时的原始文件快照备份目录。 |
 | `logs/hook-errors.log` | 脱敏、按大小轮转的 Hook 诊断日志。 |
@@ -111,9 +111,9 @@ AGY 常驻 MCP Server 不信任模型自由传入的相对路径或跨项目路�
 | `memory_status` | 只读查看各状态记忆/片段/审计/操作计数、最近恢复状态、最近 Dream 运行记录与配置摘要。 |
 | `memory_audit` | 只读查询当前工作区与全局可见的审计记录（可按 `memoryId`、`dreamId`、`limit` 过滤）。 |
 | `memory_export` | 纯只读导出兼容 JSON 快照（**不会在导出时自动触发 `archivePurgePolicy: 'after-export'` 清空归档**）；传入 `scope: 'all'`、跨工作区 `workspaceRoot` 或 `outputPath` 写盘时条件升级为 `PreToolUse` `force_ask`（相对 `outputPath` 基于当前工作区根目录解析，写盘默认拒绝覆盖既有文件）。 |
-| `memory_dream_prepare` | 两阶段片段整理（第 1 步）：认领待处理 `episodes` 并创建 `running` 整理任务，返回 `dreamId`、提示词与输出 schema。 |
-| `memory_dream_commit` | 两阶段片段整理（第 2 步）：整批校验并提交整理提案至 `pending`，收尾整理任务并更新已处理 `episodes`。 |
-| `memory_organize_prepare` | 两阶段全库整理（第 1 步）：选取当前作用域最多 60 条 `active` 记忆，创建 `organize` 整理任务。 |
+| `memory_dream_prepare` | 两阶段片段整理（第 1 步）：认领待处理 `episodes` 并创建 `running` 整理任务，返回 `dreamId`、提示词、输出 schema 与 `recommendedSubagentModel`（支持可选 `model` 标记整理所用子代理档位）。 |
+| `memory_dream_commit` | 两阶段片段整理（第 2 步）：整批校验并提交整理提案至 `pending`，收尾整理任务并将引用片段标为 `processed`、空输出或未引用片段标为 `skipped`。 |
+| `memory_organize_prepare` | 两阶段全库整理（第 1 步）：选取当前作用域最多 60 条 `active` 记忆，创建 `organize` 整理任务并返回 `recommendedSubagentModel`。 |
 | `memory_organize_commit` | 两阶段全库整理（第 2 步）：校验非空且归属当前作用域的 `supersedes` 引用，将合并/替换提案写入 `pending`。 |
 
 ### 敏感管理工具（8 个）
@@ -129,7 +129,7 @@ AGY 常驻 MCP Server 不信任模型自由传入的相对路径或跨项目路�
 | `memory_import` | 导入 DSH/AGY 兼容 JSON（`merge` 或 `replace`）；相对 `inputPath` 基于当前工作区根目录解析，`replace` 模式在确认提示中醒目标注清空当前作用域的风险。 |
 | `memory_rebuild` | 仅清除并重建 `ownership='derived'` 派生数据，保护 `ownership='user'` 用户记忆不被删除。 |
 | `memory_purge` | 永久清空指定作用域或全部记忆（确认提示中明示不可逆警告）。 |
-| `memory_config` | 更新 `${PLUGIN_DATA}/config.json` 中 23 项 AGY 适用运行配置并即时热生效；关闭 `redactSecrets`、开启 `autoAcceptProposals` 或开启 `injectForSubagents` 时，在确认提示中特别高亮风险。 |
+| `memory_config` | 更新 `${PLUGIN_DATA}/config.json` 中 24 项 AGY 适用运行配置（含 `dreamSubagentModel`）并即时热生效；关闭 `redactSecrets`、开启 `autoAcceptProposals` 或开启 `injectForSubagents` 时，在确认提示中特别高亮风险。 |
 
 ### `PreToolUse` 确认门禁（Fail-Closed）
 
@@ -163,13 +163,15 @@ AGY 常驻 MCP Server 不信任模型自由传入的相对路径或跨项目路�
 
 由于 AGY 插件进程不直接调用宿主内置 LLM，也不要求配置外部 API Key，整理工作流通过 **两阶段 MCP 工具 + 内置 Skills** 由当前 AGY 代理协作完成：
 
-### 1. 两阶段片段整理（Dreaming）
+### 1. 两阶段片段整理（Dreaming）与原生自动做梦（`autoDream`）
 
 配合 `memory-dream` Skill 执行：
 
-1. **准备阶段（`memory_dream_prepare`）**：按 `dreamMaxEpisodes` 与 `dreamLookbackDays` 认领待处理 `episodes`（标记 `processing`），创建 `DreamRun(status='running')`，返回 `dreamId`、整理提示词与 JSON 输出 schema。
-2. **提炼阶段**：代理依据证据分级与单主题记录规则，仅基于 `episodes` 中的事实提炼结构化提案；若本批片段没有值得沉淀的新经验，可提交空提案数组（`memories: []`），此时任务正常完成并将认领的 `episodes` 标为 `skipped`，防止重复认领死循环。
-3. **提交阶段（`memory_dream_commit`）**：先整批校验结构、长度与强密钥特征——任一条不合法则整批拒写并保持 `DreamRun` 为 `running`，便于修正后原地重试；校验通过后经去重与操作日志状态机全部以 `pending`（`ownership='derived'`、`origin='dream'`）入库。
+1. **子代理模型档位选择**：配置项 `dreamSubagentModel`（默认 `"flash"`，可选 `"flash_lite"` / `"flash"` / `"pro"` / `"inherit"`）决定主代理派生后台整理子代理时建议传入的 `Model` 档位，避免无谓占用主模型额度或阻塞主会话。
+2. **原生 `autoDream` 联动**：开启 `autoDream: true` 后，当 `Stop` Hook 捕获到新片段时会在会话状态记录待整理标志；满足 `autoDreamMinIntervalMs` 冷却时间后，下次 `PreInvocation` 会注入 `[Memloom autoDream]` 系统提醒，引导主代理使用 `dreamSubagentModel` 派生后台子代理执行下列两阶段整理。
+3. **准备阶段（`memory_dream_prepare`）**：按 `dreamMaxEpisodes` 与 `dreamLookbackDays` 认领待处理 `episodes`（标记 `processing`），创建 `DreamRun(status='running')`，返回 `dreamId`、整理提示词、JSON 输出 schema 与 `recommendedSubagentModel`。
+4. **提炼阶段**：代理依据高门槛证据规则提炼结构化提案；若本批片段仅含常规过程、瞬时报错、已取消轮次或重复内容，应直接提交空提案数组（`memories: []`），此时任务正常完成并将认领的 `episodes` 标为 `skipped`，防止重复认领死循环。
+5. **提交阶段（`memory_dream_commit`）**：先整批校验结构、长度与强密钥特征——任一条不合法则整批拒写并保持 `DreamRun` 为 `running`，便于修正后原地重试；校验通过后经去重与操作日志状态机全部以 `pending`（`ownership='derived'`、`origin='dream'`）入库。
 
 进行中的两阶段 `running` 整理不会被常规崩溃恢复误杀；仅当持续时间超过 `dreamProcessingTimeoutMs`（默认 10 分钟）时，才由超时回收标记为 `failed` 并将仍为 `processing` 的 `episodes` 退回可重试状态。
 
@@ -197,6 +199,6 @@ AGY 常驻 MCP Server 不信任模型自由传入的相对路径或跨项目路�
 ## 已知限制
 
 - **暂无 MCP App 图形界面**：当前版本不提供可视化管理页面，所有浏览、审阅、导入导出与配置修改均通过分级 MCP 工具与内置 Skills 在对话中完成。
-- **无内置外部 LLM 后台自动 Dream 守护线程**：插件不在 AGY 会话之外维护独立后台定时器或外部模型客户端；如需定期整理记忆，可使用 AGY 原生 `/automation` 按计划触发 `memory-dream` Skill。
+- **无内置外部 LLM 后台自动 Dream 守护线程**：插件不在 AGY 会话之外维护独立后台定时器或外部模型客户端；`autoDream: true` 通过 `Stop` + `PreInvocation` 提醒主代理在会话内派生指定 `dreamSubagentModel` 档位的后台子代理完成整理，如需按固定时间表在空闲时定期整理，也可结合 AGY 原生 `/automation` 按计划触发 `memory-dream` Skill。
 - **子代理识别保守限制**：当 AGY Hook 事件载荷未提供显式子代理层级字段时，插件仅依据已知上下文特征保守判断；无法确认时默认按主会话处理。
 - **与核心一致的边界**：检索采用本地 BM25（无外部向量数据库或 Embedding 服务），数据默认本地保存（无云端账户与跨设备同步）。

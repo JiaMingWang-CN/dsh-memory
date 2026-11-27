@@ -521,5 +521,30 @@ describe('ClientRegistry', () => {
     await expect(badRegistry.load()).rejects.toSatisfy(
       (err: unknown) => err instanceof OperationError && err.code === 'MEMORY_UNAVAILABLE',
     )
+
+    // Built-in pluginStatus is discovered and persisted through reload
+    const agyPluginDir = join(homeDir, '.gemini', 'config', 'plugins', 'memloom')
+    mkdirSync(agyPluginDir, { recursive: true })
+    writeFileSync(
+      join(agyPluginDir, 'plugin.json'),
+      JSON.stringify({ name: 'memloom', version: '0.2.1' }),
+      'utf8',
+    )
+    await registry.refreshDiscovery()
+    expect(registry.getClient('agy-default')?.pluginStatus).toMatchObject({
+      state: 'enabled',
+      installed: true,
+      version: '0.2.1',
+    })
+
+    const reloaded = new ClientRegistry({
+      statePath,
+      platform,
+      env: {},
+      now: createFixedClock(),
+    })
+    await reloaded.load()
+    expect(reloaded.getClient('agy-default')?.pluginStatus?.state).toBe('enabled')
+    expect(reloaded.getClient('dsh-default')?.pluginStatus?.state).toBe('not-installed')
   })
 })

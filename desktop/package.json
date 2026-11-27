@@ -1,6 +1,6 @@
 {
   "name": "memloom-desktop-packager",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "Isolated Electron & electron-builder packaging workspace for Memloom Desktop (0.x development preview).",
   "scripts": {

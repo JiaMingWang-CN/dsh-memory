@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { buildDreamPrompt, DREAM_SYSTEM_PROMPT } from '../../src/host/dream-prompt.ts'
+import {
+  buildDreamPrompt,
+  buildDreamSystemPrompt,
+  DREAM_SYSTEM_PROMPT,
+} from '../../src/host/dream-prompt.ts'
 import { checkDreamHealth, type DreamHealth } from '../../src/host/dream-health.ts'
 import { MemoryId } from '../../src/shared/types.ts'
 import { makeMemoryRecord } from '../helpers/factory.ts'
@@ -97,5 +101,30 @@ describe('dream prompt', () => {
       expect(prompt).toContain(episode.sessionId)
       expect(prompt).toContain(`seq ${episode.sourceSeqs.join(',')}`)
     }
+  })
+
+  it('builds high-bar system prompt and forbids worklogs when allowWorklog is false', () => {
+    expect(DREAM_SYSTEM_PROMPT).toContain('Default to empty output')
+    expect(DREAM_SYSTEM_PROMPT).toContain('FS_EDIT_NOT_FOUND')
+    const noWorklog = buildDreamSystemPrompt({ allowWorklog: false })
+    expect(noWorklog).toContain('"type":"lesson|wiki|preference"')
+    expect(noWorklog).toContain('Do NOT output type "worklog"')
+  })
+
+  it('marks pending related memories with |pending in dream user prompt', () => {
+    const pendingRecord = makeMemoryRecord({
+      id: MemoryId('mem-pending'),
+      status: 'pending',
+      title: 'Queued proposal',
+      importance: 0.7,
+    })
+    const prompt = buildDreamPrompt({
+      episodes: [],
+      related: [pendingRecord],
+      health: emptyHealth(),
+    })
+    expect(prompt).toContain(
+      '- [lesson|pending] Queued proposal (id: mem-pending, importance: 0.7)',
+    )
   })
 })

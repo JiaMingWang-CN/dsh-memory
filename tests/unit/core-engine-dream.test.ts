@@ -273,7 +273,7 @@ describe('MemoryEngine two-stage dream, organize and lifecycle', () => {
     expect(domain.table('episodes').get(ep1!.id)?.status).toBe('processing')
     expect(domain.table('episodes').get(ep2!.id)?.status).toBe('processing')
 
-    // Retry with sanitized content (referencing only ep1; ep2 returns to failed-retryable)
+    // Retry with sanitized content (referencing only ep1; uncited ep2 is marked skipped)
     const committed = await engine.commitDream({
       dreamId: prepared.dreamId,
       memories: [
@@ -291,8 +291,9 @@ describe('MemoryEngine two-stage dream, organize and lifecycle', () => {
     expect(committed.status).toBe('completed')
     expect(committed.createdIds).toHaveLength(1)
     expect(committed.processedEpisodes).toBe(1)
+    expect(committed.skippedEpisodes).toBe(1)
     expect(domain.table('episodes').get(ep1!.id)?.status).toBe('processed')
-    expect(domain.table('episodes').get(ep2!.id)?.status).toBe('failed-retryable')
+    expect(domain.table('episodes').get(ep2!.id)?.status).toBe('skipped')
   })
 
   it('validates organize supersedes strictly and writes valid proposals as pending derived dream records', async () => {
@@ -535,5 +536,57 @@ describe('MemoryEngine two-stage dream, organize and lifecycle', () => {
     nowMs += 1000
     const retention = await engine.runRetention()
     expect(retention.archivedWorklogs).toBe(0)
+  })
+
+  it('enforces worklogCapture=off in prepareDream/commitDream and includes pending proposals in related memories', async () => {
+    const domain = createInMemoryDomain()
+    const engine = new MemoryEngine({
+      domain,
+      config: { worklogCapture: 'off' },
+      now: () => new Date('2026-11-26T00:00:00.000Z'),
+    })
+    await engine.recover()
+
+    await engine.manageCreate({
+      type: 'lesson',
+      title: 'Already queued pending lesson',
+      body: 'Pending body.',
+      scope: 'workspace',
+      workspaceKey: WS_SCOPE.key,
+      workspaceRoot: WS_SCOPE.root,
+      status: 'pending',
+    })
+    const ep = await engine.appendEpisode({
+      sessionId: 's-off',
+      workspaceKey: WS_SCOPE.key,
+      workspaceRoot: WS_SCOPE.root,
+      kind: 'turn',
+      turn: 1,
+      sourceSeqs: [1],
+      prompt: 'Fix build issue',
+    })
+
+    const prepared = await engine.prepareDream({ scope: WS_SCOPE })
+    expect(prepared.systemPrompt).toContain('Do NOT output type "worklog"')
+    expect(prepared.userPrompt).toContain('[lesson|pending] Already queued pending lesson')
+    expect(JSON.stringify(prepared.outputSchema)).not.toContain('"worklog"')
+
+    await expect(
+      engine.commitDream({
+        dreamId: prepared.dreamId,
+        memories: [
+          {
+            type: 'worklog',
+            title: 'Disallowed worklog',
+            body: 'Should fail validation.',
+            confidence: 0.9,
+            importance: 0.5,
+            sourceEpisodeIds: [ep!.id],
+          },
+        ],
+      }),
+    ).rejects.toSatisfy(
+      (err: unknown) => err instanceof OperationError && err.code === 'MEMORY_INVALID_CONTENT',
+    )
   })
 })
