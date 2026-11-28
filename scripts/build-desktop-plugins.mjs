@@ -11,7 +11,7 @@
  * Usage: `node scripts/build-desktop-plugins.mjs`
  */
 import { Buffer } from 'node:buffer'
-import { execFileSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
@@ -143,27 +143,16 @@ export function formatSha256Sums(entries) {
 async function packDshTarballTo(destTgzPath) {
   const tmpDir = await mkdtemp(resolve(os.tmpdir(), 'memloom-dsh-pack-'))
   try {
-    const npmExecPath = process.env.npm_execpath
-    if (typeof npmExecPath === 'string' && /\.[cm]?js$/i.test(npmExecPath)) {
-      execFileSync(process.execPath, [npmExecPath, 'pack', '--pack-destination', tmpDir], {
-        cwd: root,
-        stdio: 'pipe',
-        windowsHide: true,
-      })
-    } else if (process.platform === 'win32') {
-      const comSpec = process.env.ComSpec || 'cmd.exe'
-      const cmdLine = `""pnpm" pack --pack-destination "${tmpDir}""`
-      execFileSync(comSpec, ['/d', '/s', '/c', cmdLine], {
-        cwd: root,
-        stdio: 'pipe',
-        windowsVerbatimArguments: true,
-        windowsHide: true,
-      })
-    } else {
-      execFileSync('pnpm', ['pack', '--pack-destination', tmpDir], {
-        cwd: root,
-        stdio: 'pipe',
-      })
+    const pnpmBin = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+    const command = `${pnpmBin} pack --pack-destination "${tmpDir}"`
+    const result = spawnSync(command, {
+      cwd: root,
+      encoding: 'utf8',
+      shell: true,
+      windowsHide: true,
+    })
+    if (result.status !== 0) {
+      throw new Error(`pnpm pack failed: ${result.stderr || result.stdout || String(result.error)}`)
     }
     const entries = await readdir(tmpDir)
     const tgzName = entries.find((name) => name.endsWith('.tgz'))
