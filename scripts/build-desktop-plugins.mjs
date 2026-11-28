@@ -143,9 +143,16 @@ export function formatSha256Sums(entries) {
 async function packDshTarballTo(destTgzPath) {
   const tmpDir = await mkdtemp(resolve(os.tmpdir(), 'memloom-dsh-pack-'))
   try {
-    if (process.platform === 'win32') {
+    const npmExecPath = process.env.npm_execpath
+    if (typeof npmExecPath === 'string' && /\.[cm]?js$/i.test(npmExecPath)) {
+      execFileSync(process.execPath, [npmExecPath, 'pack', '--pack-destination', tmpDir], {
+        cwd: root,
+        stdio: 'pipe',
+        windowsHide: true,
+      })
+    } else if (process.platform === 'win32') {
       const comSpec = process.env.ComSpec || 'cmd.exe'
-      const cmdLine = `""pnpm.cmd" pack --pack-destination "${tmpDir}""`
+      const cmdLine = `""pnpm" pack --pack-destination "${tmpDir}""`
       execFileSync(comSpec, ['/d', '/s', '/c', cmdLine], {
         cwd: root,
         stdio: 'pipe',
