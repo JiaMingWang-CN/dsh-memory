@@ -3,7 +3,7 @@
 `memloom`（原 `dsh-memory`）在共享记忆内核（`src/core/`）与既有管理界面组件（`src/client/`）的基础上，在 `src/desktop/` 与隔离打包工程 `desktop/` 提供 **Memloom Desktop**——面向本地长期记忆库的可视化桌面管理客户端，支持同机管理 DSH、Antigravity（AGY）与自定义目录记忆库。
 
 > [!NOTE]
-> **开发状态说明**：`memloom` 当前仍处于 **0.x 开发版本**（`0.2.2`），尚未发布稳定版。当前桌面端仅完成 Windows `win-x64` 安装程序（NSIS `.exe`）构建与验证，macOS / Linux 目标仅在配置中预留扩展段。
+> **开发状态说明**：`memloom` 当前仍处于 **0.x 开发版本**（`0.2.3`），尚未发布稳定版。当前桌面端仅完成 Windows `win-x64` 安装程序（NSIS `.exe`）构建与验证，macOS / Linux 目标仅在配置中预留扩展段。
 
 ---
 
@@ -24,8 +24,16 @@
 - **双层浮岛工作台与五大核心视图**：
   - 采用双层浮岛工作台布局：**左侧静谧导航轨**顶部展示 Memloom 官方横向 Logo（随浅/深色自动切换），包含「全部记忆」「待审阅提案」「跨端迁移」三大主工作台入口、等权呈现的 DSH / AGY「已连接宿主」列表与「整理与审计」「宿主配置」维护入口，底部提供 `Ctrl+K` 命令面板、中/英文切换与浅/深色主题分段开关；**右侧圆角悬浮主画布**承载独立可滚动的工作区内容与自定义精工组件（零原生 `<select>` / 原生 checkbox / 原生 range）。
   - 五大典型视图覆盖：**全部记忆**（跨端聚合与单宿主主从双栏管理、Markdown 排版检视、悬浮批量操作条、草稿保护编辑弹窗）、**待审阅提案**（跨端待审阅队列、`supersedes` 双栏版本对比与 `A` / `E` / `R` 快捷键）、**跨端迁移**（DSH ⇄ AGY 经纬桥接器与 3 步安全向导，含 `Replace` 禁止跳过及风险确认门禁）、**整理与审计**（`DreamRun` 历史按批撤销与不可变 `AuditRecord` Diff 时间线）与**宿主配置**（AGY 24 项可编辑参数含 `dreamSubagentModel` 档位选择、刻度字节滑块与备份重建，DSH 并发写保护状态机、宿主插件状态徽章与只读 Profile 卡片）。
+- **跨宿主插件一键安装 / 同步 / 卸载**：
+  - 支持在「宿主配置」页一键安装、同步到当前版本或卸载 **AGY** 与 **DSH**（支持多 profile 选择，默认 `desktop`，支持自定义 `dsh` CLI 路径）插件，操作前均弹出确认框且绝不删除或覆写 `memory.json`、运行时 `config.json` 与 `backups/`。
+  - **AGY 安全替换**：按内置清单原子替换 `~/.gemini/config/plugins/memloom`，保护符号链接（仅 `unlink` 不删外部源码目录），精准清理 `plugins.json` 中 `memloom`/`dsh-memory` 条目而保留其余第三方插件，宿主 JSON 损坏时 fail-closed 拒写。
+  - **DSH 运行态强闸门**：执行任何 DSH 插件变更前强制实时检测 DSH 进程，`running` 或 `uncertain` 一律拦截（不受记忆编辑 `force-unlocked` 影响）；Windows `.cmd` shim 经严格参数白名单校验与 `windowsVerbatimArguments` 安全包装调用。
+- **应用内更新与重启后自动联动同步**：
+  - 侧边栏底部支持检查 GitHub Releases 最新版本与更新说明；在线下载的 `.exe`、`.zip`、`.tgz` 必须先通过同 Release 的 `SHA256SUMS.txt` 强校验（缺失或不匹配一律删除临时文件并拒用）。
+  - Electron Windows 安装版下载校验新版 NSIS `.exe` 后，将已安装且启用的宿主列表写入 `desktop-state.json.pendingPluginSync` 并拉起安装向导；新版首次启动自动将内置插件同步到原已安装端（未安装端不擅自安装，已禁用 DSH profile 自动跳过），若某端受阻可一键重试或忽略。
+  - `start:desktop` 免签名本地模式自动只读忽略 `pendingPluginSync`，并支持直接在线校验更新各已安装宿主端插件。
 - **安全基线、生产窗口与外观**：
-  - Electron 窗口启用 `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`、`webSecurity: true`，移除顶部原生菜单栏及默认 DevTools 调试入口（仅在显式设置 `MEMLOOM_DESKTOP_DEVTOOLS=1` 时开放调试快捷键）；所有 IPC 通道经 `zod` 校验，文件路径操作严格受原生对话框授权登记簿约束。
+  - Electron 窗口启用单实例锁（`app.requestSingleInstanceLock()`）、`contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`、`webSecurity: true`，移除顶部原生菜单栏及默认 DevTools 调试入口（仅在显式设置 `MEMLOOM_DESKTOP_DEVTOOLS=1` 时开放调试快捷键）；所有 IPC 通道经 `zod` 校验，文件路径与 `dshCliPath` 严格受原生对话框授权登记簿与白名单约束。
   - 内置亮色 / 暗色 / 跟随系统主题与中文 / 英文界面切换，桌面自身状态持久化在 Electron `userData` 目录下的 `desktop-state.json`，不污染任何 `memory.json`。
 
 ---
@@ -43,10 +51,13 @@
 # 1. 构建主进程、Preload、Renderer 与 256x256 .ico 图标至 dist/desktop-app/
 pnpm run build:desktop
 
-# 2. 校验 dist/desktop-app/ 产物完整性与隔离边界
-pnpm run pack:desktop:check
+# 2. 构建内置 AGY/DSH 插件产物至 dist/desktop-bundled-plugins/（经 extraResources 隔离打包）
+pnpm run build:desktop:plugins
 
-# 3. 在隔离的 desktop/ 子目录安装 Electron 依赖并打包 Windows NSIS 安装程序 .exe
+# 3. 校验 dist/desktop-app/ 与 dist/desktop-bundled-plugins/ 产物完整性、版本一致与隔离边界
+node scripts/pack-desktop-check.mjs --require-bundled
+
+# 4. 在隔离的 desktop/ 子目录安装 Electron 依赖并打包 Windows NSIS 安装程序 .exe
 pnpm --dir desktop install
 pnpm --dir desktop run pack:win
 ```
@@ -54,7 +65,7 @@ pnpm --dir desktop run pack:win
 打包完成后将在 `dist/desktop-release/` 下生成向导式 Windows 安装程序（支持自定义安装路径、创建桌面与开始菜单快捷方式，卸载时保留 `%APPDATA%/memloom-desktop/` 用户数据）：
 
 ```text
-dist/desktop-release/memloom-desktop-0.2.2-win-x64-setup.exe
+dist/desktop-release/memloom-desktop-0.2.3-win-x64-setup.exe
 ```
 
 > [!TIP]
@@ -81,6 +92,16 @@ dist/desktop-app/
     ├── index.js            # 捆绑 React 19 与桌面界面的浏览器 IIFE 产物
     ├── local-bridge.js     # 本地受鉴权 HTTP/RPC 浏览器桥接产物
     └── theme.css           # --ml-* 浅/暗双主题 token 与双层浮岛工作台样式
+```
+
+内置插件产物目录（`dist/desktop-bundled-plugins/`，通过 Electron `extraResources` 复制到安装目录 `resources/bundled-plugins/`，与 `dist/desktop-app/` 严格隔离）：
+
+```text
+dist/desktop-bundled-plugins/
+├── manifest.json                 # { version, builtAt, agy: { dir, files, sha256 }, dsh: { file, sha256 } }
+├── agy-plugin/                   # 自包含 AGY 插件目录
+└── dsh-bundle/
+    └── memloom-<version>.tgz     # 确定性生成的 DSH bundle 归档
 ```
 
 ---

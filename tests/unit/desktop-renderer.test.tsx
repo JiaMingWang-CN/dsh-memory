@@ -501,13 +501,87 @@ function createFakeBridge(options?: {
       pickDirectory: () => ok(null),
       pickImportJson: () => ok(null),
       saveExportJson: () => ok('C:/fake/export.json'),
+      pickDshCli: () => ok(null),
+    },
+    plugins: {
+      listDshProfiles: () => ok([]),
+      install: () =>
+        ok({
+          kind: 'agy',
+          action: 'install',
+          pluginStatus: { state: 'enabled', installed: true, enabled: true, version: '0.2.2' },
+          restartRequired: true,
+          warnings: [],
+        }),
+      uninstall: () =>
+        ok({
+          kind: 'agy',
+          action: 'uninstall',
+          pluginStatus: { state: 'not-installed', installed: false, enabled: false },
+          restartRequired: true,
+          warnings: [],
+        }),
+      syncPending: () =>
+        ok({ phase: 'idle', pendingSync: null, updatedAt: '2026-11-27T00:00:00.000Z' }),
+      dismissPendingSync: () =>
+        ok({ phase: 'idle', pendingSync: null, updatedAt: '2026-11-27T00:00:00.000Z' }),
+    },
+    updater: {
+      check: () =>
+        ok({
+          currentVersion: '0.2.2',
+          latestVersion: '0.2.2',
+          hasUpdate: false,
+          releaseUrl: 'https://github.com/JiaMingWang-CN/memloom/releases/tag/v0.2.2',
+          releaseNotes: '',
+          runtimeMode: 'electron',
+          canSelfUpdateApp: false,
+          assets: {},
+          installedTargets: [],
+        }),
+      getState: () =>
+        ok({ phase: 'idle', pendingSync: null, updatedAt: '2026-11-27T00:00:00.000Z' }),
+      cancel: () =>
+        ok({ phase: 'cancelled', pendingSync: null, updatedAt: '2026-11-27T00:00:00.000Z' }),
+      startAppUpdate: () =>
+        ok({ phase: 'checking', pendingSync: null, updatedAt: '2026-11-27T00:00:00.000Z' }),
+      updateInstalledPluginsOnline: () =>
+        ok({ phase: 'checking', pendingSync: null, updatedAt: '2026-11-27T00:00:00.000Z' }),
     },
     app: {
-      getInfo: () => ok({ version: '0.2.2', platform: 'win32', systemTheme: 'light' }),
+      getInfo: () =>
+        ok({
+          version: '0.2.2',
+          platform: 'win32',
+          systemTheme: 'light',
+          runtimeMode: 'electron',
+          bundledPluginsAvailable: true,
+        }),
       getPreferences: () => ok(prefs),
       updatePreferences: (patch) => {
         spies.updatePreferences(patch)
-        prefs = { ...prefs, ...patch }
+        const prev = prefs as {
+          theme: 'system' | 'light' | 'dark'
+          locale: 'zh' | 'en'
+          windowBounds?: { x: number; y: number; width: number; height: number }
+          dshCliPath?: string
+        }
+        const nextDshCliPath =
+          patch.dshCliPath === undefined
+            ? prev.dshCliPath
+            : patch.dshCliPath === null || patch.dshCliPath.trim() === ''
+              ? undefined
+              : patch.dshCliPath
+        prefs = {
+          theme: patch.theme ?? prev.theme,
+          locale: patch.locale ?? prev.locale,
+          ...(patch.windowBounds !== undefined
+            ? { windowBounds: patch.windowBounds }
+            : prev.windowBounds !== undefined
+              ? { windowBounds: prev.windowBounds }
+              : {}),
+          ...(nextDshCliPath !== undefined ? { dshCliPath: nextDshCliPath } : {}),
+        }
         return ok(prefs)
       },
       openExternal: () => ok(true),
@@ -955,5 +1029,281 @@ describe('theme.css & desktopErrorText contracts', () => {
       }),
     )
     expect(container.querySelector('.ml-row-status-pill[data-status="pending"]')).toBeTruthy()
+  })
+
+  it('supports AGY one-click install/uninstall with data-safety confirmation and DSH profile selection/running guard', async () => {
+    applyDesktopLocale('zh')
+    const { bridge } = createFakeBridge()
+    const installSpy = vi.spyOn(bridge.plugins, 'install')
+    const uninstallSpy = vi.spyOn(bridge.plugins, 'uninstall')
+    vi.spyOn(bridge.plugins, 'listDshProfiles').mockResolvedValue({
+      ok: true,
+      value: [
+        {
+          name: 'desktop',
+          pluginStatus: { state: 'enabled', installed: true, enabled: true, version: '0.2.1' },
+        },
+        {
+          name: 'work',
+          pluginStatus: { state: 'not-installed', installed: false, enabled: false },
+        },
+      ],
+    })
+
+    const clientsRes = await bridge.clients.list()
+    const clients = clientsRes.ok ? clientsRes.value : []
+    const agyNotInstalled = clients.map((c) =>
+      c.kind === 'agy'
+        ? {
+            ...c,
+            pluginStatus: { state: 'not-installed' as const, installed: false, enabled: false },
+          }
+        : c,
+    )
+
+    // 1. AGY one-click install with confirmation mentioning memory data is preserved
+    const { rerender } = render(
+      h(DesktopConfigPanel, {
+        bridge,
+        clients: agyNotInstalled,
+        appInfo: {
+          version: '0.2.2',
+          platform: 'win32',
+          runtimeMode: 'electron',
+          bundledPluginsAvailable: true,
+        },
+        refreshToken: 0,
+        onRecheckGuard: async () => undefined,
+        onRequestUnlockDsh: () => undefined,
+        onRelockDsh: async () => undefined,
+        onDataChanged: async () => undefined,
+        onExternalChange: () => undefined,
+        onNotify: () => undefined,
+      }),
+    )
+
+    const installBtn = await screen.findByRole('button', { name: /一键安装/ })
+    fireEvent.click(installBtn)
+    expect(await screen.findByText(/不会删除/)).toBeTruthy()
+    const confirmInstall = screen.getByRole('button', { name: /确认安装/ })
+    fireEvent.click(confirmInstall)
+    await waitFor(() =>
+      expect(installSpy).toHaveBeenCalledWith(expect.objectContaining({ kind: 'agy' })),
+    )
+
+    // 2. AGY uninstall confirmation
+    const agyInstalled = clients.map((c) =>
+      c.kind === 'agy'
+        ? {
+            ...c,
+            pluginStatus: {
+              state: 'enabled' as const,
+              installed: true,
+              enabled: true,
+              version: '0.2.2',
+            },
+          }
+        : c,
+    )
+    rerender(
+      h(DesktopConfigPanel, {
+        bridge,
+        clients: agyInstalled,
+        appInfo: {
+          version: '0.2.2',
+          platform: 'win32',
+          runtimeMode: 'electron',
+          bundledPluginsAvailable: true,
+        },
+        refreshToken: 1,
+        onRecheckGuard: async () => undefined,
+        onRequestUnlockDsh: () => undefined,
+        onRelockDsh: async () => undefined,
+        onDataChanged: async () => undefined,
+        onExternalChange: () => undefined,
+        onNotify: () => undefined,
+      }),
+    )
+    const uninstallBtn = await screen.findByRole('button', { name: /卸载插件/ })
+    fireEvent.click(uninstallBtn)
+    expect(await screen.findByText(/不会删除/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /确认卸载/ }))
+    await waitFor(() =>
+      expect(uninstallSpy).toHaveBeenCalledWith(expect.objectContaining({ kind: 'agy' })),
+    )
+
+    // 3. Switch to DSH tab: default desktop profile v0.2.1 < v0.2.2 shows sync button, disabled when DSH running
+    rerender(
+      h(DesktopConfigPanel, {
+        bridge,
+        clients,
+        guardSnapshot: {
+          mode: 'readonly-dsh-running',
+          dshRunning: true,
+          uncertain: false,
+          matchedProcesses: ['DeepSeek Harness.exe'],
+          checkedAt: '2026-11-27T00:00:00.000Z',
+        },
+        appInfo: {
+          version: '0.2.2',
+          platform: 'win32',
+          runtimeMode: 'electron',
+          bundledPluginsAvailable: true,
+        },
+        refreshToken: 2,
+        onRecheckGuard: async () => undefined,
+        onRequestUnlockDsh: () => undefined,
+        onRelockDsh: async () => undefined,
+        onDataChanged: async () => undefined,
+        onExternalChange: () => undefined,
+        onNotify: () => undefined,
+      }),
+    )
+    fireEvent.click(screen.getByRole('tab', { name: /DSH/ }))
+    const syncBtn = await screen.findByRole('button', { name: /同步到 v0\.2\.2/ })
+    expect((syncBtn as HTMLButtonElement).disabled).toBe(true)
+
+    // 4. Even in force-unlocked mode while DSH is still running, DSH plugin buttons remain disabled
+    rerender(
+      h(DesktopConfigPanel, {
+        bridge,
+        clients,
+        guardSnapshot: {
+          mode: 'force-unlocked',
+          dshRunning: true,
+          uncertain: false,
+          matchedProcesses: ['DeepSeek Harness.exe'],
+          checkedAt: '2026-11-27T00:00:00.000Z',
+        },
+        appInfo: {
+          version: '0.2.2',
+          platform: 'win32',
+          runtimeMode: 'electron',
+          bundledPluginsAvailable: true,
+        },
+        refreshToken: 3,
+        onRecheckGuard: async () => undefined,
+        onRequestUnlockDsh: () => undefined,
+        onRelockDsh: async () => undefined,
+        onDataChanged: async () => undefined,
+        onExternalChange: () => undefined,
+        onNotify: () => undefined,
+      }),
+    )
+    const syncBtnForceUnlocked = await screen.findByRole('button', { name: /同步到 v0\.2\.2/ })
+    expect((syncBtnForceUnlocked as HTMLButtonElement).disabled).toBe(true)
+
+    // 5. Switching DSH Profile from desktop -> work updates top header badge to not-installed
+    const profileTrigger = screen.getByRole('button', { name: /目标 DSH Profile/ })
+    fireEvent.click(profileTrigger)
+    const workOption = await screen.findByRole('menuitemradio', { name: 'work' })
+    fireEvent.click(workOption)
+    await waitFor(() => {
+      expect(document.querySelector('[data-plugin-state="not-installed"]')).toBeTruthy()
+    })
+  })
+
+  it('renders UpdateModal for electron vs local-bridge and shows post-restart pendingSync retry/dismiss banner', async () => {
+    applyDesktopLocale('zh')
+    const { bridge } = createFakeBridge()
+    const syncPendingSpy = vi.spyOn(bridge.plugins, 'syncPending')
+    const dismissPendingSpy = vi.spyOn(bridge.plugins, 'dismissPendingSync')
+    const startAppUpdateSpy = vi.spyOn(bridge.updater, 'startAppUpdate')
+    const updateOnlineSpy = vi.spyOn(bridge.updater, 'updateInstalledPluginsOnline')
+
+    const failedPendingSnapshot = {
+      phase: 'failed' as const,
+      action: 'pending-sync' as const,
+      targetVersion: '0.2.3',
+      pendingSync: {
+        targetVersion: '0.2.3',
+        requestedAt: '2026-11-27T00:00:00.000Z',
+        targets: [
+          {
+            kind: 'dsh' as const,
+            profileName: 'desktop',
+            status: 'blocked-dsh-running' as const,
+            errorCode: 'desktop/dsh-running',
+            errorMessage: 'DSH is running',
+          },
+        ],
+      },
+      updatedAt: '2026-11-27T00:00:00.000Z',
+    }
+    syncPendingSpy.mockResolvedValue({ ok: true, value: failedPendingSnapshot })
+    vi.spyOn(bridge.updater, 'getState').mockResolvedValue({
+      ok: true,
+      value: failedPendingSnapshot,
+    })
+    vi.spyOn(bridge.updater, 'check').mockResolvedValue({
+      ok: true,
+      value: {
+        currentVersion: '0.2.2',
+        latestVersion: '0.2.3',
+        hasUpdate: true,
+        releaseUrl: 'https://github.com/JiaMingWang-CN/memloom/releases/tag/v0.2.3',
+        releaseNotes: 'Bug fixes',
+        runtimeMode: 'electron',
+        canSelfUpdateApp: true,
+        assets: {
+          desktopExe: 'https://github.com/a.exe',
+          checksums: 'https://github.com/SHA256SUMS.txt',
+        },
+        installedTargets: [{ kind: 'agy', previousVersion: '0.2.2', status: 'pending' }],
+      },
+    })
+
+    render(h(DesktopApp, { bridge }))
+
+    // Pending sync failure banner with retry & dismiss
+    const retryBtn = await screen.findByRole('button', { name: /重试同步/ })
+    fireEvent.click(retryBtn)
+    await waitFor(() => expect(syncPendingSpy).toHaveBeenCalledTimes(1))
+
+    const dismissBtn = screen.getByRole('button', { name: /忽略/ })
+    fireEvent.click(dismissBtn)
+    await waitFor(() => expect(dismissPendingSpy).toHaveBeenCalledTimes(1))
+
+    // Open UpdateModal from sidebar button -> Electron mode shows 立即更新
+    const checkUpdateBtn = screen.getByRole('button', { name: /检查更新/ })
+    fireEvent.click(checkUpdateBtn)
+    const updateNowBtn = await screen.findByRole('button', { name: /立即更新/ })
+    fireEvent.click(updateNowBtn)
+    await waitFor(() => expect(startAppUpdateSpy).toHaveBeenCalledTimes(1))
+
+    // Local-bridge mode shows 更新已安装端插件
+    vi.spyOn(bridge.app, 'getInfo').mockResolvedValue({
+      ok: true,
+      value: {
+        version: '0.2.2',
+        platform: 'win32',
+        systemTheme: 'light',
+        runtimeMode: 'local-bridge',
+        bundledPluginsAvailable: true,
+      },
+    })
+    vi.spyOn(bridge.updater, 'check').mockResolvedValue({
+      ok: true,
+      value: {
+        currentVersion: '0.2.2',
+        latestVersion: '0.2.3',
+        hasUpdate: true,
+        releaseUrl: 'https://github.com/JiaMingWang-CN/memloom/releases/tag/v0.2.3',
+        releaseNotes: 'Local mode release',
+        runtimeMode: 'local-bridge',
+        canSelfUpdateApp: false,
+        assets: {
+          agyZip: 'https://github.com/a.zip',
+          checksums: 'https://github.com/SHA256SUMS.txt',
+        },
+        installedTargets: [{ kind: 'agy', previousVersion: '0.2.2', status: 'pending' }],
+      },
+    })
+    const localView = render(h(DesktopApp, { bridge }))
+    const localBtns = await localView.findAllByRole('button', { name: /检查更新/ })
+    fireEvent.click(localBtns[localBtns.length - 1]!)
+    const onlinePluginsBtn = await screen.findByRole('button', { name: /更新已安装端插件/ })
+    fireEvent.click(onlinePluginsBtn)
+    await waitFor(() => expect(updateOnlineSpy).toHaveBeenCalledTimes(1))
   })
 })

@@ -74,6 +74,7 @@ function createStubEnv(): {
     pickDirectory: async () => join(root, 'ws'),
     pickImportJson: async () => null,
     saveExportJson: async () => null,
+    pickDshCli: async () => null,
   }
 
   return { rendererDir, assetsDir, service, dialog, pickedPath }
@@ -88,7 +89,12 @@ describe('local desktop server (signed runtime bridge)', () => {
       assetsDir: env.assetsDir,
       service: env.service,
       dialog: env.dialog,
-      appInfo: { version: '0.2.2', platform: 'win32' },
+      appInfo: {
+        version: '0.2.2',
+        platform: 'win32',
+        runtimeMode: 'local-bridge',
+        bundledPluginsAvailable: false,
+      },
     })
 
     try {
@@ -214,6 +220,22 @@ describe('local desktop server (signed runtime bridge)', () => {
       const invalidJson = (await invalidArgs.json()) as { ok: boolean; error?: { code: string } }
       expect(invalidJson.ok).toBe(false)
       expect(invalidJson.error?.code).toBe('desktop/invalid-args')
+
+      // app:getInfo exposes runtimeMode === 'local-bridge'
+      const infoRes = await fetch(`${server.url}api/invoke`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Memloom-Token': server.token,
+        },
+        body: JSON.stringify({ channel: 'app:getInfo' }),
+      })
+      const infoJson = (await infoRes.json()) as {
+        ok: boolean
+        value?: { runtimeMode: string; bundledPluginsAvailable: boolean }
+      }
+      expect(infoJson.ok).toBe(true)
+      expect(infoJson.value?.runtimeMode).toBe('local-bridge')
     } finally {
       await server.close()
       await env.service.closeAll()

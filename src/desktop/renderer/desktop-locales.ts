@@ -328,6 +328,59 @@ const desktopExtraZh: LocaleDict = {
   'desktop.error.unsupported': '当前客户端不支持此操作。',
   'desktop.error.invalidArgs': '请求参数无效，请检查输入后重试。',
   'desktop.error.internal': '桌面服务发生内部错误，请稍后重试。',
+  'desktop.error.busy': '当前已有插件变更或更新任务正在执行，请等待完成后重试。',
+  'desktop.error.dshRunning': '检测到 DSH 正在运行或状态未知，请先完全关闭 DSH 后再操作插件。',
+  'desktop.error.dshCliMissing':
+    '未找到 dsh CLI 可执行文件，请在宿主配置中手动选择 dsh / dsh.cmd / dsh.exe。',
+  'desktop.error.updateNetwork': '无法连接 GitHub Releases 获取更新信息，请检查网络后重试。',
+  'desktop.error.updateChecksumFailed':
+    '下载产物 SHA-256 校验失败或缺少 SHA256SUMS.txt，已中止并删除临时文件。',
+  'desktop.error.pluginOpFailed': '宿主插件操作失败，请关闭对应宿主后重试。',
+
+  'desktop.plugin.installBtn': '一键安装',
+  'desktop.plugin.syncBtn': '同步到 v{version}',
+  'desktop.plugin.uninstallBtn': '卸载插件',
+  'desktop.plugin.confirmInstallTitle': '确认安装 / 同步插件',
+  'desktop.plugin.confirmUninstallTitle': '确认卸载插件',
+  'desktop.plugin.confirmInstallBody':
+    '将把 Memloom 插件安装或同步至 {target}。此操作不会删除或覆写任何记忆数据（memory.json）与用户配置。完成后需重启对应宿主生效。',
+  'desktop.plugin.confirmUninstallBody':
+    '将从 {target} 移除 Memloom 插件文件。此操作不会删除您的记忆数据（memory.json）与备份。完成后需重启对应宿主生效。',
+  'desktop.plugin.confirmInstallAction': '确认安装',
+  'desktop.plugin.confirmUninstallAction': '确认卸载',
+  'desktop.plugin.installSuccess': '插件已安装 / 同步，请重启对应宿主生效。',
+  'desktop.plugin.uninstallSuccess': '插件已卸载，记忆数据已完整保留，请重启对应宿主生效。',
+  'desktop.plugin.dshProfileLabel': '目标 DSH Profile',
+  'desktop.plugin.noDshProfiles': '未检测到本机 DSH profile，请先运行一次 DSH 初始化环境。',
+  'desktop.plugin.dshRunningBlock':
+    'DSH 正在运行或状态待确认，请先关闭 DSH 后再安装或卸载 DSH 插件。',
+  'desktop.plugin.dshCliLabel': 'DSH CLI 路径',
+  'desktop.plugin.dshCliAuto': '自动从 PATH 探测',
+  'desktop.plugin.dshCliPick': '选择 dsh CLI…',
+  'desktop.plugin.dshCliClear': '清除',
+  'desktop.plugin.dshCliSaved': '已保存自定义 DSH CLI 路径。',
+  'desktop.plugin.dshCliCleared': '已恢复自动探测 DSH CLI。',
+
+  'desktop.updater.checkBtn': '检查更新',
+  'desktop.updater.title': '应用更新与插件同步',
+  'desktop.updater.currentVersion': '当前版本',
+  'desktop.updater.latestVersion': '最新版本',
+  'desktop.updater.upToDate': '当前已是最新版本。',
+  'desktop.updater.updateAvailable': '发现新版本 v{version}',
+  'desktop.updater.recheck': '重新检查',
+  'desktop.updater.updateNow': '立即更新',
+  'desktop.updater.updateOnlinePlugins': '更新已安装端插件',
+  'desktop.updater.cancelDownload': '取消下载',
+  'desktop.updater.openRelease': '前往 GitHub Release',
+  'desktop.updater.releaseNotes': '发布说明',
+  'desktop.updater.syncTargetsTitle': '更新后将自动同步的已安装端',
+  'desktop.updater.noInstalledTargets': '当前没有需要联动同步的已启用宿主插件。',
+  'desktop.updater.localBridgeHint':
+    '当前为免签名本地运行模式（start:desktop）。应用本体请通过源码重建或前往 GitHub 下载安装包，下方可直接在线更新各已安装宿主端插件。',
+  'desktop.updater.syncBannerRunning': '正在将内置插件同步到已安装宿主端…',
+  'desktop.updater.syncBannerFailed': '部分宿主插件同步未完成（{details}），请关闭 DSH 后重试。',
+  'desktop.updater.retrySync': '重试同步',
+  'desktop.updater.dismissSync': '忽略',
 }
 
 const desktopExtraEn: LocaleDict = {
@@ -668,6 +721,65 @@ const desktopExtraEn: LocaleDict = {
   'desktop.error.unsupported': 'This operation is not supported for the selected client.',
   'desktop.error.invalidArgs': 'Invalid request arguments. Please verify your input.',
   'desktop.error.internal': 'Unexpected internal desktop error. Please retry.',
+  'desktop.error.busy': 'Another plugin or update task is already in progress. Please wait.',
+  'desktop.error.dshRunning':
+    'DSH is currently running or uncertain. Please close DSH completely before modifying DSH plugins.',
+  'desktop.error.dshCliMissing':
+    'Could not locate the dsh CLI. Please select dsh / dsh.cmd / dsh.exe in Host Settings.',
+  'desktop.error.updateNetwork':
+    'Failed to reach GitHub Releases. Please check your network and retry.',
+  'desktop.error.updateChecksumFailed':
+    'SHA-256 verification failed or SHA256SUMS.txt is missing. Temporary files have been removed.',
+  'desktop.error.pluginOpFailed':
+    'Host plugin operation failed. Close the target host application and retry.',
+
+  'desktop.plugin.installBtn': 'Install Plugin',
+  'desktop.plugin.syncBtn': 'Sync to v{version}',
+  'desktop.plugin.uninstallBtn': 'Uninstall Plugin',
+  'desktop.plugin.confirmInstallTitle': 'Confirm Plugin Install / Sync',
+  'desktop.plugin.confirmUninstallTitle': 'Confirm Plugin Uninstall',
+  'desktop.plugin.confirmInstallBody':
+    'Install or synchronize the Memloom plugin for {target}. This never deletes or overwrites your memory data (memory.json) or user settings. Restart the host to take effect.',
+  'desktop.plugin.confirmUninstallBody':
+    'Remove the Memloom plugin files from {target}. Your memory data (memory.json) and backups are preserved untouched. Restart the host to take effect.',
+  'desktop.plugin.confirmInstallAction': 'Confirm Install',
+  'desktop.plugin.confirmUninstallAction': 'Confirm Uninstall',
+  'desktop.plugin.installSuccess': 'Plugin installed / synced. Restart the host app to apply.',
+  'desktop.plugin.uninstallSuccess':
+    'Plugin uninstalled. Memory data was preserved. Restart the host app to apply.',
+  'desktop.plugin.dshProfileLabel': 'Target DSH Profile',
+  'desktop.plugin.noDshProfiles':
+    'No local DSH profile detected. Launch DSH once to initialize your profile.',
+  'desktop.plugin.dshRunningBlock':
+    'DSH is running or uncertain. Close DSH before installing or uninstalling DSH plugins.',
+  'desktop.plugin.dshCliLabel': 'DSH CLI Path',
+  'desktop.plugin.dshCliAuto': 'Auto-detect from PATH',
+  'desktop.plugin.dshCliPick': 'Select dsh CLI…',
+  'desktop.plugin.dshCliClear': 'Clear',
+  'desktop.plugin.dshCliSaved': 'Saved custom DSH CLI path.',
+  'desktop.plugin.dshCliCleared': 'Restored automatic DSH CLI detection.',
+
+  'desktop.updater.checkBtn': 'Check Updates',
+  'desktop.updater.title': 'App Updates & Plugin Sync',
+  'desktop.updater.currentVersion': 'Current version',
+  'desktop.updater.latestVersion': 'Latest version',
+  'desktop.updater.upToDate': 'You are on the latest version.',
+  'desktop.updater.updateAvailable': 'New version v{version} available',
+  'desktop.updater.recheck': 'Check Again',
+  'desktop.updater.updateNow': 'Update Now',
+  'desktop.updater.updateOnlinePlugins': 'Update Installed Plugins',
+  'desktop.updater.cancelDownload': 'Cancel Download',
+  'desktop.updater.openRelease': 'Open GitHub Release',
+  'desktop.updater.releaseNotes': 'Release Notes',
+  'desktop.updater.syncTargetsTitle': 'Installed hosts to sync after restart',
+  'desktop.updater.noInstalledTargets': 'No enabled host plugins to sync.',
+  'desktop.updater.localBridgeHint':
+    'Running in unsigned local mode (start:desktop). Rebuild from source or download the installer on GitHub for the app itself; you can update installed host plugins online below.',
+  'desktop.updater.syncBannerRunning': 'Synchronizing bundled plugins to installed hosts…',
+  'desktop.updater.syncBannerFailed':
+    'Some host plugins failed to sync ({details}). Close DSH and retry.',
+  'desktop.updater.retrySync': 'Retry Sync',
+  'desktop.updater.dismissSync': 'Dismiss',
 }
 
 export const desktopZh: LocaleDict = {
@@ -698,6 +810,12 @@ const DESKTOP_ERROR_KEYS: Record<string, string> = {
   'desktop/unsupported': 'desktop.error.unsupported',
   'desktop/invalid-args': 'desktop.error.invalidArgs',
   'desktop/internal': 'desktop.error.internal',
+  'desktop/busy': 'desktop.error.busy',
+  'desktop/dsh-running': 'desktop.error.dshRunning',
+  'desktop/dsh-cli-missing': 'desktop.error.dshCliMissing',
+  'desktop/update-network': 'desktop.error.updateNetwork',
+  'desktop/update-checksum-failed': 'desktop.error.updateChecksumFailed',
+  'desktop/plugin-op-failed': 'desktop.error.pluginOpFailed',
 }
 
 /** Localize desktop IPC errors (`desktop/*`) and fall back to `src/client/errors.ts` for `memory/*`. */
@@ -711,7 +829,9 @@ export function desktopErrorText(error: unknown): string {
         ? (error as { message?: unknown }).message
         : undefined
     if (
-      (code === 'desktop/store-corrupt' || code === 'desktop/internal') &&
+      (code === 'desktop/store-corrupt' ||
+        code === 'desktop/internal' ||
+        code === 'desktop/update-network') &&
       typeof rawMessage === 'string' &&
       rawMessage !== ''
     ) {

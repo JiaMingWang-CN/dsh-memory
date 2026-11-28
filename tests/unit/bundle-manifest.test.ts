@@ -24,7 +24,7 @@ const manifest = JSON.parse(read('package.json')) as PackageManifest
 describe('bundle manifest', () => {
   it('declares the expected package identity and entry', () => {
     expect(manifest.name).toBe('memloom')
-    expect(manifest.version).toBe('0.2.2')
+    expect(manifest.version).toBe('0.2.3')
     expect(manifest.private).toBe(true)
     expect(manifest.type).toBe('module')
     expect(manifest.engines.node).toBe('>=24.9.0')

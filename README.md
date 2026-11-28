@@ -15,7 +15,7 @@
 
 [项目简介](#项目简介) · [使用场景](#使用场景) · [工作方式](#工作方式) · [管理体验](#管理体验) · [隐私与安全](#隐私与安全) · [安装](#安装) · [配置](#配置) · [架构说明](#架构说明) · [发布说明](#发布说明) · [FAQ](#faq)
 
-[![Status](https://img.shields.io/badge/status-0.2.2--dev-blue)](#开发进度)
+[![Status](https://img.shields.io/badge/status-0.2.3--dev-blue)](#开发进度)
 [![Distribution](https://img.shields.io/badge/distribution-GitHub%20Releases-black)](#安装)
 [![License](https://img.shields.io/badge/license-MIT-green)](#许可证)
 [![Local first](https://img.shields.io/badge/data-local--first-brightgreen)](#隐私与安全)
@@ -23,9 +23,9 @@
 </div>
 
 > [!NOTE]
-> **当前为 `0.2.2` 开发版本（0.x），仅通过 GitHub Releases 分发（含 Antigravity 原生插件、DSH Bundle 与 Memloom Desktop 独立桌面端），不发布 npm 包。**
+> **当前为 `0.2.3` 开发版本（0.x），仅通过 GitHub Releases 分发（含 Antigravity 原生插件、DSH Bundle 与 Memloom Desktop 独立桌面端），不发布 npm 包。**
 >
-> 本文描述的能力与当前仓库实现保持同步；在达到正式稳定版前，界面、配置与行为仍可能调整。详细变更见 [`CHANGELOG.md`](CHANGELOG.md)。
+> 本文描述的能力与当前仓库实现保持同步；在达到正式稳定版前，界面、配置与行为仍可能调整。完整核对清单见 [`docs/release-checklist.md`](docs/release-checklist.md)。
 
 ---
 
@@ -169,7 +169,7 @@ Dreaming 的可靠性行为（已实现）：
 
 ## 管理体验
 
-`0.2.2` 提供三种互补的管理方式，覆盖多端协同桌面台、宿主内置界面与对话内工作流：
+`0.2.3` 提供三种互补的管理方式，覆盖多端协同桌面台、宿主内置界面与对话内工作流：
 
 ### 1. Memloom Desktop（跨宿主独立桌面客户端）
 
@@ -179,7 +179,7 @@ Dreaming 的可靠性行为（已实现）：
 - **待审阅提案**：跨宿主汇总全部 `pending` 提案，提供 `supersedes` 版本对比与 `A`（批准）/ `E`（编辑后接受）/ `R`（拒绝）快捷键；
 - **跨端迁移**：经纬桥接器支持在 AGY 与 DSH 之间执行单条/多选 `merge` 迁移及带逐工作区路径映射、风险确认门禁的 `replace` 迁移向导；
 - **整理与审计**：按宿主查看 `DreamRun` 整理历史（支持按运行批次撤销）与不可变 `AuditRecord` Diff 时间线；
-- **宿主配置与写保护**：AGY 宿主可直接编辑 24 项配置（含 `dreamSubagentModel`）并执行备份重建；左侧导航与配置页同时展示 DSH / AGY 插件的安装、版本与启用状态；DSH 宿主运行期间自动进入只读保护态（`WriteGuard`），写前执行 SHA-256 外部变更检测与自动快照备份；全局支持 `Ctrl/⌘K` 命令面板。
+- **宿主配置、插件生命周期与写保护**：AGY 宿主可直接编辑 24 项配置（含 `dreamSubagentModel`）并执行备份重建；支持一键安装、版本同步与卸载 AGY / DSH（多 profile）插件（绝不删除 `memory.json`，DSH 操作强校验未运行）；支持应用内检查 GitHub Releases 更新（强校验 `SHA256SUMS.txt`）并在安装新版重启后自动同步已安装端插件；DSH 宿主运行期间自动进入只读保护态（`WriteGuard`），写前执行 SHA-256 外部变更检测与自动快照备份；全局支持 `Ctrl/⌘K` 命令面板。
 
 ### 2. DSH Settings → Memory（内置 4-Tab 管理页）
 
@@ -256,13 +256,13 @@ memloom 以结构化记录、Markdown 正文和本地检索索引组成记忆库
 
 ## 安装
 
-> memloom **仅通过 GitHub 仓库与 GitHub Releases 分发（不发布 npm 包）**。`0.2.2` 仍处于 0.x 开发阶段。
+> memloom **仅通过 GitHub 仓库与 GitHub Releases 分发（不发布 npm 包）**。`0.2.3` 仍处于 0.x 开发阶段。
 
-**通用环境要求**：Node.js `>=24.9.0`（从源码构建需额外准备 `pnpm`）。各端产物从 [GitHub Releases v0.2.2](https://github.com/JiaMingWang-CN/memloom/releases/tag/v0.2.2) 获取或本地构建，三端产物互不混用且隔离校验：
+**通用环境要求**：Node.js `>=24.9.0`（从源码构建需额外准备 `pnpm`）。各端产物从 [GitHub Releases v0.2.3](https://github.com/JiaMingWang-CN/memloom/releases/tag/v0.2.3) 获取或本地构建，三端产物互不混用且隔离校验：
 
 ### 方式 A：Antigravity（AGY）原生插件
 
-- **从 Release 安装（推荐）**：下载 [`memloom-agy-plugin-0.2.2.zip`](https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.2/memloom-agy-plugin-0.2.2.zip)，解压至 `~/.gemini/config/plugins/memloom` 并在 `plugins.json` 中启用（零外部 `node_modules` 依赖，仅需本机 Node.js）。
+- **从 Release 安装（推荐）**：下载 [`memloom-agy-plugin-0.2.3.zip`](https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.3/memloom-agy-plugin-0.2.3.zip)，解压至 `~/.gemini/config/plugins/memloom` 并在 `plugins.json` 中启用（零外部 `node_modules` 依赖，仅需本机 Node.js）。
 - **从源码构建**：
   ```bash
   git clone https://github.com/JiaMingWang-CN/memloom.git
@@ -276,25 +276,25 @@ memloom 以结构化记录、Markdown 正文和本地检索索引组成记忆库
 
 - **从 Release 安装（推荐）**：
   ```bash
-  dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.2/memloom-0.2.2.tgz
+  dsh plugin --profile desktop add https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.3/memloom-0.2.3.tgz
   ```
-  也可下载 `memloom-0.2.2.tgz` 后在 DSH 的 Plugins 页面手动安装，完成后重启 DSH。
+  也可下载 `memloom-0.2.3.tgz` 后在 DSH 的 Plugins 页面手动安装，完成后重启 DSH。
 - **从源码构建与调试**：
   ```bash
   pnpm build          # 产出 dist/host 与 dist/client.js
   dsh plugin --profile desktop add link:./
-  # 或执行 pnpm pack 生成 memloom-0.2.2.tgz
+  # 或执行 pnpm pack 生成 memloom-0.2.3.tgz
   ```
   最小 patch 配置示例见 [`examples/cordis.patch.yml`](examples/cordis.patch.yml)，卸载可执行 `dsh plugin --profile desktop remove memloom`。
 
 ### 方式 C：Memloom Desktop（独立桌面客户端）
 
-- **Windows `win-x64` 安装程序**：下载 Release 中的 [`memloom-desktop-0.2.2-win-x64-setup.exe`](https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.2/memloom-desktop-0.2.2-win-x64-setup.exe) 安装运行（支持同时发现并管理本机 AGY 与 DSH 记忆库）。
+- **Windows `win-x64` 安装程序**：下载 Release 中的 [`memloom-desktop-0.2.3-win-x64-setup.exe`](https://github.com/JiaMingWang-CN/memloom/releases/download/v0.2.3/memloom-desktop-0.2.3-win-x64-setup.exe) 安装运行（支持同时发现并管理本机 AGY 与 DSH 记忆库）。
 - **免签名本地浏览器应用模式 / 源码打包**：
   ```bash
   pnpm run start:desktop   # 通过本机 Node.js + Edge App 窗口零拦截启动（共享 desktop-state.json）
-  # 或构建 Electron 产物与 Windows NSIS 安装程序：
-  pnpm run build:desktop && pnpm run pack:desktop:check
+  # 或构建 Electron 产物、内置插件产物与 Windows NSIS 安装程序：
+  pnpm run build:desktop && pnpm run build:desktop:plugins && node scripts/pack-desktop-check.mjs --require-bundled
   pnpm --dir desktop install && pnpm --dir desktop run pack:win
   ```
 
@@ -319,7 +319,7 @@ memloom 以结构化记录、Markdown 正文和本地检索索引组成记忆库
 
 ## 配置
 
-共享内核配置默认值由 [`src/core/config.ts`](src/core/config.ts) 统一定义，完整字段见 [`docs/configuration.md`](docs/configuration.md)。`0.2.2` 的关键默认行为：
+共享内核配置默认值由 [`src/core/config.ts`](src/core/config.ts) 统一定义，完整字段见 [`docs/configuration.md`](docs/configuration.md)。`0.2.3` 的关键默认行为：
 
 | 配置 | 默认值 | 含义 |
 | --- | --- | --- |
@@ -368,26 +368,26 @@ memloom 的 `0.x` 阶段不以以下能力为目标：
 
 ## 开发进度
 
-仓库当前处于 **`0.2.2` 开发版本（0.x）**，已实现并完成自动化测试的范围包括：
+仓库当前处于 **`0.2.3` 开发版本（0.x）**，已实现并完成自动化测试的范围包括：
 
 - 零宿主依赖共享核心（`src/core/`）：领域存储、CRUD、作用域隔离、版本控制、操作日志、审计、容量控制、导入导出与崩溃恢复；
 - 本地 BM25 检索、新会话记忆索引注入（基线与可选增量刷新）、Episode 白名单捕获、条件 `worklog(turn)`、口头“记住”直接写入与 Dreaming / Organize 整理闭环；
 - Dream 队列启动恢复与冷会话启动对账、失败分类/退避/进程内暂停、健康检查、证据分级、worklog 预算、强密钥拒写与按批撤销；
 - **Antigravity（AGY）原生插件**：跨进程文件锁持久化、20 个分级 MCP 工具、`PreInvocation`/`Stop`/`PreToolUse` Hooks、两阶段整理 Skills 与自包含构建校验（[`docs/agy.md`](docs/agy.md)）；
 - **DSH 插件 Bundle**：6 个结构化原生工具、`/memory` 命令、Settings → Memory 4-Tab 管理页、会话用量小字与 `engines.dsh` 兼容声明；
-- **Memloom Desktop（`0.2.2` 全新重设计）**：`--ml-*` 浮岛工作台与零原生控件、官方 DSH / AGY 矢量 Logo、五大核心视图（全部记忆、待审阅提案、跨端迁移桥、整理与审计、宿主配置）、DSH `WriteGuard` 并发写保护、写前 20 份自动备份与 Windows `win-x64` NSIS 安装程序（[`docs/desktop.md`](docs/desktop.md)）。
+- **Memloom Desktop（`0.2.3` 全新重设计）**：`--ml-*` 浮岛工作台与零原生控件、官方 DSH / AGY 矢量 Logo、五大核心视图（全部记忆、待审阅提案、跨端迁移桥、整理与审计、宿主配置）、DSH `WriteGuard` 并发写保护、写前 20 份自动备份与 Windows `win-x64` NSIS 安装程序（[`docs/desktop.md`](docs/desktop.md)）。
 
 当前默认策略保持 `autoDream=false`、`refreshIndexOnChange=false`、`autoCaptureEpisodes=true`；安装与使用见上文[安装](#安装)与[快速开始](#快速开始)。
 
 ## 发布说明
 
 - **分发渠道**：本项目仅通过 [GitHub Releases](https://github.com/JiaMingWang-CN/memloom/releases) 分发 **`memloom-<version>.tgz`**（DSH Bundle）、**`memloom-agy-plugin-<version>.zip`**（AGY 原生插件）与 **`memloom-desktop-<version>-win-x64-setup.exe`**（Windows 桌面端）及源码仓库，**不发布 npm 包**。
-- **变更记录**：详细变更见 [`CHANGELOG.md`](CHANGELOG.md)。
+- **变更记录**：详细变更见 [`CHANGELOG.md`](CHANGELOG.md)，发布前核对项与真实环境验证记录见 [`docs/release-checklist.md`](docs/release-checklist.md)。
 
 ## FAQ
 
 **memloom 现在可以用来长期使用吗？**
-仓库处于 `0.2.2` 开发版本（0.x），尚未发布稳定版。功能可用且有自动化测试覆盖，但接口、配置与界面仍可能调整。
+仓库处于 `0.2.3` 开发版本（0.x），尚未发布稳定版。功能可用且有自动化测试覆盖，但接口、配置与界面仍可能调整。
 
 **会自动整理我的记忆吗？**
 默认不会。`autoDream=false`，由你手动触发（AGY 可通过 `memory-dream` Skill，DSH 可运行 `/memory dream` 或点击 `Dream now`）；即使开启自动整理，产物也先进入 `pending` 待审阅。
@@ -423,6 +423,6 @@ memloom 的 `0.x` 阶段不以以下能力为目标：
 
 **让经验留下来，让每个新会话接着前进。**
 
-memloom · Local-first long-term memory · 0.2.2-dev
+memloom · Local-first long-term memory · 0.2.3-dev
 
 </div>

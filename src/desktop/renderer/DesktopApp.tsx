@@ -9,12 +9,14 @@ import { formatMessage, t } from '../../client/locales.ts'
 import type { DesktopAppInfo, DesktopBridgeApi } from '../ipc-contract.ts'
 import type { DesktopClientInfo, MigrationSourceSelection } from '../multi-service.ts'
 import type { DesktopPreferences } from '../registry.ts'
+import type { UpdateCheckResult, UpdaterTaskSnapshot } from '../updater.ts'
 import type { WriteGuardSnapshot } from '../write-guard.ts'
 import { DesktopConfigPanel } from './DesktopConfigPanel.tsx'
 import { DreamAuditPanel } from './DreamAuditPanel.tsx'
 import { MemoriesView } from './MemoriesView.tsx'
 import { MigrationView } from './MigrationView.tsx'
 import { ReviewView } from './ReviewView.tsx'
+import { UpdateModal } from './UpdateModal.tsx'
 import {
   applyDesktopLocale,
   desktopErrorText,
@@ -86,7 +88,13 @@ export function DesktopApp(props: DesktopAppProps = {}): React.ReactElement {
     return 'zh'
   })
   const [themePref, setThemePref] = React.useState<DesktopPreferences['theme']>('system')
+  const [dshCliPath, setDshCliPath] = React.useState<string | undefined>(undefined)
   const [appInfo, setAppInfo] = React.useState<DesktopAppInfo | undefined>(undefined)
+  const [updateModalOpen, setUpdateModalOpen] = React.useState(false)
+  const [updateCheckResult, setUpdateCheckResult] = React.useState<UpdateCheckResult | undefined>(
+    undefined,
+  )
+  const [updaterState, setUpdaterState] = React.useState<UpdaterTaskSnapshot | undefined>(undefined)
 
   const [clients, setClients] = React.useState<DesktopClientInfo[]>([])
   const [guardSnapshot, setGuardSnapshot] = React.useState<WriteGuardSnapshot | undefined>(
@@ -178,22 +186,27 @@ export function DesktopApp(props: DesktopAppProps = {}): React.ReactElement {
     if (bridge === undefined) return
     setLoadError('')
     try {
-      const [clientsRes, guardRes, prefsRes, infoRes, legacyRes] = await Promise.all([
+      const [clientsRes, guardRes, prefsRes, infoRes, legacyRes, updaterRes] = await Promise.all([
         bridge.clients.list(),
         bridge.clients.getGuardSnapshot(),
         bridge.app.getPreferences(),
         bridge.app.getInfo(),
         bridge.clients.getLegacyAgyCandidate(),
+        bridge.updater.getState(),
       ])
       const nextClients = unwrapIpc(clientsRes)
       const nextGuard = unwrapIpc(guardRes)
       const nextPrefs = unwrapIpc(prefsRes)
       const nextInfo = unwrapIpc(infoRes)
       const nextLegacy = unwrapIpc(legacyRes)
+      if (updaterRes.ok) {
+        setUpdaterState(updaterRes.value)
+      }
 
       applyDesktopLocale(nextPrefs.locale)
       setLocale(nextPrefs.locale)
       setThemePref(nextPrefs.theme)
+      setDshCliPath(nextPrefs.dshCliPath)
       setAppInfo(nextInfo)
       setClients(nextClients)
       setGuardSnapshot(nextGuard)
@@ -212,6 +225,15 @@ export function DesktopApp(props: DesktopAppProps = {}): React.ReactElement {
       return undefined
     }
     void loadAll()
+    // Silent background update check after startup delay (never interrupts on network failure)
+    const silentCheckTimer = window.setTimeout(() => {
+      void bridge.updater
+        .check()
+        .then((res) => {
+          if (res.ok) setUpdateCheckResult(res.value)
+        })
+        .catch(() => undefined)
+    }, 1500)
     const unsubscribe = bridge.app.onFocusRefresh(() => {
       void bridge.clients
         .refreshAll()
@@ -224,8 +246,47 @@ export function DesktopApp(props: DesktopAppProps = {}): React.ReactElement {
         })
         .catch(() => undefined)
     })
-    return unsubscribe
+    return () => {
+      window.clearTimeout(silentCheckTimer)
+      unsubscribe()
+    }
   }, [bridge, loadAll, loadHostStats])
+
+  const isUpdaterActive =
+    updaterState?.phase === 'checking' ||
+    updaterState?.phase === 'downloading' ||
+    updaterState?.phase === 'verifying' ||
+    updaterState?.phase === 'launching-installer' ||
+    updaterState?.phase === 'syncing-plugins'
+
+  React.useEffect(() => {
+    if (bridge === undefined || !isUpdaterActive) return undefined
+    const interval = window.setInterval(() => {
+      void bridge.updater
+        .getState()
+        .then(async (res) => {
+          if (!res.ok) return
+          const next = res.value
+          setUpdaterState(next)
+          const stillActive =
+            next.phase === 'checking' ||
+            next.phase === 'downloading' ||
+            next.phase === 'verifying' ||
+            next.phase === 'launching-installer' ||
+            next.phase === 'syncing-plugins'
+          if (!stillActive) {
+            const refreshed = await bridge.clients.refreshAll()
+            if (refreshed.ok) {
+              setClients(refreshed.value)
+              await loadHostStats(refreshed.value)
+              setRefreshToken((v) => v + 1)
+            }
+          }
+        })
+        .catch(() => undefined)
+    }, 400)
+    return () => window.clearInterval(interval)
+  }, [bridge, isUpdaterActive, loadHostStats])
 
   const syncAfterDataChange = React.useCallback(async (): Promise<void> => {
     if (bridge === undefined) return
@@ -399,7 +460,31 @@ export function DesktopApp(props: DesktopAppProps = {}): React.ReactElement {
       activeClient.dshProtected ||
       guardSnapshot.mode === 'force-unlocked')
 
+  const showSyncRunningBanner = updaterState?.phase === 'syncing-plugins'
+  const pendingSyncTargets = updaterState?.pendingSync?.targets ?? []
+  const showPendingSyncFailedBanner = !showSyncRunningBanner && pendingSyncTargets.length > 0
+
+  const handleRetryPendingSync = async (): Promise<void> => {
+    try {
+      const next = unwrapIpc(await bridge.plugins.syncPending())
+      setUpdaterState(next)
+    } catch (err) {
+      notify(desktopErrorText(err), 'danger')
+    }
+  }
+
+  const handleDismissPendingSync = async (): Promise<void> => {
+    try {
+      const next = unwrapIpc(await bridge.plugins.dismissPendingSync())
+      setUpdaterState(next)
+    } catch (err) {
+      notify(desktopErrorText(err), 'danger')
+    }
+  }
+
   const hasBanners =
+    showSyncRunningBanner ||
+    showPendingSyncFailedBanner ||
     (showGuardBanner && guardSnapshot !== undefined) ||
     externalChanged ||
     (legacyCandidate !== null && !legacyDismissed) ||
@@ -410,6 +495,45 @@ export function DesktopApp(props: DesktopAppProps = {}): React.ReactElement {
     : h(
         React.Fragment,
         null,
+        showSyncRunningBanner
+          ? h(
+              'div',
+              { className: 'ml-banner', 'data-tone': 'info', role: 'status' },
+              h('span', null, updaterState?.message ?? t('desktop.updater.syncBannerRunning')),
+            )
+          : null,
+
+        showPendingSyncFailedBanner
+          ? h(
+              'div',
+              { className: 'ml-banner', 'data-tone': 'warn', role: 'alert' },
+              h(
+                'span',
+                null,
+                formatMessage('desktop.updater.syncBannerFailed', {
+                  details: pendingSyncTargets
+                    .map((item) =>
+                      item.kind === 'agy' ? 'AGY' : `DSH(${item.profileName ?? 'desktop'})`,
+                    )
+                    .join(', '),
+                }),
+              ),
+              h(
+                'div',
+                { className: 'ml-banner-actions' },
+                h(
+                  Button,
+                  { size: 'sm', variant: 'primary', onClick: () => void handleRetryPendingSync() },
+                  t('desktop.updater.retrySync'),
+                ),
+                h(
+                  Button,
+                  { size: 'sm', variant: 'ghost', onClick: () => void handleDismissPendingSync() },
+                  t('desktop.updater.dismissSync'),
+                ),
+              ),
+            )
+          : null,
         showGuardBanner && guardSnapshot !== undefined
           ? h(
               'div',
@@ -897,6 +1021,30 @@ export function DesktopApp(props: DesktopAppProps = {}): React.ReactElement {
             },
           ],
         }),
+        h(
+          'div',
+          { className: 'ml-rail-version-row' },
+          h(
+            'span',
+            { className: 'ml-mono', style: { fontSize: '11px', color: 'var(--ml-text-muted)' } },
+            appInfo !== undefined ? `v${appInfo.version}` : '',
+          ),
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'ml-btn',
+              'data-variant': 'ghost',
+              'data-size': 'sm',
+              style: { position: 'relative', padding: '0 8px', height: '26px', fontSize: '11px' },
+              onClick: () => setUpdateModalOpen(true),
+            },
+            h('span', null, t('desktop.updater.checkBtn')),
+            updateCheckResult?.hasUpdate
+              ? h('span', { className: 'ml-update-dot', 'aria-hidden': true })
+              : null,
+          ),
+        ),
       ),
     ),
 
@@ -985,16 +1133,36 @@ export function DesktopApp(props: DesktopAppProps = {}): React.ReactElement {
                       bridge,
                       clients,
                       ...(guardSnapshot !== undefined ? { guardSnapshot } : {}),
+                      ...(appInfo !== undefined ? { appInfo } : {}),
+                      ...(dshCliPath !== undefined ? { dshCliPath } : {}),
                       refreshToken,
                       banners: bannersNode,
                       onRecheckGuard: recheckGuard,
                       onRequestUnlockDsh: () => setUnlockModalOpen(true),
                       onRelockDsh: relockGuard,
-                      onDataChanged: syncAfterDataChange,
+                      onDataChanged: async () => {
+                        await refreshClientsAndGuard()
+                      },
+                      onPreferencesChanged: (nextPrefs) => {
+                        setDshCliPath(nextPrefs.dshCliPath)
+                      },
                       onExternalChange: () => setExternalChanged(true),
                       onNotify: notify,
                     }),
     ),
+
+    // In-app Updater Modal
+    h(UpdateModal, {
+      open: updateModalOpen,
+      onClose: () => setUpdateModalOpen(false),
+      bridge,
+      ...(appInfo !== undefined ? { appInfo } : {}),
+      ...(updateCheckResult !== undefined ? { checkResult: updateCheckResult } : {}),
+      ...(updaterState !== undefined ? { taskState: updaterState } : {}),
+      onChecked: (res) => setUpdateCheckResult(res),
+      onStateChange: (next) => setUpdaterState(next),
+      onNotify: notify,
+    }),
 
     // Command Palette Modal
     cmdOpen

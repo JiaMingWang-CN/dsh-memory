@@ -7,6 +7,9 @@ directories:
   output: ../dist/desktop-release
 files:
   - '**/*'
+extraResources:
+  - from: ../dist/desktop-bundled-plugins
+    to: bundled-plugins
 win:
   target:
     - target: nsis

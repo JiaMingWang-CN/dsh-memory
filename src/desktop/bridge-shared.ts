@@ -5,6 +5,52 @@
  */
 import type { DesktopBridgeApi, IpcResult } from './ipc-contract.ts'
 
+/** Compare two SemVer strings (`> 0` if `a > b`, `< 0` if `a < b`, `0` if equal). */
+export function compareSemver(a: string, b: string): number {
+  const parse = (raw: string) => {
+    const cleaned = raw.trim().replace(/^v/i, '')
+    const [corePart = '', ...preParts] = cleaned.split('-')
+    const [majStr = '0', minStr = '0', patStr = '0'] = corePart.split('.')
+    const major = Number.parseInt(majStr, 10)
+    const minor = Number.parseInt(minStr, 10)
+    const patch = Number.parseInt(patStr, 10)
+    const preJoined = preParts.join('-').split('+')[0] ?? ''
+    return {
+      major: Number.isFinite(major) ? major : 0,
+      minor: Number.isFinite(minor) ? minor : 0,
+      patch: Number.isFinite(patch) ? patch : 0,
+      prerelease: preJoined.length > 0 ? preJoined.split('.') : [],
+    }
+  }
+  const pa = parse(a)
+  const pb = parse(b)
+  if (pa.major !== pb.major) return pa.major - pb.major
+  if (pa.minor !== pb.minor) return pa.minor - pb.minor
+  if (pa.patch !== pb.patch) return pa.patch - pb.patch
+
+  const aPre = pa.prerelease
+  const bPre = pb.prerelease
+  if (aPre.length === 0 && bPre.length === 0) return 0
+  if (aPre.length === 0) return 1
+  if (bPre.length === 0) return -1
+
+  const len = Math.max(aPre.length, bPre.length)
+  for (let i = 0; i < len; i++) {
+    const segA = aPre[i]
+    const segB = bPre[i]
+    if (segA === undefined) return -1
+    if (segB === undefined) return 1
+    if (segA === segB) continue
+    const numA = /^\d+$/.test(segA) ? Number.parseInt(segA, 10) : null
+    const numB = /^\d+$/.test(segB) ? Number.parseInt(segB, 10) : null
+    if (numA !== null && numB !== null) return numA - numB
+    if (numA !== null) return -1
+    if (numB !== null) return 1
+    return segA.localeCompare(segB)
+  }
+  return 0
+}
+
 /** Whitelisted IPC channel names shared by Main, Preload, and Renderer. */
 export const IPC_CHANNELS = {
   clientsList: 'clients:list',
@@ -47,6 +93,19 @@ export const IPC_CHANNELS = {
   dialogPickDirectory: 'dialog:pickDirectory',
   dialogPickImportJson: 'dialog:pickImportJson',
   dialogSaveExportJson: 'dialog:saveExportJson',
+  dialogPickDshCli: 'dialog:pickDshCli',
+
+  pluginsListDshProfiles: 'plugins:listDshProfiles',
+  pluginsInstall: 'plugins:install',
+  pluginsUninstall: 'plugins:uninstall',
+  pluginsSyncPending: 'plugins:syncPending',
+  pluginsDismissPendingSync: 'plugins:dismissPendingSync',
+
+  updaterCheck: 'updater:check',
+  updaterGetState: 'updater:getState',
+  updaterCancel: 'updater:cancel',
+  updaterStartAppUpdate: 'updater:startAppUpdate',
+  updaterUpdateInstalledPluginsOnline: 'updater:updateInstalledPluginsOnline',
 
   appGetInfo: 'app:getInfo',
   appGetPreferences: 'app:getPreferences',
@@ -124,6 +183,21 @@ export function createDesktopBridge(ipc: PreloadIpcRendererLike): DesktopBridgeA
       pickDirectory: () => invoke(IPC_CHANNELS.dialogPickDirectory),
       pickImportJson: () => invoke(IPC_CHANNELS.dialogPickImportJson),
       saveExportJson: (request) => invoke(IPC_CHANNELS.dialogSaveExportJson, request),
+      pickDshCli: () => invoke(IPC_CHANNELS.dialogPickDshCli),
+    },
+    plugins: {
+      listDshProfiles: () => invoke(IPC_CHANNELS.pluginsListDshProfiles),
+      install: (request) => invoke(IPC_CHANNELS.pluginsInstall, request),
+      uninstall: (request) => invoke(IPC_CHANNELS.pluginsUninstall, request),
+      syncPending: () => invoke(IPC_CHANNELS.pluginsSyncPending),
+      dismissPendingSync: () => invoke(IPC_CHANNELS.pluginsDismissPendingSync),
+    },
+    updater: {
+      check: () => invoke(IPC_CHANNELS.updaterCheck),
+      getState: () => invoke(IPC_CHANNELS.updaterGetState),
+      cancel: () => invoke(IPC_CHANNELS.updaterCancel),
+      startAppUpdate: () => invoke(IPC_CHANNELS.updaterStartAppUpdate),
+      updateInstalledPluginsOnline: () => invoke(IPC_CHANNELS.updaterUpdateInstalledPluginsOnline),
     },
     app: {
       getInfo: () => invoke(IPC_CHANNELS.appGetInfo),

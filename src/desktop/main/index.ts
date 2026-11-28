@@ -8,10 +8,13 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type * as Electron from 'electron'
 import { writeFileAtomic } from '../../agy/storage.ts'
+import { resolveBundledPlugins } from '../bundled-plugins.ts'
 import { IPC_CHANNELS, isAllowedExternalUrl } from '../ipc-contract.ts'
 import { MultiClientService } from '../multi-service.ts'
 import { createPlatformAdapter } from '../platform/index.ts'
+import { DesktopPluginManager } from '../plugin-manager.ts'
 import { ClientRegistry } from '../registry.ts'
+import { DesktopUpdater } from '../updater.ts'
 import { WriteGuard } from '../write-guard.ts'
 import { AuthorizedPathBook, createDesktopIpcHandlers, type DialogAdapter } from './ipc-handlers.ts'
 
@@ -190,6 +193,19 @@ export function createElectronDialogAdapter(
       await writeFileAtomic(resolved, content)
       return resolved
     },
+
+    async pickDshCli() {
+      const res = await showOpen({
+        title: 'Select DSH CLI executable',
+        properties: ['openFile'],
+        filters:
+          process.platform === 'win32'
+            ? [{ name: 'DSH CLI (dsh.cmd / dsh.exe)', extensions: ['cmd', 'exe'] }]
+            : [{ name: 'All Files', extensions: ['*'] }],
+      })
+      const first = res.filePaths[0]
+      return res.canceled || first === undefined ? null : path.resolve(first)
+    },
   }
 }
 
@@ -215,6 +231,19 @@ export async function startDesktopMain(options: StartDesktopMainOptions = {}): P
   const electron = await import('electron')
   const { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell } = electron
 
+  const gotSingleInstanceLock = app.requestSingleInstanceLock()
+  if (!gotSingleInstanceLock) {
+    app.quit()
+    const platform = createPlatformAdapter()
+    const statePath = path.join(app.getPath('userData'), 'desktop-state.json')
+    const registry = new ClientRegistry({ statePath, platform })
+    const writeGuard = new WriteGuard(platform)
+    return {
+      service: new MultiClientService({ registry, writeGuard }),
+      getMainWindow: () => null,
+    }
+  }
+
   const appDir = options.appDir ?? resolveDefaultAppDir()
   const preloadPath = path.join(appDir, 'preload.cjs')
   const rendererHtmlPath = path.join(appDir, 'renderer', 'index.html')
@@ -222,7 +251,9 @@ export async function startDesktopMain(options: StartDesktopMainOptions = {}): P
   const allowedEntryUrl = pathToFileURL(rendererHtmlPath).href
 
   const platform = createPlatformAdapter()
-  const statePath = path.join(app.getPath('userData'), 'desktop-state.json')
+  const userDataDir = app.getPath('userData')
+  const statePath = path.join(userDataDir, 'desktop-state.json')
+  const updatesDir = path.join(userDataDir, 'updates')
   const registry = new ClientRegistry({ statePath, platform })
   const writeGuard = new WriteGuard(platform)
   const service = new MultiClientService({ registry, writeGuard })
@@ -231,12 +262,62 @@ export async function startDesktopMain(options: StartDesktopMainOptions = {}): P
   Menu?.setApplicationMenu?.(null)
   await service.initialize()
 
+  const currentVersion = app.getVersion()
+  const resourcesPath = process.resourcesPath
+  const resolveBundled = () =>
+    resolveBundledPlugins({
+      appDir,
+      ...(resourcesPath !== undefined ? { resourcesPath } : {}),
+      expectedVersion: currentVersion,
+    })
+  const initialBundled = await resolveBundled()
+  const trustedArtifactRoots = [
+    updatesDir,
+    ...(resourcesPath !== undefined ? [path.join(resourcesPath, 'bundled-plugins')] : []),
+    path.resolve(appDir, '..', 'desktop-bundled-plugins'),
+  ]
+
+  const pluginManager = new DesktopPluginManager({
+    registry,
+    platform,
+    trustedArtifactRoots,
+    resolveBundled,
+  })
+
+  let quittingForInstaller = false
+  const updater = new DesktopUpdater({
+    currentVersion,
+    runtimeMode: 'electron',
+    updatesDir,
+    registry,
+    pluginManager,
+    resolveBundled,
+    prepareForInstallerQuit: async () => {
+      quittingForInstaller = true
+      await service.closeAll()
+    },
+    onInstallerLaunchAborted: () => {
+      quittingForInstaller = false
+    },
+    requestAppQuit: () => {
+      app.exit(0)
+    },
+  })
+
   const initialPrefs = service.getPreferences()
   nativeTheme.themeSource = initialPrefs.theme
 
   let mainWindow: Electron.BrowserWindow | null = null
   const getMainWindow = (): Electron.BrowserWindow | null =>
     mainWindow !== null && !mainWindow.isDestroyed() ? mainWindow : null
+
+  app.on('second-instance', () => {
+    const win = getMainWindow()
+    if (win !== null) {
+      if (win.isMinimized()) win.restore()
+      win.focus()
+    }
+  })
 
   const pathBook = new AuthorizedPathBook()
   const dialogAdapter = createElectronDialogAdapter(getMainWindow, dialog)
@@ -245,10 +326,15 @@ export async function startDesktopMain(options: StartDesktopMainOptions = {}): P
     service,
     dialog: dialogAdapter,
     pathBook,
+    pluginManager,
+    updater,
+    resolveBundledAvailable: async () => (await resolveBundled()) !== null,
     appInfo: {
-      version: app.getVersion(),
+      version: currentVersion,
       platform: process.platform,
       systemTheme: nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
+      runtimeMode: 'electron',
+      bundledPluginsAvailable: initialBundled !== null,
     },
     openExternal: (url) => shell.openExternal(url),
     onPreferencesUpdated: (prefs) => {
@@ -287,10 +373,10 @@ export async function startDesktopMain(options: StartDesktopMainOptions = {}): P
 
     let saveTimer: ReturnType<typeof setTimeout> | undefined
     const scheduleBoundsPersist = (): void => {
-      if (win.isDestroyed() || win.isMinimized()) return
+      if (quittingForInstaller || win.isDestroyed() || win.isMinimized()) return
       if (saveTimer !== undefined) clearTimeout(saveTimer)
       saveTimer = setTimeout(() => {
-        if (!win.isDestroyed() && !win.isMinimized()) {
+        if (!quittingForInstaller && !win.isDestroyed() && !win.isMinimized()) {
           void service.updatePreferences({ windowBounds: win.getBounds() }).catch(() => {})
         }
       }, 250)
@@ -300,7 +386,7 @@ export async function startDesktopMain(options: StartDesktopMainOptions = {}): P
     win.on('move', scheduleBoundsPersist)
     win.on('close', () => {
       if (saveTimer !== undefined) clearTimeout(saveTimer)
-      if (!win.isDestroyed() && !win.isMinimized()) {
+      if (!quittingForInstaller && !win.isDestroyed() && !win.isMinimized()) {
         void service.updatePreferences({ windowBounds: win.getBounds() }).catch(() => {})
       }
     })
@@ -320,6 +406,7 @@ export async function startDesktopMain(options: StartDesktopMainOptions = {}): P
   }
 
   await createMainWindow()
+  void updater.reconcilePendingSyncOnStartup().catch(() => {})
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

@@ -53,6 +53,7 @@ import type {
   ClientKind,
   ClientRegistry,
   DesktopPreferences,
+  DesktopPreferencesPatch,
   RegisteredClient,
   UpdateClientInput,
 } from './registry.ts'
@@ -548,7 +549,7 @@ export class MultiClientService {
     return this.registry.getPreferences()
   }
 
-  updatePreferences(patch: Partial<DesktopPreferences>): Promise<DesktopPreferences> {
+  updatePreferences(patch: DesktopPreferencesPatch): Promise<DesktopPreferences> {
     return this.registry.updatePreferences(patch)
   }
 

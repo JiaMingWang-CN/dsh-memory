@@ -45,6 +45,7 @@ Section "Install" SEC_INSTALL
   SetShellVarContext current
   SetRegView 64
   SetOutPath "$INSTDIR"
+  RMDir /r "$INSTDIR\resources\bundled-plugins"
 
   !ifdef APP_64
     !ifdef COMPRESS

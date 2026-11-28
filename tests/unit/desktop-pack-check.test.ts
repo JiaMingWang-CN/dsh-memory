@@ -5,14 +5,12 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 // @ts-expect-error -- scripts/build-desktop.mjs has no .d.mts companion inside Task 8 file boundary
 import { buildDesktopApp as rawBuildDesktopApp } from '../../scripts/build-desktop.mjs'
-// @ts-expect-error -- scripts/pack-desktop-check.mjs has no .d.mts companion inside Task 8 file boundary
-import { validateDesktopArtifact as rawValidateDesktopArtifact } from '../../scripts/pack-desktop-check.mjs'
+import { validateDesktopArtifact } from '../../scripts/pack-desktop-check.mjs'
 import { validateManifest } from '../../scripts/pack-check.mjs'
 
 const buildDesktopApp = rawBuildDesktopApp as (options?: {
   outDir?: string
 }) => Promise<{ outDir: string; files: string[] }>
-const validateDesktopArtifact = rawValidateDesktopArtifact as (outDir?: string) => string[]
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const tempDirs: string[] = []

@@ -14,8 +14,11 @@ import {
   type MemoryConfig,
   type ResolvedMemoryConfig,
 } from '../../core/config.ts'
-import type { DesktopBridgeApi } from '../ipc-contract.ts'
+import { compareSemver } from '../bridge-shared.ts'
+import type { DesktopAppInfo, DesktopBridgeApi } from '../ipc-contract.ts'
 import type { DesktopClientConfigResult, DesktopClientInfo } from '../multi-service.ts'
+import type { DshProfileSummary } from '../plugin-manager.ts'
+import type { DesktopPreferences } from '../registry.ts'
 import type { WriteGuardSnapshot } from '../write-guard.ts'
 import { desktopErrorText, isExternalChangeError, unwrapIpc } from './desktop-locales.ts'
 import {
@@ -38,12 +41,15 @@ export interface DesktopConfigPanelProps {
   readonly bridge: DesktopBridgeApi
   readonly clients: readonly DesktopClientInfo[]
   readonly guardSnapshot?: WriteGuardSnapshot
+  readonly appInfo?: DesktopAppInfo
+  readonly dshCliPath?: string
   readonly refreshToken: number
   readonly banners?: React.ReactNode
   readonly onRecheckGuard: () => Promise<void>
   readonly onRequestUnlockDsh: () => void
   readonly onRelockDsh: () => Promise<void>
   readonly onDataChanged: () => Promise<void>
+  readonly onPreferencesChanged?: (prefs: DesktopPreferences) => void
   readonly onExternalChange: () => void
   readonly onNotify: (message: string, tone?: 'info' | 'success' | 'warn' | 'danger') => void
 }
@@ -147,6 +153,17 @@ export function DesktopConfigPanel(props: DesktopConfigPanelProps): React.ReactE
   const [saving, setSaving] = React.useState(false)
   const [riskWarnings, setRiskWarnings] = React.useState<string[]>([])
   const [maintModal, setMaintModal] = React.useState<'rebuild' | 'purge' | undefined>(undefined)
+  const [dshProfiles, setDshProfiles] = React.useState<DshProfileSummary[]>([])
+  const [selectedDshProfile, setSelectedDshProfile] = React.useState<string>('desktop')
+  const [pluginBusy, setPluginBusy] = React.useState(false)
+  const [pluginConfirm, setPluginConfirm] = React.useState<
+    | {
+        readonly kind: 'agy' | 'dsh'
+        readonly action: 'install' | 'uninstall'
+        readonly profileName?: string
+      }
+    | undefined
+  >(undefined)
 
   React.useEffect(() => {
     if (hostId === '' || !clients.some((c) => c.id === hostId)) {
@@ -195,6 +212,26 @@ export function DesktopConfigPanel(props: DesktopConfigPanelProps): React.ReactE
       cancelled = true
     }
   }, [bridge, activeClient, refreshToken])
+
+  const loadDshProfiles = React.useCallback(async (): Promise<void> => {
+    try {
+      const list = unwrapIpc(await bridge.plugins.listDshProfiles())
+      setDshProfiles(list)
+      setSelectedDshProfile((cur) => {
+        if (list.some((p) => p.name === cur)) return cur
+        const desktop = list.find((p) => p.name === 'desktop')
+        return desktop?.name ?? list[0]?.name ?? 'desktop'
+      })
+    } catch {
+      setDshProfiles([])
+    }
+  }, [bridge])
+
+  React.useEffect(() => {
+    if (activeClient?.kind === 'dsh') {
+      void loadDshProfiles()
+    }
+  }, [activeClient?.kind, loadDshProfiles, refreshToken])
 
   const baseline = React.useMemo(() => draftFromResolved(configResult?.config), [configResult])
   const dirtyCount = configResult?.editable === true ? countDiffs(draft, baseline) : 0
@@ -353,7 +390,80 @@ export function DesktopConfigPanel(props: DesktopConfigPanelProps): React.ReactE
     }
   }
 
+  const handleExecutePluginConfirm = async (): Promise<void> => {
+    if (pluginConfirm === undefined) return
+    setPluginBusy(true)
+    try {
+      if (pluginConfirm.action === 'install') {
+        const source = props.appInfo?.bundledPluginsAvailable === false ? 'online' : 'bundled'
+        unwrapIpc(
+          await bridge.plugins.install({
+            kind: pluginConfirm.kind,
+            ...(pluginConfirm.profileName !== undefined
+              ? { profileName: pluginConfirm.profileName }
+              : {}),
+            source,
+          }),
+        )
+        props.onNotify(t('desktop.plugin.installSuccess'), 'success')
+      } else {
+        unwrapIpc(
+          await bridge.plugins.uninstall({
+            kind: pluginConfirm.kind,
+            ...(pluginConfirm.profileName !== undefined
+              ? { profileName: pluginConfirm.profileName }
+              : {}),
+          }),
+        )
+        props.onNotify(t('desktop.plugin.uninstallSuccess'), 'success')
+      }
+      setPluginConfirm(undefined)
+      await props.onDataChanged()
+      if (pluginConfirm.kind === 'dsh') {
+        await loadDshProfiles()
+      }
+    } catch (err) {
+      props.onNotify(desktopErrorText(err), 'danger')
+    } finally {
+      setPluginBusy(false)
+    }
+  }
+
+  const handlePickDshCli = async (): Promise<void> => {
+    try {
+      const picked = unwrapIpc(await bridge.dialog.pickDshCli())
+      if (picked === null) return
+      const updated = unwrapIpc(await bridge.app.updatePreferences({ dshCliPath: picked }))
+      props.onPreferencesChanged?.(updated)
+      props.onNotify(t('desktop.plugin.dshCliSaved'), 'success')
+    } catch (err) {
+      props.onNotify(desktopErrorText(err), 'danger')
+    }
+  }
+
+  const handleClearDshCli = async (): Promise<void> => {
+    try {
+      const updated = unwrapIpc(await bridge.app.updatePreferences({ dshCliPath: null }))
+      props.onPreferencesChanged?.(updated)
+      props.onNotify(t('desktop.plugin.dshCliCleared'), 'info')
+    } catch (err) {
+      props.onNotify(desktopErrorText(err), 'danger')
+    }
+  }
+
   const isLockedDsh = guardSnapshot?.mode === 'readonly-dsh-running'
+  const isDshRunningOrUncertain = Boolean(guardSnapshot?.dshRunning || guardSnapshot?.uncertain)
+  const appVersion = props.appInfo?.version
+  const activeDshProfile = dshProfiles.find((p) => p.name === selectedDshProfile)
+  const effectivePluginStatus =
+    activeClient?.kind === 'dsh' && activeDshProfile !== undefined
+      ? activeDshProfile.pluginStatus
+      : activeClient?.pluginStatus
+  const isPluginOutdated =
+    effectivePluginStatus?.installed === true &&
+    effectivePluginStatus.version !== undefined &&
+    appVersion !== undefined &&
+    compareSemver(effectivePluginStatus.version, appVersion) < 0
 
   return h(
     React.Fragment,
@@ -441,7 +551,7 @@ export function DesktopConfigPanel(props: DesktopConfigPanelProps): React.ReactE
                     },
                     activeClient.storePath,
                   ),
-                  activeClient.pluginStatus !== undefined
+                  effectivePluginStatus !== undefined
                     ? h(
                         'div',
                         {
@@ -453,17 +563,17 @@ export function DesktopConfigPanel(props: DesktopConfigPanelProps): React.ReactE
                             wordBreak: 'break-all',
                           },
                         },
-                        activeClient.pluginStatus.installPath !== undefined
-                          ? `${t('desktop.plugin.installPathLabel')}: ${activeClient.pluginStatus.installPath}`
-                          : activeClient.pluginStatus.state === 'not-installed'
+                        effectivePluginStatus.installPath !== undefined
+                          ? `${t('desktop.plugin.installPathLabel')}: ${effectivePluginStatus.installPath}`
+                          : effectivePluginStatus.state === 'not-installed'
                             ? activeClient.kind === 'dsh'
                               ? t('desktop.plugin.notInstalledHintDsh')
                               : t('desktop.plugin.notInstalledHintAgy')
-                            : (activeClient.pluginStatus.detail ?? ''),
-                        activeClient.pluginStatus.state === 'disabled' &&
-                          activeClient.pluginStatus.installPath !== undefined &&
-                          activeClient.pluginStatus.detail !== undefined
-                          ? ` (${activeClient.pluginStatus.detail})`
+                            : (effectivePluginStatus.detail ?? ''),
+                        effectivePluginStatus.state === 'disabled' &&
+                          effectivePluginStatus.installPath !== undefined &&
+                          effectivePluginStatus.detail !== undefined
+                          ? ` (${effectivePluginStatus.detail})`
                           : null,
                       )
                     : null,
@@ -480,11 +590,11 @@ export function DesktopConfigPanel(props: DesktopConfigPanelProps): React.ReactE
                       flex: 'none',
                     },
                   },
-                  activeClient.pluginStatus !== undefined
+                  effectivePluginStatus !== undefined
                     ? h(
                         'span',
                         {
-                          'data-plugin-state': activeClient.pluginStatus.state,
+                          'data-plugin-state': effectivePluginStatus.state,
                           style: {
                             padding: '4px 10px',
                             borderRadius: '7px',
@@ -494,15 +604,15 @@ export function DesktopConfigPanel(props: DesktopConfigPanelProps): React.ReactE
                             alignItems: 'center',
                             gap: '6px',
                             background:
-                              activeClient.pluginStatus.state === 'enabled'
+                              effectivePluginStatus.state === 'enabled'
                                 ? 'var(--ml-success-soft)'
-                                : activeClient.pluginStatus.state === 'disabled'
+                                : effectivePluginStatus.state === 'disabled'
                                   ? 'var(--ml-warn-soft)'
                                   : 'var(--ml-recessed)',
                             color:
-                              activeClient.pluginStatus.state === 'enabled'
+                              effectivePluginStatus.state === 'enabled'
                                 ? 'var(--ml-success)'
-                                : activeClient.pluginStatus.state === 'disabled'
+                                : effectivePluginStatus.state === 'disabled'
                                   ? 'var(--ml-warn)'
                                   : 'var(--ml-text-muted)',
                           },
@@ -511,17 +621,17 @@ export function DesktopConfigPanel(props: DesktopConfigPanelProps): React.ReactE
                           className: 'ml-host-dot',
                           style: {
                             background:
-                              activeClient.pluginStatus.state === 'enabled'
+                              effectivePluginStatus.state === 'enabled'
                                 ? 'var(--ml-success)'
-                                : activeClient.pluginStatus.state === 'disabled'
+                                : effectivePluginStatus.state === 'disabled'
                                   ? 'var(--ml-warn)'
                                   : 'var(--ml-text-muted)',
                           },
                         }),
-                        activeClient.pluginStatus.state === 'enabled'
-                          ? `${t('desktop.plugin.enabled')}${activeClient.pluginStatus.version !== undefined ? ` v${activeClient.pluginStatus.version}` : ''}`
-                          : activeClient.pluginStatus.state === 'disabled'
-                            ? `${t('desktop.plugin.disabled')}${activeClient.pluginStatus.version !== undefined ? ` v${activeClient.pluginStatus.version}` : ''}`
+                        effectivePluginStatus.state === 'enabled'
+                          ? `${t('desktop.plugin.enabled')}${effectivePluginStatus.version !== undefined ? ` v${effectivePluginStatus.version}` : ''}`
+                          : effectivePluginStatus.state === 'disabled'
+                            ? `${t('desktop.plugin.disabled')}${effectivePluginStatus.version !== undefined ? ` v${effectivePluginStatus.version}` : ''}`
                             : t('desktop.plugin.notInstalled'),
                       )
                     : null,
@@ -556,6 +666,269 @@ export function DesktopConfigPanel(props: DesktopConfigPanelProps): React.ReactE
                   ),
                 ),
               ),
+
+              // Host Plugin Lifecycle Card (AGY / DSH)
+              activeClient.kind === 'agy' || activeClient.kind === 'dsh'
+                ? h(
+                    'div',
+                    {
+                      className: 'ml-surface-card',
+                      style: {
+                        padding: '16px 20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                      },
+                    },
+                    h(
+                      'div',
+                      {
+                        style: {
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          flexWrap: 'wrap',
+                        },
+                      },
+                      h(
+                        'div',
+                        {
+                          style: {
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            flexWrap: 'wrap',
+                          },
+                        },
+                        h(
+                          'span',
+                          { style: { fontSize: '13px', fontWeight: 600 } },
+                          t('desktop.plugin.cardTitle'),
+                        ),
+                        activeClient.kind === 'dsh' && dshProfiles.length > 0
+                          ? h(Dropdown, {
+                              label: t('desktop.plugin.dshProfileLabel'),
+                              prefix: t('desktop.plugin.dshProfileLabel'),
+                              value: selectedDshProfile,
+                              onChange: setSelectedDshProfile,
+                              options: dshProfiles.map((p) => ({
+                                value: p.name,
+                                label:
+                                  p.pluginStatus.installed && p.pluginStatus.version !== undefined
+                                    ? `${p.name} (v${p.pluginStatus.version})`
+                                    : p.name,
+                              })),
+                            })
+                          : null,
+                      ),
+                      h(
+                        'div',
+                        {
+                          style: {
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            flexWrap: 'wrap',
+                          },
+                        },
+                        !effectivePluginStatus?.installed
+                          ? h(
+                              Button,
+                              {
+                                size: 'sm',
+                                variant: 'primary',
+                                disabled:
+                                  pluginBusy ||
+                                  (activeClient.kind === 'dsh' &&
+                                    (isDshRunningOrUncertain || dshProfiles.length === 0)),
+                                onClick: () =>
+                                  setPluginConfirm({
+                                    kind: activeClient.kind === 'dsh' ? 'dsh' : 'agy',
+                                    action: 'install',
+                                    ...(activeClient.kind === 'dsh'
+                                      ? { profileName: selectedDshProfile }
+                                      : {}),
+                                  }),
+                              },
+                              t('desktop.plugin.installBtn'),
+                            )
+                          : null,
+                        isPluginOutdated && appVersion !== undefined
+                          ? h(
+                              Button,
+                              {
+                                size: 'sm',
+                                variant: 'primary',
+                                disabled:
+                                  pluginBusy ||
+                                  (activeClient.kind === 'dsh' &&
+                                    (isDshRunningOrUncertain || dshProfiles.length === 0)),
+                                onClick: () =>
+                                  setPluginConfirm({
+                                    kind: activeClient.kind === 'dsh' ? 'dsh' : 'agy',
+                                    action: 'install',
+                                    ...(activeClient.kind === 'dsh'
+                                      ? { profileName: selectedDshProfile }
+                                      : {}),
+                                  }),
+                              },
+                              formatMessage('desktop.plugin.syncBtn', { version: appVersion }),
+                            )
+                          : null,
+                        effectivePluginStatus?.installed
+                          ? h(
+                              Button,
+                              {
+                                size: 'sm',
+                                variant: 'danger',
+                                disabled:
+                                  pluginBusy ||
+                                  (activeClient.kind === 'dsh' &&
+                                    (isDshRunningOrUncertain || dshProfiles.length === 0)),
+                                onClick: () =>
+                                  setPluginConfirm({
+                                    kind: activeClient.kind === 'dsh' ? 'dsh' : 'agy',
+                                    action: 'uninstall',
+                                    ...(activeClient.kind === 'dsh'
+                                      ? { profileName: selectedDshProfile }
+                                      : {}),
+                                  }),
+                              },
+                              t('desktop.plugin.uninstallBtn'),
+                            )
+                          : null,
+                      ),
+                    ),
+                    activeClient.kind === 'dsh' && dshProfiles.length === 0
+                      ? h(
+                          'div',
+                          { style: { fontSize: '12px', color: 'var(--ml-text-muted)' } },
+                          t('desktop.plugin.noDshProfiles'),
+                        )
+                      : null,
+                    activeClient.kind === 'dsh' && isDshRunningOrUncertain
+                      ? h(
+                          'div',
+                          { style: { fontSize: '12px', color: 'var(--ml-warn)' } },
+                          t('desktop.plugin.dshRunningBlock'),
+                        )
+                      : null,
+                    activeClient.kind === 'dsh'
+                      ? h(
+                          'div',
+                          {
+                            style: {
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '10px',
+                              paddingTop: '8px',
+                              borderTop: '1px solid var(--ml-border)',
+                              flexWrap: 'wrap',
+                            },
+                          },
+                          h(
+                            'div',
+                            {
+                              style: {
+                                fontSize: '12px',
+                                color: 'var(--ml-text-secondary)',
+                                minWidth: 0,
+                              },
+                            },
+                            h(
+                              'span',
+                              { style: { fontWeight: 500 } },
+                              `${t('desktop.plugin.dshCliLabel')}: `,
+                            ),
+                            h(
+                              'span',
+                              { className: 'ml-mono', style: { wordBreak: 'break-all' } },
+                              props.dshCliPath ?? t('desktop.plugin.dshCliAuto'),
+                            ),
+                          ),
+                          h(
+                            'div',
+                            { style: { display: 'flex', gap: '6px' } },
+                            h(
+                              Button,
+                              { size: 'sm', onClick: () => void handlePickDshCli() },
+                              t('desktop.plugin.dshCliPick'),
+                            ),
+                            props.dshCliPath !== undefined
+                              ? h(
+                                  Button,
+                                  {
+                                    size: 'sm',
+                                    variant: 'ghost',
+                                    onClick: () => void handleClearDshCli(),
+                                  },
+                                  t('desktop.plugin.dshCliClear'),
+                                )
+                              : null,
+                          ),
+                        )
+                      : null,
+                  )
+                : null,
+
+              pluginConfirm !== undefined
+                ? h(
+                    Modal,
+                    {
+                      title:
+                        pluginConfirm.action === 'install'
+                          ? t('desktop.plugin.confirmInstallTitle')
+                          : t('desktop.plugin.confirmUninstallTitle'),
+                      closeLabel: t('common.close'),
+                      maxWidth: 460,
+                      onClose: () => setPluginConfirm(undefined),
+                      footer: h(
+                        React.Fragment,
+                        null,
+                        h(
+                          Button,
+                          { disabled: pluginBusy, onClick: () => setPluginConfirm(undefined) },
+                          t('common.cancel'),
+                        ),
+                        h(
+                          Button,
+                          {
+                            variant: pluginConfirm.action === 'uninstall' ? 'danger' : 'primary',
+                            disabled: pluginBusy,
+                            onClick: () => void handleExecutePluginConfirm(),
+                          },
+                          pluginConfirm.action === 'install'
+                            ? t('desktop.plugin.confirmInstallAction')
+                            : t('desktop.plugin.confirmUninstallAction'),
+                        ),
+                      ),
+                    },
+                    h(
+                      'p',
+                      {
+                        style: {
+                          margin: 0,
+                          fontSize: '13px',
+                          color: 'var(--ml-text-secondary)',
+                          lineHeight: 1.6,
+                        },
+                      },
+                      formatMessage(
+                        pluginConfirm.action === 'install'
+                          ? 'desktop.plugin.confirmInstallBody'
+                          : 'desktop.plugin.confirmUninstallBody',
+                        {
+                          target:
+                            pluginConfirm.kind === 'agy'
+                              ? 'Antigravity (AGY)'
+                              : `DSH (${pluginConfirm.profileName ?? 'desktop'})`,
+                        },
+                      ),
+                    ),
+                  )
+                : null,
 
               configResult === undefined || !configResult.editable
                 ? h(

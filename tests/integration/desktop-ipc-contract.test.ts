@@ -126,6 +126,7 @@ async function createTestHarness(
     open: string | null
     create: string | null
     dir: string | null
+    dshCli: string | null
     saved: Array<{ fileName: string; content: string }>
   }
   openedUrls: string[]
@@ -149,11 +150,13 @@ async function createTestHarness(
     open: string | null
     create: string | null
     dir: string | null
+    dshCli: string | null
     saved: Array<{ fileName: string; content: string }>
   } = {
     open: null,
     create: null,
     dir: null,
+    dshCli: null,
     saved: [],
   }
 
@@ -172,13 +175,22 @@ async function createTestHarness(
       pickedFiles.saved.push({ fileName: defaultFileName, content })
       return target
     },
+    async pickDshCli() {
+      return pickedFiles.dshCli
+    },
   }
 
   const openedUrls: string[] = []
   const handlers = createDesktopIpcHandlers({
     service,
     dialog,
-    appInfo: { version: '0.2.2', platform: 'win32', systemTheme: 'dark' },
+    appInfo: {
+      version: '0.2.2',
+      platform: 'win32',
+      systemTheme: 'dark',
+      runtimeMode: 'electron',
+      bundledPluginsAvailable: false,
+    },
     openExternal: async (url) => {
       openedUrls.push(url)
     },
@@ -732,7 +744,13 @@ describe('desktop IPC contract & security boundary', () => {
     const infoRes = await handlers[IPC_CHANNELS.appGetInfo]!()
     expect(infoRes).toEqual({
       ok: true,
-      value: { version: '0.2.2', platform: 'win32', systemTheme: 'dark' },
+      value: {
+        version: '0.2.2',
+        platform: 'win32',
+        systemTheme: 'dark',
+        runtimeMode: 'electron',
+        bundledPluginsAvailable: false,
+      },
     })
     const prefRes = await handlers[IPC_CHANNELS.appUpdatePreferences]!({
       locale: 'en',
@@ -752,6 +770,52 @@ describe('desktop IPC contract & security boundary', () => {
     })
     expect(blockedExt.ok).toBe(false)
     expect(blockedExt.error?.code).toBe('memory/forbidden')
+
+    await service.closeAll()
+  })
+
+  it('enforces dshCliPath authorization + basename allowlist and validates new plugin/updater IPC channels', async () => {
+    const { rootDir, service, handlers, pickedFiles } = await createTestHarness()
+
+    const unauthorizedDsh = join(rootDir, 'bin', 'dsh.cmd')
+    const forbiddenPref = await handlers[IPC_CHANNELS.appUpdatePreferences]!({
+      dshCliPath: unauthorizedDsh,
+    })
+    expect(forbiddenPref.ok).toBe(false)
+    expect(forbiddenPref.error?.code).toBe('memory/forbidden')
+
+    // Picking a non-whitelisted executable via dialog is rejected
+    const badExe = join(rootDir, 'bin', 'powershell.exe')
+    pickedFiles.dshCli = badExe
+    await handlers[IPC_CHANNELS.dialogPickDshCli]!()
+    const badBasenamePref = await handlers[IPC_CHANNELS.appUpdatePreferences]!({
+      dshCliPath: badExe,
+    })
+    expect(badBasenamePref.ok).toBe(false)
+    expect(badBasenamePref.error?.code).toBe('desktop/invalid-args')
+
+    // Picking an allowlisted dsh.cmd succeeds and null clears it
+    pickedFiles.dshCli = unauthorizedDsh
+    const pickedCli = await handlers[IPC_CHANNELS.dialogPickDshCli]!()
+    expect(pickedCli).toEqual({ ok: true, value: unauthorizedDsh })
+    const savedPref = await handlers[IPC_CHANNELS.appUpdatePreferences]!({
+      dshCliPath: unauthorizedDsh,
+    })
+    expect(savedPref.ok).toBe(true)
+    expect((savedPref.value as { dshCliPath?: string }).dshCliPath).toBe(unauthorizedDsh)
+
+    const clearedPref = await handlers[IPC_CHANNELS.appUpdatePreferences]!({
+      dshCliPath: null,
+    })
+    expect(clearedPref.ok).toBe(true)
+    expect((clearedPref.value as { dshCliPath?: string }).dshCliPath).toBeUndefined()
+
+    // Zod validation on plugins:install rejects unknown kind
+    const invalidPluginInstall = await handlers[IPC_CHANNELS.pluginsInstall]!({
+      kind: 'unknown-host',
+    })
+    expect(invalidPluginInstall.ok).toBe(false)
+    expect(invalidPluginInstall.error?.code).toBe('desktop/invalid-args')
 
     await service.closeAll()
   })

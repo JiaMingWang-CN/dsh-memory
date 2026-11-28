@@ -23,25 +23,32 @@ import {
   type DesktopAppInfo,
   type IpcResult,
 } from '../ipc-contract.ts'
-import type {
-  AggregateSearchRequest,
-  AggregateSearchResult,
-  MigrationSourceSelection,
-  MultiClientService,
+import {
+  DesktopUnsupportedError,
+  type AggregateSearchRequest,
+  type AggregateSearchResult,
+  type MigrationSourceSelection,
+  type MultiClientService,
 } from '../multi-service.ts'
+import { isAllowedDshCliBasename, type DesktopPluginManager } from '../plugin-manager.ts'
 import type { DesktopPreferences } from '../registry.ts'
+import type { DesktopUpdater } from '../updater.ts'
 
 export interface DialogAdapter {
   pickMemoryFile(mode: 'open' | 'create'): Promise<string | null>
   pickDirectory(): Promise<string | null>
   pickImportJson(): Promise<{ path: string; content: string } | null>
   saveExportJson(defaultFileName: string, content: string): Promise<string | null>
+  pickDshCli(): Promise<string | null>
 }
 
 export interface DesktopIpcDeps {
   readonly service: MultiClientService
   readonly dialog: DialogAdapter
   readonly appInfo: DesktopAppInfo
+  readonly pluginManager?: DesktopPluginManager
+  readonly updater?: DesktopUpdater
+  readonly resolveBundledAvailable?: () => Promise<boolean>
   readonly openExternal?: (url: string) => Promise<void>
   readonly onPreferencesUpdated?: (prefs: DesktopPreferences) => void | Promise<void>
   readonly pathBook?: AuthorizedPathBook
@@ -419,6 +426,23 @@ const updatePreferencesSchema = z
     theme: z.enum(['system', 'light', 'dark']).optional(),
     locale: z.enum(['zh', 'en']).optional(),
     windowBounds: windowBoundsSchema.optional(),
+    dshCliPath: z.union([z.string(), z.null()]).optional(),
+  })
+  .strict()
+
+const pluginsInstallSchema = z
+  .object({
+    kind: z.enum(['agy', 'dsh']),
+    profileName: nonEmptyText.optional(),
+    source: z.enum(['bundled', 'online']).optional(),
+    version: nonEmptyText.optional(),
+  })
+  .strict()
+
+const pluginsUninstallSchema = z
+  .object({
+    kind: z.enum(['agy', 'dsh']),
+    profileName: nonEmptyText.optional(),
   })
   .strict()
 
@@ -723,14 +747,131 @@ export function createDesktopIpcHandlers(
         return ok(saved)
       },
     ),
+    [IPC_CHANNELS.dialogPickDshCli]: makeValidatedHandler(noArgsSchema, async () => {
+      const picked = await dialog.pickDshCli()
+      if (picked === null) return ok(null)
+      return ok(pathBook.authorizeFile(picked))
+    }),
 
-    [IPC_CHANNELS.appGetInfo]: makeValidatedHandler(noArgsSchema, () => ok(deps.appInfo)),
+    [IPC_CHANNELS.pluginsListDshProfiles]: makeValidatedHandler(noArgsSchema, async () => {
+      if (deps.pluginManager === undefined) {
+        throw new DesktopUnsupportedError('Plugin manager is not available in this runtime.')
+      }
+      return ok(await deps.pluginManager.listDshProfiles())
+    }),
+    [IPC_CHANNELS.pluginsInstall]: makeValidatedHandler(pluginsInstallSchema, async (input) => {
+      const source = input.source ?? 'bundled'
+      if (source === 'online') {
+        if (deps.updater === undefined) {
+          throw new DesktopUnsupportedError('Updater is not available in this runtime.')
+        }
+        return ok(await deps.updater.installOnlinePlugin(stripUndefinedProps(input)))
+      }
+      if (deps.pluginManager === undefined) {
+        throw new DesktopUnsupportedError('Plugin manager is not available in this runtime.')
+      }
+      const bundledAvailable =
+        deps.resolveBundledAvailable !== undefined
+          ? await deps.resolveBundledAvailable()
+          : deps.appInfo.bundledPluginsAvailable
+      if (!bundledAvailable) {
+        throw new DesktopUnsupportedError(
+          'Bundled plugins are not available in this build; switch to online installation.',
+        )
+      }
+      return ok(await deps.pluginManager.installBundled(stripUndefinedProps(input)))
+    }),
+    [IPC_CHANNELS.pluginsUninstall]: makeValidatedHandler(pluginsUninstallSchema, async (input) => {
+      if (deps.pluginManager === undefined) {
+        throw new DesktopUnsupportedError('Plugin manager is not available in this runtime.')
+      }
+      return ok(await deps.pluginManager.uninstall(stripUndefinedProps(input)))
+    }),
+    [IPC_CHANNELS.pluginsSyncPending]: makeValidatedHandler(noArgsSchema, async () => {
+      if (deps.updater === undefined) {
+        throw new DesktopUnsupportedError('Updater is not available in this runtime.')
+      }
+      return ok(await deps.updater.syncPending())
+    }),
+    [IPC_CHANNELS.pluginsDismissPendingSync]: makeValidatedHandler(noArgsSchema, async () => {
+      if (deps.updater === undefined) {
+        throw new DesktopUnsupportedError('Updater is not available in this runtime.')
+      }
+      return ok(await deps.updater.dismissPendingSync())
+    }),
+
+    [IPC_CHANNELS.updaterCheck]: makeValidatedHandler(noArgsSchema, async () => {
+      if (deps.updater === undefined) {
+        throw new DesktopUnsupportedError('Updater is not available in this runtime.')
+      }
+      return ok(await deps.updater.checkForUpdates())
+    }),
+    [IPC_CHANNELS.updaterGetState]: makeValidatedHandler(noArgsSchema, () => {
+      if (deps.updater === undefined) {
+        throw new DesktopUnsupportedError('Updater is not available in this runtime.')
+      }
+      return ok(deps.updater.getState())
+    }),
+    [IPC_CHANNELS.updaterCancel]: makeValidatedHandler(noArgsSchema, async () => {
+      if (deps.updater === undefined) {
+        throw new DesktopUnsupportedError('Updater is not available in this runtime.')
+      }
+      return ok(await deps.updater.cancel())
+    }),
+    [IPC_CHANNELS.updaterStartAppUpdate]: makeValidatedHandler(noArgsSchema, async () => {
+      if (deps.updater === undefined) {
+        throw new DesktopUnsupportedError('Updater is not available in this runtime.')
+      }
+      return ok(await deps.updater.startAppUpdate())
+    }),
+    [IPC_CHANNELS.updaterUpdateInstalledPluginsOnline]: makeValidatedHandler(
+      noArgsSchema,
+      async () => {
+        if (deps.updater === undefined) {
+          throw new DesktopUnsupportedError('Updater is not available in this runtime.')
+        }
+        return ok(await deps.updater.updateInstalledPluginsOnline())
+      },
+    ),
+
+    [IPC_CHANNELS.appGetInfo]: makeValidatedHandler(noArgsSchema, async () => {
+      const bundledPluginsAvailable =
+        deps.resolveBundledAvailable !== undefined
+          ? await deps.resolveBundledAvailable()
+          : deps.appInfo.bundledPluginsAvailable
+      return ok({
+        ...deps.appInfo,
+        bundledPluginsAvailable,
+      })
+    }),
     [IPC_CHANNELS.appGetPreferences]: makeValidatedHandler(noArgsSchema, () =>
       ok(service.getPreferences()),
     ),
     [IPC_CHANNELS.appUpdatePreferences]: makeValidatedHandler(
       updatePreferencesSchema,
       async (patch) => {
+        if (typeof patch.dshCliPath === 'string' && patch.dshCliPath.trim().length > 0) {
+          const trimmed = patch.dshCliPath.trim()
+          if (!isAllowedDshCliBasename(trimmed)) {
+            return {
+              ok: false,
+              error: {
+                code: 'desktop/invalid-args',
+                message: 'dshCliPath must point to `dsh`, `dsh.exe`, or `dsh.cmd`.',
+              },
+            }
+          }
+          if (!pathBook.isFileAuthorized(trimmed)) {
+            return {
+              ok: false,
+              error: {
+                code: 'memory/forbidden',
+                message: 'dshCliPath must be selected via the OS file dialog.',
+                details: { code: 'MEMORY_FORBIDDEN' },
+              },
+            }
+          }
+        }
         const updated = await service.updatePreferences(stripUndefinedProps(patch))
         if (deps.onPreferencesUpdated !== undefined) {
           await deps.onPreferencesUpdated(updated)

@@ -11,10 +11,13 @@ import { existsSync, readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { resolveBundledPlugins } from './bundled-plugins.ts'
 import { createWindowsPowerShellDialogAdapter, startLocalDesktopServer } from './local-server.ts'
 import { MultiClientService } from './multi-service.ts'
 import { createPlatformAdapter } from './platform/index.ts'
+import { DesktopPluginManager } from './plugin-manager.ts'
 import { ClientRegistry } from './registry.ts'
+import { DesktopUpdater } from './updater.ts'
 import { WriteGuard } from './write-guard.ts'
 
 /** Locate Microsoft Edge executable on Windows hosts. */
@@ -113,9 +116,12 @@ export async function launchLocalDesktop(
   options: LaunchLocalDesktopOptions = {},
 ): Promise<LaunchedLocalDesktop> {
   const rendererDir = path.resolve(options.rendererDir ?? resolveDefaultRendererDir())
-  const assetsDir = path.resolve(rendererDir, '..', 'assets')
+  const appDir = path.resolve(rendererDir, '..')
+  const assetsDir = path.resolve(appDir, 'assets')
   const userDataDir = resolveDesktopUserDataDir()
   const statePath = path.join(userDataDir, 'desktop-state.json')
+  const updatesDir = path.join(userDataDir, 'updates')
+  const currentVersion = readAppVersion(rendererDir)
 
   const platform = createPlatformAdapter()
   const registry = new ClientRegistry({ statePath, platform })
@@ -124,14 +130,40 @@ export async function launchLocalDesktop(
 
   await service.initialize()
 
+  const resolveBundled = () =>
+    resolveBundledPlugins({
+      appDir,
+      expectedVersion: currentVersion,
+    })
+  const initialBundled = await resolveBundled()
+  const pluginManager = new DesktopPluginManager({
+    registry,
+    platform,
+    trustedArtifactRoots: [updatesDir, path.resolve(appDir, '..', 'desktop-bundled-plugins')],
+    resolveBundled,
+  })
+  const updater = new DesktopUpdater({
+    currentVersion,
+    runtimeMode: 'local-bridge',
+    updatesDir,
+    registry,
+    pluginManager,
+    resolveBundled,
+  })
+
   const server = await startLocalDesktopServer({
     rendererDir,
     assetsDir,
     service,
     dialog: createWindowsPowerShellDialogAdapter(),
+    pluginManager,
+    updater,
+    resolveBundledAvailable: async () => (await resolveBundled()) !== null,
     appInfo: {
-      version: readAppVersion(rendererDir),
+      version: currentVersion,
       platform: process.platform,
+      runtimeMode: 'local-bridge',
+      bundledPluginsAvailable: initialBundled !== null,
     },
   })
 

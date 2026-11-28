@@ -15,6 +15,8 @@ import { promisify } from 'node:util'
 import { isAllowedExternalUrl, type DesktopAppInfo } from './ipc-contract.ts'
 import { createDesktopIpcHandlers, type DialogAdapter } from './main/ipc-handlers.ts'
 import type { MultiClientService } from './multi-service.ts'
+import type { DesktopPluginManager } from './plugin-manager.ts'
+import type { DesktopUpdater } from './updater.ts'
 
 const execFileAsync = promisify(execFile)
 
@@ -41,6 +43,9 @@ export interface LocalDesktopServerOptions {
   readonly service: MultiClientService
   readonly dialog: DialogAdapter
   readonly appInfo: DesktopAppInfo
+  readonly pluginManager?: DesktopPluginManager
+  readonly updater?: DesktopUpdater
+  readonly resolveBundledAvailable?: () => Promise<boolean>
   readonly host?: string
   readonly port?: number
   readonly openExternal?: (url: string) => Promise<void>
@@ -141,6 +146,18 @@ export function createWindowsPowerShellDialogAdapter(): DialogAdapter {
       if (targetPath === null) return null
       await fs.writeFile(targetPath, content, 'utf8')
       return targetPath
+    },
+
+    async pickDshCli() {
+      const script = [
+        'Add-Type -AssemblyName System.Windows.Forms',
+        '$d = New-Object System.Windows.Forms.OpenFileDialog',
+        "$d.Title = 'Select DSH CLI executable'",
+        "$d.Filter = 'DSH CLI (dsh.cmd;dsh.exe)|dsh.cmd;dsh.exe|All files (*.*)|*.*'",
+        '$d.CheckFileExists = $true',
+        'if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($d.FileName) }',
+      ].join('; ')
+      return runPowerShellDialog(script)
     },
   }
 }
@@ -246,6 +263,11 @@ export async function startLocalDesktopServer(
     service: options.service,
     dialog: options.dialog,
     appInfo: options.appInfo,
+    ...(options.pluginManager !== undefined ? { pluginManager: options.pluginManager } : {}),
+    ...(options.updater !== undefined ? { updater: options.updater } : {}),
+    ...(options.resolveBundledAvailable !== undefined
+      ? { resolveBundledAvailable: options.resolveBundledAvailable }
+      : {}),
     openExternal: options.openExternal ?? openExternalUrl,
   })
 

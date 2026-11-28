@@ -28,5 +28,10 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - run: pnpm build:agy
+      - run: pnpm build:desktop
+      - run: pnpm build:desktop:plugins
       - run: pnpm pack:check
+      - run: pnpm pack:agy:check
+      - run: node scripts/pack-desktop-check.mjs --require-bundled
       - run: pnpm format:check

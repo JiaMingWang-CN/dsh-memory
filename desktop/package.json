@@ -1,10 +1,10 @@
 {
   "name": "memloom-desktop-packager",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "description": "Isolated Electron & electron-builder packaging workspace for Memloom Desktop (0.x development preview).",
   "scripts": {
-    "pack:win": "electron-builder --config ./electron-builder.yml --win nsis --x64"
+    "pack:win": "node ../scripts/pack-desktop-check.mjs --require-bundled && electron-builder --config ./electron-builder.yml --win nsis --x64"
   },
   "devDependencies": {
     "electron": "45.5.0",

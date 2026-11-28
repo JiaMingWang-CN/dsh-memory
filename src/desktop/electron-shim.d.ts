@@ -130,7 +130,9 @@ declare module 'electron' {
     getVersion(): string
     whenReady(): Promise<void>
     on(event: string, listener: (...args: unknown[]) => void): void
+    requestSingleInstanceLock(): boolean
     quit(): void
+    exit(exitCode?: number): void
   }
 
   export const dialog: {
@@ -180,5 +182,11 @@ declare module 'electron' {
 
   export const Menu: {
     setApplicationMenu(menu: null): void
+  }
+}
+
+declare namespace NodeJS {
+  interface Process {
+    readonly resourcesPath?: string
   }
 }

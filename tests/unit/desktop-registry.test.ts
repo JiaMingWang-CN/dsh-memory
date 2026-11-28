@@ -547,4 +547,74 @@ describe('ClientRegistry', () => {
     expect(reloaded.getClient('agy-default')?.pluginStatus?.state).toBe('enabled')
     expect(reloaded.getClient('dsh-default')?.pluginStatus?.state).toBe('not-installed')
   })
+
+  it('persists dshCliPath (including clearing via null) and pendingPluginSync while remaining backward-compatible with v1 state', async () => {
+    const root = makeTempDir()
+    const homeDir = join(root, 'home')
+    const statePath = join(root, 'userData', 'desktop-state.json')
+    mkdirSync(path.dirname(statePath), { recursive: true })
+
+    // Legacy v1 state without dshCliPath or pendingPluginSync
+    writeFileSync(
+      statePath,
+      JSON.stringify({
+        version: 1,
+        preferences: { theme: 'dark', locale: 'en' },
+        clients: [],
+      }),
+      'utf8',
+    )
+
+    const platform = createWin32PlatformAdapter({
+      homeDir,
+      runProbe: async () => '[]',
+    })
+    const registry = new ClientRegistry({
+      statePath,
+      platform,
+      env: {},
+      now: createFixedClock(),
+    })
+    await registry.load()
+    expect(registry.getPreferences()).toEqual({ theme: 'dark', locale: 'en' })
+    expect(registry.getPendingPluginSync()).toBeNull()
+
+    // Set dshCliPath and pendingPluginSync
+    const updatedPrefs = await registry.updatePreferences({
+      dshCliPath: 'C:\\Tools\\dsh.cmd',
+    })
+    expect(updatedPrefs.dshCliPath).toBe('C:\\Tools\\dsh.cmd')
+
+    const syncState = {
+      targetVersion: '0.2.3',
+      requestedAt: '2026-11-27T00:00:00.000Z',
+      targets: [
+        { kind: 'agy' as const, previousVersion: '0.2.2', status: 'pending' as const },
+        {
+          kind: 'dsh' as const,
+          profileName: 'desktop',
+          previousVersion: '0.2.2',
+          status: 'pending' as const,
+        },
+      ],
+    }
+    await registry.setPendingPluginSync(syncState)
+
+    // Reload from disk and verify persistence
+    const reloaded = new ClientRegistry({
+      statePath,
+      platform,
+      env: {},
+      now: createFixedClock(),
+    })
+    await reloaded.load()
+    expect(reloaded.getPreferences().dshCliPath).toBe('C:\\Tools\\dsh.cmd')
+    expect(reloaded.getPendingPluginSync()).toEqual(syncState)
+
+    // Clear dshCliPath with null and clear pendingPluginSync
+    const clearedPrefs = await reloaded.updatePreferences({ dshCliPath: null })
+    expect(clearedPrefs.dshCliPath).toBeUndefined()
+    await reloaded.setPendingPluginSync(null)
+    expect(reloaded.getPendingPluginSync()).toBeNull()
+  })
 })

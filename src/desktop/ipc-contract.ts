@@ -42,8 +42,28 @@ import {
   type MigrationPreviewRequest,
   type MigrationPreviewResult,
 } from './multi-service.ts'
-import type { AddCustomClientInput, DesktopPreferences, UpdateClientInput } from './registry.ts'
+import {
+  DesktopBusyError,
+  DesktopDshCliMissingError,
+  DesktopDshRunningError,
+  DesktopPluginOpError,
+  type DshProfileSummary,
+  type PluginOpResult,
+} from './plugin-manager.ts'
+import type {
+  AddCustomClientInput,
+  DesktopPreferences,
+  DesktopPreferencesPatch,
+  UpdateClientInput,
+} from './registry.ts'
 import { DesktopExternalChangeError } from './storage/dsh-domain.ts'
+import {
+  DesktopUpdateChecksumError,
+  DesktopUpdateNetworkError,
+  type DesktopRuntimeMode,
+  type UpdateCheckResult,
+  type UpdaterTaskSnapshot,
+} from './updater.ts'
 import { DesktopReadonlyGuardError, type WriteGuardSnapshot } from './write-guard.ts'
 
 import { IPC_CHANNELS } from './bridge-shared.ts'
@@ -63,6 +83,12 @@ export type IpcErrorCode =
   | 'desktop/unsupported'
   | 'desktop/invalid-args'
   | 'desktop/internal'
+  | 'desktop/busy'
+  | 'desktop/dsh-running'
+  | 'desktop/dsh-cli-missing'
+  | 'desktop/update-network'
+  | 'desktop/update-checksum-failed'
+  | 'desktop/plugin-op-failed'
 
 export interface IpcError {
   readonly code: IpcErrorCode
@@ -77,6 +103,8 @@ export interface DesktopAppInfo {
   readonly version: string
   readonly platform: NodeJS.Platform
   readonly systemTheme?: 'light' | 'dark'
+  readonly runtimeMode: DesktopRuntimeMode
+  readonly bundledPluginsAvailable: boolean
 }
 
 export interface AggregateWorkspaceItem extends WorkspaceSummary {
@@ -163,6 +191,44 @@ export function mapDesktopError(error: unknown): {
     return {
       code: 'desktop/unsupported',
       message: error.message,
+    }
+  }
+  if (error instanceof DesktopBusyError) {
+    return {
+      code: 'desktop/busy',
+      message: error.message,
+    }
+  }
+  if (error instanceof DesktopDshRunningError) {
+    return {
+      code: 'desktop/dsh-running',
+      message: error.message,
+      details: { matchedProcesses: error.matchedProcesses },
+    }
+  }
+  if (error instanceof DesktopDshCliMissingError) {
+    return {
+      code: 'desktop/dsh-cli-missing',
+      message: error.message,
+    }
+  }
+  if (error instanceof DesktopUpdateNetworkError) {
+    return {
+      code: 'desktop/update-network',
+      message: error.message,
+    }
+  }
+  if (error instanceof DesktopUpdateChecksumError) {
+    return {
+      code: 'desktop/update-checksum-failed',
+      message: error.message,
+    }
+  }
+  if (error instanceof DesktopPluginOpError) {
+    return {
+      code: 'desktop/plugin-op-failed',
+      message: error.message,
+      ...(error.details !== undefined ? { details: error.details } : {}),
     }
   }
   if (error instanceof ZodError) {
@@ -272,11 +338,34 @@ export interface DesktopBridgeApi {
       readonly defaultFileName: string
       readonly content: string
     }): Promise<IpcResult<string | null>>
+    pickDshCli(): Promise<IpcResult<string | null>>
+  }
+  readonly plugins: {
+    listDshProfiles(): Promise<IpcResult<DshProfileSummary[]>>
+    install(request: {
+      readonly kind: 'agy' | 'dsh'
+      readonly profileName?: string
+      readonly source?: 'bundled' | 'online'
+      readonly version?: string
+    }): Promise<IpcResult<PluginOpResult>>
+    uninstall(request: {
+      readonly kind: 'agy' | 'dsh'
+      readonly profileName?: string
+    }): Promise<IpcResult<PluginOpResult>>
+    syncPending(): Promise<IpcResult<UpdaterTaskSnapshot>>
+    dismissPendingSync(): Promise<IpcResult<UpdaterTaskSnapshot>>
+  }
+  readonly updater: {
+    check(): Promise<IpcResult<UpdateCheckResult>>
+    getState(): Promise<IpcResult<UpdaterTaskSnapshot>>
+    cancel(): Promise<IpcResult<UpdaterTaskSnapshot>>
+    startAppUpdate(): Promise<IpcResult<UpdaterTaskSnapshot>>
+    updateInstalledPluginsOnline(): Promise<IpcResult<UpdaterTaskSnapshot>>
   }
   readonly app: {
     getInfo(): Promise<IpcResult<DesktopAppInfo>>
     getPreferences(): Promise<IpcResult<DesktopPreferences>>
-    updatePreferences(patch: Partial<DesktopPreferences>): Promise<IpcResult<DesktopPreferences>>
+    updatePreferences(patch: DesktopPreferencesPatch): Promise<IpcResult<DesktopPreferences>>
     openExternal(request: { readonly url: string }): Promise<IpcResult<boolean>>
     onFocusRefresh(listener: () => void): () => void
   }

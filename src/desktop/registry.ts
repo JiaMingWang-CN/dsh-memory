@@ -27,6 +27,29 @@ export interface DesktopPreferences {
   readonly theme: 'system' | 'light' | 'dark'
   readonly locale: 'zh' | 'en'
   readonly windowBounds?: DesktopWindowBounds
+  readonly dshCliPath?: string
+}
+
+export interface DesktopPreferencesPatch {
+  readonly theme?: 'system' | 'light' | 'dark'
+  readonly locale?: 'zh' | 'en'
+  readonly windowBounds?: DesktopWindowBounds
+  readonly dshCliPath?: string | null
+}
+
+export interface PendingPluginSyncTarget {
+  readonly kind: 'agy' | 'dsh'
+  readonly profileName?: string
+  readonly previousVersion?: string
+  readonly status: 'pending' | 'succeeded' | 'skipped-disabled' | 'blocked-dsh-running' | 'failed'
+  readonly errorCode?: string
+  readonly errorMessage?: string
+}
+
+export interface PendingPluginSyncState {
+  readonly targetVersion: string
+  readonly requestedAt: string
+  readonly targets: readonly PendingPluginSyncTarget[]
 }
 
 export interface RegisteredClient {
@@ -71,6 +94,7 @@ const preferencesSchema = z.object({
   theme: z.enum(['system', 'light', 'dark']),
   locale: z.enum(['zh', 'en']),
   windowBounds: windowBoundsSchema.optional(),
+  dshCliPath: z.string().min(1).optional(),
 })
 
 const preferencesPatchSchema = z
@@ -78,8 +102,24 @@ const preferencesPatchSchema = z
     theme: z.enum(['system', 'light', 'dark']).optional(),
     locale: z.enum(['zh', 'en']).optional(),
     windowBounds: windowBoundsSchema.optional(),
+    dshCliPath: z.union([z.string(), z.null()]).optional(),
   })
   .strict()
+
+const pendingPluginSyncTargetSchema = z.object({
+  kind: z.enum(['agy', 'dsh']),
+  profileName: z.string().min(1).optional(),
+  previousVersion: z.string().min(1).optional(),
+  status: z.enum(['pending', 'succeeded', 'skipped-disabled', 'blocked-dsh-running', 'failed']),
+  errorCode: z.string().min(1).optional(),
+  errorMessage: z.string().min(1).optional(),
+})
+
+const pendingPluginSyncStateSchema = z.object({
+  targetVersion: z.string().min(1),
+  requestedAt: z.string().min(1),
+  targets: z.array(pendingPluginSyncTargetSchema),
+})
 
 const hostPluginStatusSchema = z.object({
   state: z.enum(['enabled', 'disabled', 'not-installed', 'unknown']),
@@ -112,6 +152,7 @@ const persistedStateSchema = z.object({
   version: z.literal(DESKTOP_STATE_VERSION),
   preferences: preferencesSchema,
   clients: z.array(registeredClientSchema),
+  pendingPluginSync: pendingPluginSyncStateSchema.optional(),
 })
 
 interface ProbeResult {
@@ -135,6 +176,33 @@ function clonePreferences(prefs: DesktopPreferences): DesktopPreferences {
     theme: prefs.theme,
     locale: prefs.locale,
     ...(prefs.windowBounds !== undefined ? { windowBounds: { ...prefs.windowBounds } } : {}),
+    ...(prefs.dshCliPath !== undefined ? { dshCliPath: prefs.dshCliPath } : {}),
+  }
+}
+
+function clonePendingTarget(target: {
+  readonly kind: 'agy' | 'dsh'
+  readonly profileName?: string | undefined
+  readonly previousVersion?: string | undefined
+  readonly status: PendingPluginSyncTarget['status']
+  readonly errorCode?: string | undefined
+  readonly errorMessage?: string | undefined
+}): PendingPluginSyncTarget {
+  return {
+    kind: target.kind,
+    ...(target.profileName !== undefined ? { profileName: target.profileName } : {}),
+    ...(target.previousVersion !== undefined ? { previousVersion: target.previousVersion } : {}),
+    status: target.status,
+    ...(target.errorCode !== undefined ? { errorCode: target.errorCode } : {}),
+    ...(target.errorMessage !== undefined ? { errorMessage: target.errorMessage } : {}),
+  }
+}
+
+function clonePendingSyncState(state: PendingPluginSyncState): PendingPluginSyncState {
+  return {
+    targetVersion: state.targetVersion,
+    requestedAt: state.requestedAt,
+    targets: state.targets.map(clonePendingTarget),
   }
 }
 
@@ -184,6 +252,7 @@ function fromParsedPreferences(parsed: z.infer<typeof preferencesSchema>): Deskt
     theme: parsed.theme,
     locale: parsed.locale,
     ...(parsed.windowBounds !== undefined ? { windowBounds: { ...parsed.windowBounds } } : {}),
+    ...(parsed.dshCliPath !== undefined ? { dshCliPath: parsed.dshCliPath } : {}),
   }
 }
 
@@ -220,6 +289,7 @@ export class ClientRegistry {
 
   private clients: RegisteredClient[] = []
   private preferences: DesktopPreferences = clonePreferences(DEFAULT_PREFERENCES)
+  private pendingPluginSync: PendingPluginSyncState | null = null
   private legacyAgyCandidate: string | undefined
   private opQueue: Promise<void> = Promise.resolve()
 
@@ -298,6 +368,9 @@ export class ClientRegistry {
       version: DESKTOP_STATE_VERSION,
       preferences: clonePreferences(this.preferences),
       clients: this.clients.map(cloneClient),
+      ...(this.pendingPluginSync !== null
+        ? { pendingPluginSync: clonePendingSyncState(this.pendingPluginSync) }
+        : {}),
     }
     await writeFileAtomic(this.statePath, `${JSON.stringify(payload, null, 2)}\n`)
   }
@@ -312,6 +385,7 @@ export class ClientRegistry {
         if (isErrno(err, 'ENOENT')) {
           this.clients = []
           this.preferences = clonePreferences(DEFAULT_PREFERENCES)
+          this.pendingPluginSync = null
           return
         }
         throw new OperationError(
@@ -340,6 +414,14 @@ export class ClientRegistry {
 
       this.preferences = fromParsedPreferences(parsed.data.preferences)
       this.clients = parsed.data.clients.map(fromParsedClient)
+      this.pendingPluginSync =
+        parsed.data.pendingPluginSync !== undefined
+          ? {
+              targetVersion: parsed.data.pendingPluginSync.targetVersion,
+              requestedAt: parsed.data.pendingPluginSync.requestedAt,
+              targets: parsed.data.pendingPluginSync.targets.map(clonePendingTarget),
+            }
+          : null
     })
   }
 
@@ -570,7 +652,7 @@ export class ClientRegistry {
   }
 
   /** Merge and atomically persist desktop UI preferences. */
-  updatePreferences(patch: Partial<DesktopPreferences>): Promise<DesktopPreferences> {
+  updatePreferences(patch: DesktopPreferencesPatch): Promise<DesktopPreferences> {
     return this.runSerialized(async () => {
       const parsed = preferencesPatchSchema.safeParse(patch)
       if (!parsed.success) {
@@ -587,14 +669,55 @@ export class ClientRegistry {
             ? { ...this.preferences.windowBounds }
             : undefined
 
+      let nextDshCliPath = this.preferences.dshCliPath
+      if (parsed.data.dshCliPath !== undefined) {
+        if (parsed.data.dshCliPath === null || parsed.data.dshCliPath.trim().length === 0) {
+          nextDshCliPath = undefined
+        } else {
+          nextDshCliPath = parsed.data.dshCliPath.trim()
+        }
+      }
+
       this.preferences = {
         theme: parsed.data.theme ?? this.preferences.theme,
         locale: parsed.data.locale ?? this.preferences.locale,
         ...(nextBounds !== undefined ? { windowBounds: nextBounds } : {}),
+        ...(nextDshCliPath !== undefined ? { dshCliPath: nextDshCliPath } : {}),
       }
 
       await this.saveState()
       return this.getPreferences()
+    })
+  }
+
+  /** Return the pending post-restart plugin sync state, if any. */
+  getPendingPluginSync(): PendingPluginSyncState | null {
+    return this.pendingPluginSync !== null ? clonePendingSyncState(this.pendingPluginSync) : null
+  }
+
+  /** Atomically persist or clear the pending post-restart plugin sync state. */
+  setPendingPluginSync(
+    state: PendingPluginSyncState | null,
+  ): Promise<PendingPluginSyncState | null> {
+    return this.runSerialized(async () => {
+      if (state === null) {
+        this.pendingPluginSync = null
+      } else {
+        const parsed = pendingPluginSyncStateSchema.safeParse(state)
+        if (!parsed.success) {
+          throw new OperationError(
+            'MEMORY_INVALID_CONFIG',
+            `Invalid pendingPluginSync state: ${parsed.error.message}`,
+          )
+        }
+        this.pendingPluginSync = {
+          targetVersion: parsed.data.targetVersion,
+          requestedAt: parsed.data.requestedAt,
+          targets: parsed.data.targets.map(clonePendingTarget),
+        }
+      }
+      await this.saveState()
+      return this.getPendingPluginSync()
     })
   }
 
